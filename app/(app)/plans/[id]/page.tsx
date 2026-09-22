@@ -20,6 +20,7 @@ import { ArrowLeft, ArrowUpRight } from "lucide-react";
 
 import { getPlanById } from "@/lib/data/plans";
 import { formatDate, isUuid, timeAgo } from "@/lib/utils";
+import { ComposeUpdateButton } from "@/components/plans/ComposeUpdateButton";
 import { ExportMarkdownButton } from "@/components/plans/ExportMarkdownButton";
 import { PlanStatusBadge } from "@/components/plans/PlanStatusBadge";
 import { PlanStatusSelect } from "@/components/plans/PlanStatusSelect";
@@ -177,6 +178,9 @@ export default async function PlanDetailPage({
                 budgetTimeline={plan.budget_timeline}
                 tasks={plan.tasks}
               />
+            </div>
+            <div className="border-t border-border pt-4">
+              <ComposeUpdateButton planId={plan.id} />
             </div>
           </CardContent>
         </Card>

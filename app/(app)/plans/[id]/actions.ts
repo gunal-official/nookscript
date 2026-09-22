@@ -12,8 +12,11 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
+import { getPlanById } from "@/lib/data/plans";
 import { createClient } from "@/lib/supabase/server";
+import { formatDate } from "@/lib/utils";
 import type { PlanStatus, PlanTask } from "@/lib/types/plan";
 
 export type ActionResult = { error?: string } | undefined;
@@ -87,4 +90,55 @@ export async function toggleTask(input: {
   revalidatePath(`/plans/${input.planId}`);
   revalidatePath("/plans");
   return { error: undefined };
+}
+
+/**
+ * Compose a client update from a plan: generates a starting draft — title
+ * from today's date, body as a markdown snapshot of the plan (task
+ * completion summary + `- [x]`/`- [ ]` task list) — inserts the updates
+ * row as 'draft', then redirects to the new update's composer where the
+ * user edits and saves explicitly. Ungated on plan status (mirrors
+ * proposal/plan generation). All queries go through the session client,
+ * so RLS blocks plans outside the user's workspaces.
+ */
+export async function composeUpdateFromPlan(input: {
+  planId: string;
+}): Promise<ActionResult> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "Your session has expired. Please log in again." };
+
+  const plan = await getPlanById(input.planId);
+  if (!plan) return { error: "Plan not found." };
+
+  const doneCount = plan.tasks.filter((t) => t.checked).length;
+  const body = [
+    `**Progress:** ${doneCount} of ${plan.tasks.length} tasks done.`,
+    "",
+    ...plan.tasks.map((t) => `- [${t.checked ? "x" : " "}] ${t.text}`),
+    "",
+  ].join("\n");
+
+  const { data: update, error } = await supabase
+    .from("updates")
+    .insert({
+      workspace_id: plan.workspace_id,
+      plan_id: plan.id,
+      title: `Update — ${formatDate(new Date().toISOString())}`,
+      client_name: plan.client_name,
+      status: "draft",
+      body,
+    })
+    .select("id")
+    .single();
+
+  if (error) return { error: error.message };
+  if (!update) return { error: "Could not create the update." };
+
+  revalidatePath("/updates");
+  // throws NEXT_REDIRECT — intentionally not wrapped in try/catch
+  redirect(`/updates/${update.id}`);
 }

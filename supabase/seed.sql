@@ -211,3 +211,51 @@ insert into public.plans (
   now() - interval '12 hours',
   now() - interval '6 hours'
 ) on conflict (id) do nothing;
+
+-- ── Updates: two client updates composed from the Brightloop plan ──
+-- One older 'sent' + one recent 'draft', so the list demonstrates both
+-- status tabs and recency ordering (updated_at desc).
+
+insert into public.updates (
+  id, workspace_id, plan_id, title, client_name, status, body, created_at, updated_at
+) values (
+  '00000000-0000-0000-0000-000000000040',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000030',
+  'Update — Week 1: kickoff & discovery',
+  'Brightloop Co. (contact: Priya Raman, Head of Marketing)',
+  'sent',
+  '**Progress:** 1 of 3 tasks done.
+
+Hi Priya — great first week. We kicked off on schedule and the social media kit is already through, since the assets were straightforward to adapt from your current brand.
+
+- [ ] Primary logo redesign + wordmark (vector masters)
+- [ ] Brand palette, typography & usage guide (PDF)
+- [x] Social media kit — avatars + banners for LinkedIn and X
+
+Next week: first logo directions for the board''s minimal, warm aesthetic.',
+  now() - interval '7 days',
+  now() - interval '6 days'
+) on conflict (id) do nothing;
+
+insert into public.updates (
+  id, workspace_id, plan_id, title, client_name, status, body, created_at, updated_at
+) values (
+  '00000000-0000-0000-0000-000000000041',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000030',
+  'Update — Week 2: logo directions',
+  'Brightloop Co. (contact: Priya Raman, Head of Marketing)',
+  'draft',
+  '**Progress:** 1 of 3 tasks done.
+
+Hi Priya — two logo directions are ready for review: a “wordmark-forward” minimal route and a warmer geometric mark. Both avoid the gradient look the board flagged.
+
+- [ ] Primary logo redesign + wordmark (vector masters)
+- [ ] Brand palette, typography & usage guide (PDF)
+- [x] Social media kit — avatars + banners for LinkedIn and X
+
+Still on track for identity lock before Nov 14.',
+  now() - interval '1 day',
+  now() - interval '3 hours'
+) on conflict (id) do nothing;

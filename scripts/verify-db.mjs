@@ -36,10 +36,13 @@ const SEED_WS = "00000000-0000-0000-0000-000000000002";
 const SEED_BRIEF = "00000000-0000-0000-0000-000000000010";
 const SEED_PROPOSAL = "00000000-0000-0000-0000-000000000020";
 const SEED_PLAN = "00000000-0000-0000-0000-000000000030";
+const SEED_UPDATE_SENT = "00000000-0000-0000-0000-000000000040";
+const SEED_UPDATE_DRAFT = "00000000-0000-0000-0000-000000000041";
 const FOREIGN_WS = "00000000-0000-0000-0000-000000000099";
 const FOREIGN_BRIEF = "00000000-0000-0000-0000-000000000098";
 const FOREIGN_PROPOSAL = "00000000-0000-0000-0000-000000000097";
 const FOREIGN_PLAN = "00000000-0000-0000-0000-000000000096";
+const FOREIGN_UPDATE = "00000000-0000-0000-0000-000000000095";
 
 console.log("Starting PGlite (WASM Postgres)…");
 const db = new PGlite();
@@ -114,11 +117,11 @@ const { rows: rlsRows } = await db.query(
   `select relname, relrowsecurity from pg_class
     where relnamespace = 'public'::regnamespace
       and relname = any($1) order by relname`,
-  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "proposals", "plans", "workspaces", "workspace_members", "profiles"]]
+  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "proposals", "plans", "updates", "workspaces", "workspace_members", "profiles"]]
 );
 check(
-  "all 9 tables exist with RLS enabled",
-  rlsRows.length === 9 && rlsRows.every((r) => r.relrowsecurity),
+  "all 10 tables exist with RLS enabled",
+  rlsRows.length === 10 && rlsRows.every((r) => r.relrowsecurity),
   rlsRows.map((r) => `${r.relname}=${r.relrowsecurity}`).join(" ")
 );
 
@@ -231,6 +234,43 @@ try {
 }
 check("plans.proposal_id FK enforces a real proposal", planFkRejected);
 
+// ── Seed updates (Step 9) ──
+const { rows: seedUpdates } = await db.query(
+  "select id, status, plan_id from public.updates where id = any($1) order by id",
+  [[SEED_UPDATE_SENT, SEED_UPDATE_DRAFT]]
+);
+check(
+  "seed updates present (from Brightloop plan: 1 sent + 1 draft)",
+  seedUpdates.length === 2 &&
+    seedUpdates.every((u) => u.plan_id === SEED_PLAN) &&
+    seedUpdates.find((u) => u.id === SEED_UPDATE_SENT)?.status === "sent" &&
+    seedUpdates.find((u) => u.id === SEED_UPDATE_DRAFT)?.status === "draft",
+  JSON.stringify(seedUpdates.map((u) => u.status))
+);
+
+// ── updates constraints: status CHECK + plan FK (Step 9) ──
+let updateStatusRejected = false;
+try {
+  await db.query(
+    "insert into public.updates (workspace_id, plan_id, title, status) values ($1, $2, 'x', 'archived')",
+    [SEED_WS, SEED_PLAN]
+  );
+} catch (e) {
+  updateStatusRejected = /violates check constraint/.test(e.message);
+}
+check("updates.status CHECK rejects invalid value", updateStatusRejected);
+
+let updateFkRejected = false;
+try {
+  await db.query(
+    "insert into public.updates (workspace_id, plan_id, title) values ($1, '00000000-0000-0000-0000-000000000077', 'x')",
+    [SEED_WS]
+  );
+} catch (e) {
+  updateFkRejected = /violates foreign key constraint/.test(e.message);
+}
+check("updates.plan_id FK enforces a real plan", updateFkRejected);
+
 // ── create_workspace() RPC ──
 await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
 const { rows: [rpc] } = await db.query(
@@ -308,15 +348,16 @@ await db.exec(`
   grant select, insert, update, delete on
     public.workspaces, public.workspace_members, public.profiles,
     public.briefs, public.brief_sources, public.brief_questions, public.brief_edit_history,
-    public.proposals, public.plans
+    public.proposals, public.plans, public.updates
     to nstester;
 `);
-// a foreign workspace + brief + proposal + plan the seed user does NOT belong to
+// a foreign workspace + brief + proposal + plan + update the seed user does NOT belong to
 await db.exec(`
   insert into public.workspaces (id, name) values ('${FOREIGN_WS}', 'Foreign Co') on conflict do nothing;
   insert into public.briefs (id, workspace_id, title) values ('${FOREIGN_BRIEF}', '${FOREIGN_WS}', 'Foreign brief') on conflict do nothing;
   insert into public.proposals (id, workspace_id, brief_id, title) values ('${FOREIGN_PROPOSAL}', '${FOREIGN_WS}', '${FOREIGN_BRIEF}', 'Foreign proposal') on conflict do nothing;
   insert into public.plans (id, workspace_id, proposal_id, title) values ('${FOREIGN_PLAN}', '${FOREIGN_WS}', '${FOREIGN_PROPOSAL}', 'Foreign plan') on conflict do nothing;
+  insert into public.updates (id, workspace_id, plan_id, title) values ('${FOREIGN_UPDATE}', '${FOREIGN_WS}', '${FOREIGN_PLAN}', 'Foreign update') on conflict do nothing;
 `);
 
 await db.query("set role nstester");
@@ -444,6 +485,48 @@ const { rows: [planAfter] } = await db.query(
 check(
   "plans updated_at touch trigger fires",
   new Date(planAfter.updated_at) > new Date(planBefore.updated_at)
+);
+
+// ── RLS on updates (Step 9) ──
+const { rows: [updateBefore] } = await db.query(
+  "select updated_at from public.updates where id = $1",
+  [SEED_UPDATE_DRAFT]
+);
+
+await db.query("set role nstester");
+const { rows: visibleUpdates } = await db.query("select id from public.updates");
+check(
+  "RLS: member sees own-workspace updates only",
+  visibleUpdates.length === 2 &&
+    visibleUpdates.every((u) => u.id === SEED_UPDATE_SENT || u.id === SEED_UPDATE_DRAFT),
+  `${visibleUpdates.length} visible`
+);
+
+let insertUpdateBlocked = false;
+try {
+  await db.query(
+    "insert into public.updates (workspace_id, plan_id, title) values ($1, $2, 'nope')",
+    [FOREIGN_WS, FOREIGN_PLAN]
+  );
+} catch (e) {
+  insertUpdateBlocked = true;
+}
+check("RLS: cannot insert update into foreign workspace", insertUpdateBlocked);
+
+const { rows: updU } = await db.query(
+  "update public.updates set status = 'sent' where id = $1 returning status",
+  [SEED_UPDATE_DRAFT]
+);
+check("RLS: member can update update status", updU[0]?.status === "sent");
+await db.query("reset role");
+
+const { rows: [updateAfter] } = await db.query(
+  "select updated_at from public.updates where id = $1",
+  [SEED_UPDATE_DRAFT]
+);
+check(
+  "updates updated_at touch trigger fires",
+  new Date(updateAfter.updated_at) > new Date(updateBefore.updated_at)
 );
 
 // ── create_brief_bundle() RPC (Step 4 intake) ──
