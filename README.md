@@ -81,6 +81,19 @@ Browser checklist (the “Confirm” list):
 5. Offline proof of the storage layer: `npm run verify:db` (22 assertions,
    incl. the atomic `create_brief_bundle` transaction).
 
+## Verify Step 5 (/briefs/:id)
+
+1. With seed data loaded, open
+   `/briefs/00000000-0000-0000-0000-000000000010` — details, questions
+   (1 open / 2 resolved), source email, and history all render from the DB.
+2. **Status dropdown** → pick “Approved”: `briefs.status` updates and a
+   `status_changed` row appears in the History card (written by the DB
+   trigger, with you as the actor).
+3. **Resolve** the open question → answer + “Answered by” → it moves to
+   Resolved with its answer, and history gains `question_resolved`.
+4. A bogus or foreign-workspace id shows the “not found” state (RLS hides
+   other tenants identically). DB-level proof remains `npm run verify:db`.
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

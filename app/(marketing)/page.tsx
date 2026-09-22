@@ -12,7 +12,7 @@ const ROUTE_MAP: { href: string; label: string; step: number }[] = [
   { href: "/intake", label: "Intake", step: 4 },
   { href: "/intake/inbox", label: "Inbox", step: 12 },
   { href: "/briefs", label: "Briefs", step: 6 },
-  { href: "/briefs/demo", label: "Brief detail", step: 5 },
+  { href: "/briefs/00000000-0000-0000-0000-000000000010", label: "Brief detail (seed)", step: 5 },
   { href: "/proposals", label: "Proposals", step: 7 },
   { href: "/proposals/demo", label: "Proposal detail", step: 7 },
   { href: "/plans", label: "Plans", step: 8 },
