@@ -1,0 +1,34 @@
+import Link from "next/link";
+import { Search } from "lucide-react";
+
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+
+export function Topbar() {
+  return (
+    <header className="col-span-2 flex h-14 items-center justify-between border-b border-border bg-card px-5">
+      <Link
+        href="/intake"
+        className="font-display text-xl font-bold tracking-tight text-text"
+      >
+        nook<span className="text-accent">script</span>
+      </Link>
+
+      <div className="flex items-center gap-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search..."
+            className="h-9 w-64 border-border bg-muted pl-8 shadow-none"
+          />
+        </div>
+        <Avatar className="h-8 w-8">
+          <AvatarFallback className="bg-accent text-xs font-semibold text-white">
+            NS
+          </AvatarFallback>
+        </Avatar>
+      </div>
+    </header>
+  );
+}

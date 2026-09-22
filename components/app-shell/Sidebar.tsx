@@ -1,0 +1,74 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+import { cn } from "@/lib/utils";
+
+const NAV_ITEMS = [
+  { label: "Intake", href: "/intake" },
+  { label: "Briefs", href: "/briefs" },
+  { label: "Proposals", href: "/proposals" },
+  { label: "Plans", href: "/plans" },
+  { label: "Updates", href: "/updates" },
+  { label: "Settings", href: "/settings" },
+];
+
+function NavItem({
+  label,
+  href,
+  active = false,
+}: {
+  label: string;
+  href: string;
+  active?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center gap-2.5 rounded-md border border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-card hover:text-text",
+        active && "border-border bg-card font-semibold text-text"
+      )}
+    >
+      <span
+        className={cn(
+          "h-1.5 w-1.5 shrink-0 rounded-full",
+          active ? "bg-accent" : "bg-text opacity-40"
+        )}
+      />
+      {label}
+    </Link>
+  );
+}
+
+export function Sidebar() {
+  const pathname = usePathname();
+
+  const isActive = (href: string) =>
+    href !== "#" && (pathname === href || pathname.startsWith(`${href}/`));
+
+  return (
+    <aside className="flex flex-col border-r border-border bg-muted p-3">
+      <nav className="flex flex-col gap-1">
+        {NAV_ITEMS.map((item) => (
+          <NavItem
+            key={item.label}
+            label={item.label}
+            href={item.href}
+            active={isActive(item.href)}
+          />
+        ))}
+      </nav>
+
+      <div className="mt-8">
+        <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          Workspace
+        </p>
+        <nav className="flex flex-col gap-1">
+          <NavItem label="Acme Studio" href="#" />
+        </nav>
+      </div>
+    </aside>
+  );
+}

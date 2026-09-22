@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #fefbfa;
+    --text: #16100f;
+    --accent: #c12c01;
+    --muted: #f6f0ef;
+    --card: #fffffe;
+    --border: #e3dcda;
+    --radius: 0.35rem;
+  }
+
+  .dark {
+    --bg: #120b0a;
+    --text: #f6f0ef;
+    --accent: #f35e3d;
+    --muted: #2a2220;
+    --card: #1c1412;
+    --border: #f5ffff1a;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
