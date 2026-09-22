@@ -106,6 +106,24 @@ Browser checklist (the “Confirm” list):
    back — the list reflects it (`updateBriefStatus` revalidates `/briefs`).
 4. “New brief” links to `/intake`.
 
+## Verify Step 7 (/proposals)
+
+1. Run the migrations + seed (see above), then open `/proposals`: the
+   seeded “Brightloop Co.” proposal renders — Draft badge, client name,
+   “1/3 deliverables done”, “Updated … ago”. Status tabs and search filter
+   client-side; there is intentionally no “New” button.
+2. Open the proposal → change the status dropdown (Draft → Sent →
+   Accepted/Declined): `proposals.status` updates and the list badge
+   matches after navigating back.
+3. On the proposal page, “View source brief” links to
+   `/briefs/00000000-0000-0000-0000-000000000010`.
+4. From that brief page, click **Generate proposal** (Details card): a new
+   draft proposal is created by copying the brief’s title / client /
+   budget / deliverables (deterministic — no AI), and you’re redirected to
+   `/proposals/<new-id>`.
+5. A bogus or foreign-workspace id shows the “not found” state. DB-level
+   proof: `npm run verify:db` (29 checks, incl. proposals CHECK/FK/RLS).
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

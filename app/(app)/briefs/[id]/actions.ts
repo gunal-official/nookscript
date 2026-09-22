@@ -12,8 +12,9 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
-import { resolveQuestion } from "@/lib/data/briefs";
+import { getBriefById, resolveQuestion } from "@/lib/data/briefs";
 import { createClient } from "@/lib/supabase/server";
 import type { BriefStatus } from "@/lib/types/brief";
 
@@ -82,4 +83,46 @@ export async function updateBriefStatus(input: {
   revalidatePath(`/briefs/${input.briefId}`);
   revalidatePath("/briefs");
   return { error: undefined };
+}
+
+/**
+ * Generate a proposal from a brief: copies title / client / budget /
+ * deliverables verbatim (deterministic — no AI in this step), inserts the
+ * proposals row as 'draft', then redirects to the new proposal's page.
+ * All queries go through the session client, so RLS blocks briefs outside
+ * the user's workspaces (getBriefById returns null → "Brief not found.").
+ */
+export async function createProposalFromBrief(input: {
+  briefId: string;
+}): Promise<ActionResult> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "Your session has expired. Please log in again." };
+
+  const brief = await getBriefById(input.briefId);
+  if (!brief) return { error: "Brief not found." };
+
+  const { data: proposal, error } = await supabase
+    .from("proposals")
+    .insert({
+      workspace_id: brief.workspace_id,
+      brief_id: brief.id,
+      title: brief.title,
+      client_name: brief.client_name,
+      budget_timeline: brief.budget_timeline,
+      deliverables: brief.deliverables,
+      status: "draft",
+    })
+    .select("id")
+    .single();
+
+  if (error) return { error: error.message };
+  if (!proposal) return { error: "Could not create the proposal." };
+
+  revalidatePath("/proposals");
+  // throws NEXT_REDIRECT — intentionally not wrapped in try/catch
+  redirect(`/proposals/${proposal.id}`);
 }

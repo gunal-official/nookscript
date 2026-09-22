@@ -34,6 +34,10 @@ const MIGRATIONS_DIR = "supabase/migrations";
 const SEED_UID = "00000000-0000-0000-0000-000000000001";
 const SEED_WS = "00000000-0000-0000-0000-000000000002";
 const SEED_BRIEF = "00000000-0000-0000-0000-000000000010";
+const SEED_PROPOSAL = "00000000-0000-0000-0000-000000000020";
+const FOREIGN_WS = "00000000-0000-0000-0000-000000000099";
+const FOREIGN_BRIEF = "00000000-0000-0000-0000-000000000098";
+const FOREIGN_PROPOSAL = "00000000-0000-0000-0000-000000000097";
 
 console.log("Starting PGlite (WASM Postgres)…");
 const db = new PGlite();
@@ -108,11 +112,11 @@ const { rows: rlsRows } = await db.query(
   `select relname, relrowsecurity from pg_class
     where relnamespace = 'public'::regnamespace
       and relname = any($1) order by relname`,
-  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "workspaces", "workspace_members", "profiles"]]
+  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "proposals", "workspaces", "workspace_members", "profiles"]]
 );
 check(
-  "all 7 tables exist with RLS enabled",
-  rlsRows.length === 7 && rlsRows.every((r) => r.relrowsecurity),
+  "all 8 tables exist with RLS enabled",
+  rlsRows.length === 8 && rlsRows.every((r) => r.relrowsecurity),
   rlsRows.map((r) => `${r.relname}=${r.relrowsecurity}`).join(" ")
 );
 
@@ -150,6 +154,43 @@ check(
   counts[0].sources === 1 && counts[0].open_q === 1 && counts[0].resolved_q === 2 && counts[0].history === 2,
   JSON.stringify(counts[0])
 );
+
+// ── Seed proposal (Step 7) ──
+const { rows: [seedProposal] } = await db.query(
+  "select brief_id, status, title, jsonb_array_length(deliverables) as dcount from public.proposals where id = $1",
+  [SEED_PROPOSAL]
+);
+check(
+  "seed proposal present (from Brightloop brief, draft, 3 deliverables)",
+  seedProposal?.brief_id === SEED_BRIEF &&
+    seedProposal?.status === "draft" &&
+    seedProposal?.title === "Brightloop Co. — Brand Identity Refresh" &&
+    Number(seedProposal?.dcount) === 3,
+  seedProposal?.title
+);
+
+// ── proposals constraints: status CHECK + brief FK (Step 7) ──
+let statusRejected = false;
+try {
+  await db.query(
+    "insert into public.proposals (workspace_id, brief_id, title, status) values ($1, $2, 'x', 'maybe')",
+    [SEED_WS, SEED_BRIEF]
+  );
+} catch (e) {
+  statusRejected = /violates check constraint/.test(e.message);
+}
+check("proposals.status CHECK rejects invalid value", statusRejected);
+
+let fkRejected = false;
+try {
+  await db.query(
+    "insert into public.proposals (workspace_id, brief_id, title) values ($1, '00000000-0000-0000-0000-000000000077', 'x')",
+    [SEED_WS]
+  );
+} catch (e) {
+  fkRejected = /violates foreign key constraint/.test(e.message);
+}
+check("proposals.brief_id FK enforces a real brief", fkRejected);
 
 // ── create_workspace() RPC ──
 await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
@@ -227,13 +268,15 @@ await db.exec(`
   grant execute on function auth.uid() to nstester;
   grant select, insert, update, delete on
     public.workspaces, public.workspace_members, public.profiles,
-    public.briefs, public.brief_sources, public.brief_questions, public.brief_edit_history
+    public.briefs, public.brief_sources, public.brief_questions, public.brief_edit_history,
+    public.proposals
     to nstester;
 `);
-// a foreign workspace + brief the seed user does NOT belong to
+// a foreign workspace + brief + proposal the seed user does NOT belong to
 await db.exec(`
-  insert into public.workspaces (id, name) values ('00000000-0000-0000-0000-000000000099', 'Foreign Co') on conflict do nothing;
-  insert into public.briefs (id, workspace_id, title) values ('00000000-0000-0000-0000-000000000098', '00000000-0000-0000-0000-000000000099', 'Foreign brief') on conflict do nothing;
+  insert into public.workspaces (id, name) values ('${FOREIGN_WS}', 'Foreign Co') on conflict do nothing;
+  insert into public.briefs (id, workspace_id, title) values ('${FOREIGN_BRIEF}', '${FOREIGN_WS}', 'Foreign brief') on conflict do nothing;
+  insert into public.proposals (id, workspace_id, brief_id, title) values ('${FOREIGN_PROPOSAL}', '${FOREIGN_WS}', '${FOREIGN_BRIEF}', 'Foreign proposal') on conflict do nothing;
 `);
 
 await db.query("set role nstester");
@@ -278,6 +321,49 @@ const { rowCount: histInserted } = await db.query(
 );
 check("RLS: member can append edit history", histInserted === 1);
 await db.query("reset role");
+
+// ── RLS on proposals (Step 7) ──
+// updated_at value before the member's status update, for the touch-trigger
+// check below (seed sets it to now() - 12h, so any update advances it).
+const { rows: [propBefore] } = await db.query(
+  "select updated_at from public.proposals where id = $1",
+  [SEED_PROPOSAL]
+);
+
+await db.query("set role nstester");
+const { rows: visibleProposals } = await db.query("select id from public.proposals");
+check(
+  "RLS: member sees own-workspace proposals only",
+  visibleProposals.length === 1 && visibleProposals[0].id === SEED_PROPOSAL,
+  `${visibleProposals.length} visible`
+);
+
+let insertProposalBlocked = false;
+try {
+  await db.query(
+    "insert into public.proposals (workspace_id, brief_id, title) values ($1, $2, 'nope')",
+    [FOREIGN_WS, FOREIGN_BRIEF]
+  );
+} catch (e) {
+  insertProposalBlocked = true;
+}
+check("RLS: cannot insert proposal into foreign workspace", insertProposalBlocked);
+
+const { rows: updP } = await db.query(
+  "update public.proposals set status = 'sent' where id = $1 returning status",
+  [SEED_PROPOSAL]
+);
+check("RLS: member can update proposal status", updP[0]?.status === "sent");
+await db.query("reset role");
+
+const { rows: [propAfter] } = await db.query(
+  "select updated_at from public.proposals where id = $1",
+  [SEED_PROPOSAL]
+);
+check(
+  "proposals updated_at touch trigger fires",
+  new Date(propAfter.updated_at) > new Date(propBefore.updated_at)
+);
 
 // ── create_brief_bundle() RPC (Step 4 intake) ──
 await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);

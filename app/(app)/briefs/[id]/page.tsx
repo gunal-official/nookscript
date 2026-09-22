@@ -23,6 +23,7 @@ import { ArrowLeft, Check, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getBriefById } from "@/lib/data/briefs";
 import { formatDate, getInitials, isUuid, timeAgo } from "@/lib/utils";
+import { GenerateProposalButton } from "@/components/briefs/GenerateProposalButton";
 import { ResolveQuestionDialog } from "@/components/briefs/ResolveQuestionDialog";
 import { StatusBadge } from "@/components/briefs/StatusBadge";
 import { StatusSelect } from "@/components/briefs/StatusSelect";
@@ -329,6 +330,9 @@ export default async function BriefDetailPage({
                   ? `You${userName ? ` (${userName})` : ""}`
                   : "Team"}
               </MetaRow>
+              <div className="border-t border-border pt-4">
+                <GenerateProposalButton briefId={brief.id} />
+              </div>
             </CardContent>
           </Card>
 
