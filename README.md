@@ -94,6 +94,18 @@ Browser checklist (the “Confirm” list):
 4. A bogus or foreign-workspace id shows the “not found” state (RLS hides
    other tenants identically). DB-level proof remains `npm run verify:db`.
 
+## Verify Step 6 (/briefs)
+
+1. Open `/briefs`: the seeded “Brightloop Co.” brief renders as a card —
+   Draft badge, client name, “1 open question” badge, “Updated … ago”.
+2. Status tabs (All / Draft / In review / Approved, with counts) and the
+   search box filter the grid client-side; no matches → “No matching
+   briefs” + Clear filters. With zero briefs the page shows the “No briefs
+   yet” empty state with a create CTA.
+3. Card title links into `/briefs/[id]`; change the status there, navigate
+   back — the list reflects it (`updateBriefStatus` revalidates `/briefs`).
+4. “New brief” links to `/intake`.
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

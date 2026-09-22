@@ -4,8 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   Brief,
   BriefQuestion,
+  BriefStatus,
+  BriefSummary,
   BriefWithDetails,
   EditableBriefField,
+  QuestionStatus,
 } from "@/lib/types/brief";
 
 /**
@@ -29,6 +32,46 @@ export async function getBriefsForWorkspace(
 
   if (error) throw error;
   return (data ?? []) as Brief[];
+}
+
+/**
+ * Summary rows for the /briefs list, most recently updated first.
+ * No explicit workspace filter — RLS (is_workspace_member) already scopes
+ * the query to the current user's workspaces. Question statuses ride along
+ * as an embedded resource (same pattern as getBriefById) and are counted
+ * here, keeping it a single query.
+ */
+export async function getBriefs(): Promise<BriefSummary[]> {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("briefs")
+    .select(
+      "id, title, client_name, status, updated_at, questions:brief_questions(status)"
+    )
+    .order("updated_at", { ascending: false });
+
+  if (error) throw error;
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    title: string;
+    client_name: string | null;
+    status: BriefStatus;
+    updated_at: string;
+    questions: Array<{ status: QuestionStatus }> | null;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    client_name: row.client_name,
+    status: row.status,
+    updated_at: row.updated_at,
+    openQuestionCount: (row.questions ?? []).filter(
+      (q) => q.status === "open"
+    ).length,
+  }));
 }
 
 /** A single brief with sources, questions, and edit history nested.

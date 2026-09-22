@@ -79,6 +79,17 @@ export interface BriefWithDetails extends Brief {
   edit_history: BriefEditHistoryEntry[];
 }
 
+/** Summary row for the /briefs list (as returned by getBriefs) — the
+ *  brief's display fields plus a count of its open clarifying questions. */
+export interface BriefSummary {
+  id: string;
+  title: string;
+  client_name: string | null;
+  status: BriefStatus;
+  updated_at: string;
+  openQuestionCount: number;
+}
+
 /** Editable fields allowed through updateBriefField (whitelist in the
  *  update_brief_field() RPC; 'status' is edited separately so the
  *  status-changed trigger can log old → new). */
