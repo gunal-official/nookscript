@@ -18,16 +18,22 @@ npm ci
    If you leave it ON, signup still works — users confirm their email and are
    asked for a workspace name at first login (`/onboarding`).
 
-### 2. Apply the database migration
+### 2. Apply the database migrations
 
-In the dashboard: **SQL Editor → New query** → paste the contents of
-`supabase/migrations/20260922000000_workspace_auth_init.sql` → **Run**.
+In the dashboard: **SQL Editor → New query** → paste + **Run** each file in
+`supabase/migrations/` in filename order (or `supabase link` + `supabase db push`
+with the CLI).
 
-(Or with the CLI: `supabase link` + `supabase db push`.)
+This creates `workspaces` / `workspace_members` / `profiles`, the auth
+triggers, and the briefs schema: `briefs` / `brief_sources` /
+`brief_questions` / `brief_edit_history` — all RLS-scoped to workspace
+membership — plus the `create_workspace()` and `update_brief_field()` RPCs
+and the status-change history trigger.
 
-This creates `workspaces`, `workspace_members`, `profiles`, their RLS
-policies, the new-user profile trigger (with auto-derived avatar initials),
-and the `create_workspace()` bootstrap function.
+To load demo data (the “Brightloop Co. — Brand Identity Refresh” brief,
+plus a login-able demo user `maya@nookscript.dev` / `password123`), run
+`supabase/seed.sql` in the SQL Editor afterwards (runs automatically on a
+local `supabase db reset`).
 
 ### 3. Configure env + run
 
@@ -47,12 +53,16 @@ Browser checklist (the “Confirm” list):
    topbar avatar showing your initials.
 2. **Rows created** — `node scripts/verify-auth.mjs` exercises the exact DB/RLS
    flow (signup trigger, initials, owner-only member insert, anonymous reads)
-   and prints a ✓/✗ report.
-3. **Middleware** — in a logged-out/incognito window, visit `/intake` →
+   and prints a ✓/✗ report against your real project.
+3. **Schema logic, offline** — `npm run verify:db` applies all migrations
+   + seed data to an in-memory WASM Postgres (PGlite) and runs 19 functional
+   and RLS assertions: triggers, RPCs, status-history logging, member-only
+   visibility, and the immutability of `brief_sources.raw_content`.
+4. **Middleware** — in a logged-out/incognito window, visit `/intake` →
    redirected to `/login`. While logged in, `/login` and `/signup` bounce to
    `/intake`. `/`, `/about`, `/pricing`, `/vs/*`, `/share/*` stay public.
-4. **Login** — `/login` with the same credentials → `/intake`.
-5. **Logout** — topbar “Log out” → back to `/login`; `/intake` is blocked again.
+5. **Login** — `/login` with the same credentials → `/intake`.
+6. **Logout** — topbar “Log out” → back to `/login`; `/intake` is blocked again.
 
 ## Notes
 
