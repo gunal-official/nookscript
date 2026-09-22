@@ -202,6 +202,33 @@ Editor), then re-run `supabase/seed.sql`.
    which returns just the update’s public fields (no ids). DB-level
    proof: `npm run verify:db` (51 checks).
 
+## Verify Step 11 (/settings — templates)
+
+⚠ New migration in this step — re-apply to your live Supabase project
+(`supabase db push`, or paste
+`supabase/migrations/20260923040000_templates_schema.sql` into the SQL
+Editor). If you don’t, `/settings` shows its load-error state.
+
+1. Log in with the seeded demo user — they are the **owner** of the demo
+   workspace — and open **Settings** (`/settings`): the Templates card
+   lists the two seeded snippets with a “New template” button and ✏️/🗑
+   per-row actions.
+2. **Create / edit** — New template opens a dialog (title + multiline
+   body); saving closes it and the list refreshes (sorted by last
+   edit). Edit pre-fills the row’s values. A title is required; the body
+   may be empty.
+3. **Delete** — clicking 🗑 swaps the row’s actions for an inline
+   “Delete? Cancel / Delete” confirmation — the app’s first hard DELETE.
+4. **Member view** — a plain member sees the same list but **zero
+   controls** (hidden, not disabled), a “View only” note, and a
+   different empty state. To try it: sign up a second account in the
+   app, re-run the seed (every new user is auto-added to the demo
+   workspace as a `member`), and log in as them. The split is also
+   enforced **twice behind the UI**: server actions re-check the role,
+   and RLS rejects non-owner writes outright.
+5. DB-level proof: `npm run verify:db` (59 checks, incl. the
+   member-view/member-✗-insert/owner-CRUD template assertions).
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

@@ -274,3 +274,38 @@ insert into public.share_links (
   null,
   now() - interval '6 days'
 ) on conflict (id) do nothing;
+
+-- ── Templates: two reusable snippets for the demo workspace ──
+
+insert into public.templates (id, workspace_id, title, body, created_at, updated_at)
+values (
+  '00000000-0000-0000-0000-000000000060',
+  '00000000-0000-0000-0000-000000000002',
+  'Intake follow-up — missing scope',
+  'Hi there,
+
+Thanks for the details so far! Before I draft the brief, could you clarify:
+- Which deliverables are must-haves vs nice-to-haves for this phase?
+- Is the budget figure a cap or a starting point?
+- Any hard deadline I should plan around?
+
+Once I have those, I''ll send the structured brief for review.
+
+Best,
+Maya',
+  now() - interval '3 days',
+  now() - interval '3 days'
+) on conflict (id) do nothing;
+
+insert into public.templates (id, workspace_id, title, body, created_at, updated_at)
+values (
+  '00000000-0000-0000-0000-000000000061',
+  '00000000-0000-0000-0000-000000000002',
+  'Weekly update sign-off',
+  'That''s everything for this week — full task list above. Hit reply with any questions or priorities for next week; otherwise I''ll keep rolling on the current plan.
+
+Best,
+Maya',
+  now() - interval '2 days',
+  now() - interval '2 days'
+) on conflict (id) do nothing;

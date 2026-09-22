@@ -48,6 +48,7 @@ const SEED_SHARE_TOKEN = "00000000-0000-0000-0000-000000000051";
 const REVOKED_SHARE_TOKEN = "00000000-0000-0000-0000-000000000052";
 const REVOKED_SHARE_LINK = "00000000-0000-0000-0000-000000000053";
 const FOREIGN_SHARE_LINK = "00000000-0000-0000-0000-000000000094";
+const MEMBER_UID = "00000000-0000-0000-0000-000000000070";
 
 console.log("Starting PGlite (WASM Postgres)…");
 const db = new PGlite();
@@ -122,11 +123,11 @@ const { rows: rlsRows } = await db.query(
   `select relname, relrowsecurity from pg_class
     where relnamespace = 'public'::regnamespace
       and relname = any($1) order by relname`,
-  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "proposals", "plans", "updates", "share_links", "workspaces", "workspace_members", "profiles"]]
+  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "proposals", "plans", "updates", "share_links", "templates", "workspaces", "workspace_members", "profiles"]]
 );
 check(
-  "all 11 tables exist with RLS enabled",
-  rlsRows.length === 11 && rlsRows.every((r) => r.relrowsecurity),
+  "all 12 tables exist with RLS enabled",
+  rlsRows.length === 12 && rlsRows.every((r) => r.relrowsecurity),
   rlsRows.map((r) => `${r.relname}=${r.relrowsecurity}`).join(" ")
 );
 
@@ -312,6 +313,17 @@ try {
 }
 check("share_links unique(token) enforces token uniqueness", dupTokenRejected);
 
+// ── Seed templates (Step 11) ──
+const { rows: seedTemplates } = await db.query(
+  "select id, title from public.templates where id = any($1) order by title",
+  [["00000000-0000-0000-0000-000000000060", "00000000-0000-0000-0000-000000000061"]]
+);
+check(
+  "seed templates present (2 snippets on the demo workspace)",
+  seedTemplates.length === 2 && seedTemplates.every((t) => t.title.length > 0),
+  seedTemplates.map((t) => t.title).join(" | ")
+);
+
 // ── create_workspace() RPC ──
 await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
 const { rows: [rpc] } = await db.query(
@@ -389,7 +401,7 @@ await db.exec(`
   grant select, insert, update, delete on
     public.workspaces, public.workspace_members, public.profiles,
     public.briefs, public.brief_sources, public.brief_questions, public.brief_edit_history,
-    public.proposals, public.plans, public.updates, public.share_links
+    public.proposals, public.plans, public.updates, public.share_links, public.templates
     to nstester;
 `);
 // fixtures the seed user does NOT belong to, plus one own-workspace REVOKED
@@ -402,6 +414,19 @@ await db.exec(`
   insert into public.updates (id, workspace_id, plan_id, title) values ('${FOREIGN_UPDATE}', '${FOREIGN_WS}', '${FOREIGN_PLAN}', 'Foreign update') on conflict do nothing;
   insert into public.share_links (id, workspace_id, update_id, token) values ('${FOREIGN_SHARE_LINK}', '${FOREIGN_WS}', '${FOREIGN_UPDATE}', '00000000-0000-0000-0000-000000000093') on conflict do nothing;
   insert into public.share_links (id, workspace_id, update_id, token, revoked_at) values ('${REVOKED_SHARE_LINK}', '${SEED_WS}', '00000000-0000-0000-0000-000000000041', '${REVOKED_SHARE_TOKEN}', now()) on conflict do nothing;
+  -- a second user who is only a MEMBER of the demo workspace (Step 11:
+  -- owner-vs-member split checks) — auth trigger creates their profile
+  insert into auth.users (
+    id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+    confirmation_token, email_change, email_change_token_new, recovery_token
+  ) values (
+    '${MEMBER_UID}', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+    'leo@nookscript.dev', 'pglite-test-password-hash', now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Leo Park"}'::jsonb,
+    now(), now(), '', '', '', ''
+  ) on conflict (id) do nothing;
+  insert into public.workspace_members (workspace_id, user_id, role) values ('${SEED_WS}', '${MEMBER_UID}', 'member') on conflict (workspace_id, user_id) do nothing;
 `);
 
 await db.query("set role nstester");
@@ -625,6 +650,68 @@ check(
   "get_shared_document returns nothing for a nonexistent token",
   missingDoc.length === 0
 );
+await db.query("reset role");
+
+// ── templates: owner-only writes (Step 11) — the first "member ✗ / owner ✓" split ──
+
+// as a plain MEMBER: read yes, write no
+await db.query("select set_config('app.jwt_sub', $1, false)", [MEMBER_UID]);
+await db.query("set role nstester");
+const { rows: memberTemplates } = await db.query(
+  "select id from public.templates order by id"
+);
+check(
+  "RLS: plain member can VIEW templates (read allowed)",
+  memberTemplates.length === 2,
+  `${memberTemplates.length} visible`
+);
+let memberInsertRejected = false;
+try {
+  await db.query(
+    "insert into public.templates (workspace_id, title) values ($1, 'nope')",
+    [SEED_WS]
+  );
+} catch (e) {
+  memberInsertRejected = true;
+}
+check("RLS: plain member CANNOT insert template (owner-only)", memberInsertRejected);
+
+// as the OWNER (seed user): full CRUD + touch trigger on a throwaway row
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+const { rows: [tempTpl] } = await db.query(
+  "insert into public.templates (workspace_id, title, body) values ($1, 'Temp template', 'temp') returning id, updated_at",
+  [SEED_WS]
+);
+check("RLS: OWNER can insert template", Boolean(tempTpl?.id), tempTpl?.id);
+
+await new Promise((r) => setTimeout(r, 20));
+const { rows: [tempAfter] } = await db.query(
+  "update public.templates set body = 'updated' where id = $1 returning updated_at, body",
+  [tempTpl.id]
+);
+check("RLS: OWNER can update template", tempAfter?.body === "updated");
+check(
+  "templates updated_at touch trigger fires",
+  new Date(tempAfter.updated_at) > new Date(tempTpl.updated_at)
+);
+
+const { rowCount: tplDeleted } = await db.query(
+  "delete from public.templates where id = $1",
+  [tempTpl.id]
+);
+check("RLS: OWNER can delete template (first delete policy)", tplDeleted === 1);
+
+// workspace scoping still holds even for an owner: no writing in foreign ws
+let foreignTplBlocked = false;
+try {
+  await db.query(
+    "insert into public.templates (workspace_id, title) values ($1, 'nope')",
+    [FOREIGN_WS]
+  );
+} catch (e) {
+  foreignTplBlocked = true;
+}
+check("RLS: owner cannot insert template into foreign workspace", foreignTplBlocked);
 await db.query("reset role");
 
 // ── create_brief_bundle() RPC (Step 4 intake) ──
