@@ -27,8 +27,9 @@ with the CLI).
 This creates `workspaces` / `workspace_members` / `profiles`, the auth
 triggers, and the product schema: `briefs` / `brief_sources` /
 `brief_questions` / `brief_edit_history` / `proposals` / `plans` /
-`updates` — all RLS-scoped to workspace membership — plus the
-`create_workspace()`, `update_brief_field()`, and `create_brief_bundle()`
+`updates` / `share_links` — all RLS-scoped to workspace membership —
+plus the `create_workspace()`, `update_brief_field()`,
+`create_brief_bundle()`, and public token-gated `get_shared_document()`
 RPCs and the status-change history + updated_at touch triggers.
 
 To load demo data (the “Brightloop Co. — Brand Identity Refresh” brief,
@@ -56,9 +57,11 @@ Browser checklist (the “Confirm” list):
    flow (signup trigger, initials, owner-only member insert, anonymous reads)
    and prints a ✓/✗ report against your real project.
 3. **Schema logic, offline** — `npm run verify:db` applies all migrations
-   + seed data to an in-memory WASM Postgres (PGlite) and runs 43 functional
+   + seed data to an in-memory WASM Postgres (PGlite) and runs 51 functional
    and RLS assertions: triggers, RPCs, status-history logging, member-only
-   visibility on every product table, and the immutability of
+   visibility on every product table (including `share_links`, whose public
+   access is deliberately token-gated through a SECURITY DEFINER RPC rather
+   than an anon policy), and the immutability of
    `brief_sources.raw_content`.
 4. **Middleware** — in a logged-out/incognito window, visit `/intake` →
    redirected to `/login`. While logged in, `/login` and `/signup` bounce to
@@ -174,6 +177,30 @@ Editor), then re-run `supabase/seed.sql`.
 5. From the seeded plan page, **Compose update** generates a draft (dated
    title + task-snapshot body) and redirects to its composer. DB-level
    proof: `npm run verify:db` (43 checks, incl. updates CHECK/FK/RLS).
+
+## Verify Step 10 (/share/:token — public link)
+
+⚠ New migration in this step — re-apply to your live Supabase project
+before manual testing (`supabase db push`, or paste
+`supabase/migrations/20260923030000_share_links_schema.sql` into the SQL
+Editor), then re-run `supabase/seed.sql`.
+
+1. **Working public link from the seed** — open this exact URL in an
+   **incognito window** (no login required):
+   `http://localhost:3000/share/00000000-0000-0000-0000-000000000051`
+   → the seeded “Week 1” sent update renders read-only (title, client,
+   Sent badge, body, updated date), with no app shell.
+2. **Manage links in-app** — as a logged-in member, open the seeded
+   “Week 1” update → the Share card shows the copyable link + **Revoke**.
+   After revoking, the incognito URL shows the generic “invalid or
+   revoked” state; **Regenerate link** issues a fresh token (old one
+   stays dead). The seeded “Week 2” draft shows **Create share link**.
+3. **No leak between invalid/revoked** — `/share/demo-token` (route map),
+   a revoked token, and a random UUID all render the identical state.
+4. **Security model** — `share_links` is fully member-gated; public
+   reads go only through the `get_shared_document` SECURITY DEFINER RPC,
+   which returns just the update’s public fields (no ids). DB-level
+   proof: `npm run verify:db` (51 checks).
 
 ## Notes
 

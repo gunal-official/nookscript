@@ -22,8 +22,10 @@ import Link from "next/link";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 
 import { getUpdateById } from "@/lib/data/updates";
+import { getShareLinkForUpdate } from "@/lib/data/shares";
 import { formatDate, isUuid, timeAgo } from "@/lib/utils";
 import { ExportUpdateMarkdownButton } from "@/components/updates/ExportUpdateMarkdownButton";
+import { ShareLinkPanel } from "@/components/updates/ShareLinkPanel";
 import { UpdateComposer } from "@/components/updates/UpdateComposer";
 import { UpdateStatusBadge } from "@/components/updates/UpdateStatusBadge";
 import { UpdateStatusSelect } from "@/components/updates/UpdateStatusSelect";
@@ -85,6 +87,8 @@ export default async function UpdateDetailPage({
   if (!update) {
     return <NotFoundState />;
   }
+
+  const shareLink = await getShareLinkForUpdate(params.id);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -163,6 +167,18 @@ export default async function UpdateDetailPage({
                 body={update.body}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
+            <CardTitle className="text-base">Share</CardTitle>
+            <CardDescription>
+              Public, read-only link — revocable any time.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-5">
+            <ShareLinkPanel updateId={update.id} shareLink={shareLink} />
           </CardContent>
         </Card>
       </div>

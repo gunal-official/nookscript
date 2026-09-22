@@ -43,6 +43,11 @@ const FOREIGN_BRIEF = "00000000-0000-0000-0000-000000000098";
 const FOREIGN_PROPOSAL = "00000000-0000-0000-0000-000000000097";
 const FOREIGN_PLAN = "00000000-0000-0000-0000-000000000096";
 const FOREIGN_UPDATE = "00000000-0000-0000-0000-000000000095";
+const SEED_SHARE_LINK = "00000000-0000-0000-0000-000000000050";
+const SEED_SHARE_TOKEN = "00000000-0000-0000-0000-000000000051";
+const REVOKED_SHARE_TOKEN = "00000000-0000-0000-0000-000000000052";
+const REVOKED_SHARE_LINK = "00000000-0000-0000-0000-000000000053";
+const FOREIGN_SHARE_LINK = "00000000-0000-0000-0000-000000000094";
 
 console.log("Starting PGlite (WASM Postgres)…");
 const db = new PGlite();
@@ -117,11 +122,11 @@ const { rows: rlsRows } = await db.query(
   `select relname, relrowsecurity from pg_class
     where relnamespace = 'public'::regnamespace
       and relname = any($1) order by relname`,
-  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "proposals", "plans", "updates", "workspaces", "workspace_members", "profiles"]]
+  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "proposals", "plans", "updates", "share_links", "workspaces", "workspace_members", "profiles"]]
 );
 check(
-  "all 10 tables exist with RLS enabled",
-  rlsRows.length === 10 && rlsRows.every((r) => r.relrowsecurity),
+  "all 11 tables exist with RLS enabled",
+  rlsRows.length === 11 && rlsRows.every((r) => r.relrowsecurity),
   rlsRows.map((r) => `${r.relname}=${r.relrowsecurity}`).join(" ")
 );
 
@@ -271,6 +276,42 @@ try {
 }
 check("updates.plan_id FK enforces a real plan", updateFkRejected);
 
+// ── Seed share link (Step 10) ──
+const { rows: [seedShare] } = await db.query(
+  "select update_id, token, revoked_at from public.share_links where id = $1",
+  [SEED_SHARE_LINK]
+);
+check(
+  "seed share link present (for Week 1 update, active token …0051)",
+  seedShare?.update_id === "00000000-0000-0000-0000-000000000040" &&
+    seedShare?.token === SEED_SHARE_TOKEN &&
+    seedShare?.revoked_at === null,
+  seedShare?.token
+);
+
+// ── share_links uniqueness: one link per update + unique tokens ──
+let dupUpdateRejected = false;
+try {
+  await db.query(
+    "insert into public.share_links (workspace_id, update_id, token) values ($1, $2, '00000000-0000-0000-0000-000000000055')",
+    [SEED_WS, "00000000-0000-0000-0000-000000000040"]
+  );
+} catch (e) {
+  dupUpdateRejected = /duplicate key/.test(e.message);
+}
+check("share_links unique(update_id) — one link per update", dupUpdateRejected);
+
+let dupTokenRejected = false;
+try {
+  await db.query(
+    "insert into public.share_links (workspace_id, update_id, token) values ($1, $2, $3)",
+    [SEED_WS, "00000000-0000-0000-0000-000000000041", SEED_SHARE_TOKEN]
+  );
+} catch (e) {
+  dupTokenRejected = /duplicate key/.test(e.message);
+}
+check("share_links unique(token) enforces token uniqueness", dupTokenRejected);
+
 // ── create_workspace() RPC ──
 await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
 const { rows: [rpc] } = await db.query(
@@ -348,16 +389,19 @@ await db.exec(`
   grant select, insert, update, delete on
     public.workspaces, public.workspace_members, public.profiles,
     public.briefs, public.brief_sources, public.brief_questions, public.brief_edit_history,
-    public.proposals, public.plans, public.updates
+    public.proposals, public.plans, public.updates, public.share_links
     to nstester;
 `);
-// a foreign workspace + brief + proposal + plan + update the seed user does NOT belong to
+// fixtures the seed user does NOT belong to, plus one own-workspace REVOKED
+// share link (fixture for the RPC's revoked-filter check)
 await db.exec(`
   insert into public.workspaces (id, name) values ('${FOREIGN_WS}', 'Foreign Co') on conflict do nothing;
   insert into public.briefs (id, workspace_id, title) values ('${FOREIGN_BRIEF}', '${FOREIGN_WS}', 'Foreign brief') on conflict do nothing;
   insert into public.proposals (id, workspace_id, brief_id, title) values ('${FOREIGN_PROPOSAL}', '${FOREIGN_WS}', '${FOREIGN_BRIEF}', 'Foreign proposal') on conflict do nothing;
   insert into public.plans (id, workspace_id, proposal_id, title) values ('${FOREIGN_PLAN}', '${FOREIGN_WS}', '${FOREIGN_PROPOSAL}', 'Foreign plan') on conflict do nothing;
   insert into public.updates (id, workspace_id, plan_id, title) values ('${FOREIGN_UPDATE}', '${FOREIGN_WS}', '${FOREIGN_PLAN}', 'Foreign update') on conflict do nothing;
+  insert into public.share_links (id, workspace_id, update_id, token) values ('${FOREIGN_SHARE_LINK}', '${FOREIGN_WS}', '${FOREIGN_UPDATE}', '00000000-0000-0000-0000-000000000093') on conflict do nothing;
+  insert into public.share_links (id, workspace_id, update_id, token, revoked_at) values ('${REVOKED_SHARE_LINK}', '${SEED_WS}', '00000000-0000-0000-0000-000000000041', '${REVOKED_SHARE_TOKEN}', now()) on conflict do nothing;
 `);
 
 await db.query("set role nstester");
@@ -528,6 +572,60 @@ check(
   "updates updated_at touch trigger fires",
   new Date(updateAfter.updated_at) > new Date(updateBefore.updated_at)
 );
+
+// ── RLS on share_links + public RPC (Step 10) ──
+await db.query("set role nstester");
+const { rows: visibleLinks } = await db.query("select id from public.share_links order by id");
+check(
+  "RLS: member sees own-workspace share links only",
+  visibleLinks.length === 2 &&
+    visibleLinks.every((l) => l.id === SEED_SHARE_LINK || l.id === REVOKED_SHARE_LINK),
+  `${visibleLinks.length} visible`
+);
+
+let insertLinkBlocked = false;
+try {
+  await db.query(
+    "insert into public.share_links (workspace_id, update_id) values ($1, $2)",
+    [FOREIGN_WS, FOREIGN_UPDATE]
+  );
+} catch (e) {
+  insertLinkBlocked = true;
+}
+check("RLS: cannot insert share link into foreign workspace", insertLinkBlocked);
+
+// get_shared_document — called as nstester (a non-member role), proving the
+// definer RPC is anon-callable and self-gated
+const { rows: sharedDoc } = await db.query(
+  "select title, client_name, status, body from public.get_shared_document($1)",
+  [SEED_SHARE_TOKEN]
+);
+check(
+  "get_shared_document returns the update for a valid active token",
+  sharedDoc.length === 1 &&
+    sharedDoc[0].title.startsWith("Update — Week 1") &&
+    sharedDoc[0].status === "sent" &&
+    sharedDoc[0].body.includes("social media kit"),
+  sharedDoc[0]?.title
+);
+
+const { rows: revokedDoc } = await db.query(
+  "select title from public.get_shared_document($1)",
+  [REVOKED_SHARE_TOKEN]
+);
+check(
+  "get_shared_document returns nothing for a revoked token",
+  revokedDoc.length === 0
+);
+
+const { rows: missingDoc } = await db.query(
+  "select title from public.get_shared_document('10000000-0000-0000-0000-000000000000')"
+);
+check(
+  "get_shared_document returns nothing for a nonexistent token",
+  missingDoc.length === 0
+);
+await db.query("reset role");
 
 // ── create_brief_bundle() RPC (Step 4 intake) ──
 await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);

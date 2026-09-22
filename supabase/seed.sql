@@ -259,3 +259,18 @@ Still on track for identity lock before Nov 14.',
   now() - interval '1 day',
   now() - interval '3 hours'
 ) on conflict (id) do nothing;
+
+-- ── Share link: public link for the "Week 1" sent update ──
+-- Token is deterministic so local manual testing has a stable URL:
+--   http://localhost:3000/share/00000000-0000-0000-0000-000000000051
+
+insert into public.share_links (
+  id, workspace_id, update_id, token, revoked_at, created_at
+) values (
+  '00000000-0000-0000-0000-000000000050',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000040',
+  '00000000-0000-0000-0000-000000000051',
+  null,
+  now() - interval '6 days'
+) on conflict (id) do nothing;
