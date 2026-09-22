@@ -64,6 +64,23 @@ Browser checklist (the “Confirm” list):
 5. **Login** — `/login` with the same credentials → `/intake`.
 6. **Logout** — topbar “Log out” → back to `/login`; `/intake` is blocked again.
 
+## Verify Step 4 (/intake)
+
+1. Log in (Step 2) and load the migrations + seed (above).
+2. **Without** `OPENAI_API_KEY`: paste a client email at `/intake` → Generate.
+   The built-in deterministic parser drafts the brief (UI shows a notice).
+   With `OPENAI_API_KEY` set in `.env.local`, OpenAI (`gpt-4o-mini`, JSON
+   mode) does the extraction instead — same flow.
+3. Left panel becomes the read-only source thread; right panel is the
+   editable draft (title, client, objective, deliverables checkboxes,
+   budget & timeline) plus the accent-tinted **Open questions** box.
+4. Edit + **Save brief** → check Table Editor: `briefs` updated,
+   `brief_sources` has the verbatim paste (immutable), `brief_questions`
+   holds the open questions, `brief_edit_history` shows `generated` +
+   `field_edited` rows.
+5. Offline proof of the storage layer: `npm run verify:db` (22 assertions,
+   incl. the atomic `create_brief_bundle` transaction).
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

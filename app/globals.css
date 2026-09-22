@@ -11,6 +11,7 @@
     --card: #fffffe;
     --border: #e3dcda;
     --error: #b4462f;
+    --accent-soft: color-mix(in srgb, var(--accent) 8%, var(--card));
     --radius: 0.35rem;
   }
 
@@ -22,6 +23,7 @@
     --card: #1c1412;
     --border: #f5ffff1a;
     --error: #e78a71;
+    --accent-soft: color-mix(in srgb, var(--accent) 14%, var(--card));
   }
 }
 

@@ -16,6 +16,7 @@ const config = {
         accent: {
           DEFAULT: "var(--accent)",
           foreground: "#ffffff",
+          soft: "var(--accent-soft)",
         },
         card: {
           DEFAULT: "var(--card)",

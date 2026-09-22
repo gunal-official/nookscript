@@ -83,7 +83,7 @@ for (const file of files) {
   await db.exec(readFileSync(join(MIGRATIONS_DIR, file), "utf8"));
   console.log(`· applied migration ${file}`);
 }
-check(`${files.length} migrations apply cleanly`, files.length >= 2);
+check(`${files.length} migrations apply cleanly`, files.length >= 3);
 
 // ── Seed (twice, for idempotency) ──
 let seedSql = readFileSync("supabase/seed.sql", "utf8");
@@ -278,6 +278,62 @@ const { rowCount: histInserted } = await db.query(
 );
 check("RLS: member can append edit history", histInserted === 1);
 await db.query("reset role");
+
+// ── create_brief_bundle() RPC (Step 4 intake) ──
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+const { rows: [bundle] } = await db.query(
+  "select public.create_brief_bundle($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb) as id",
+  [
+    SEED_WS,
+    "Bundle Test — Landing Page",
+    "Client wants a landing page refresh.",
+    JSON.stringify([{ id: "d1", text: "New hero section", checked: false }]),
+    "$2k, two weeks",
+    "Bundle Test Co.",
+    SEED_UID,
+    "manual",
+    "Pasted source text for the bundle test.",
+    JSON.stringify({ char_count: 42 }),
+    JSON.stringify([
+      { question_text: "Is the copy provided?", context_note: "Client said \"maybe\"" },
+      { question_text: "   ", context_note: "blank rows are filtered" },
+    ]),
+  ]
+);
+const { rows: bundleCounts } = await db.query(
+  `select
+     (select count(*)::int from public.briefs where id = $1 and status = 'draft') as brief,
+     (select count(*)::int from public.brief_sources where brief_id = $1) as sources,
+     (select count(*)::int from public.brief_questions where brief_id = $1 and status = 'open') as open_q,
+     (select count(*)::int from public.brief_edit_history where brief_id = $1 and action_type = 'generated') as gen_log`,
+  [bundle.id]
+);
+check(
+  "create_brief_bundle: brief + source + questions (blank filtered) + 'generated' log, atomically",
+  bundleCounts[0].brief === 1 && bundleCounts[0].sources === 1 && bundleCounts[0].open_q === 1 && bundleCounts[0].gen_log === 1,
+  JSON.stringify(bundleCounts[0])
+);
+
+let bundleGuard = false;
+try {
+  await db.query(
+    "select public.create_brief_bundle('00000000-0000-0000-0000-000000000099', 'x', null, '[]'::jsonb, null, null, null, 'manual', 'text', '{}'::jsonb, '[]'::jsonb)"
+  );
+} catch (e) {
+  bundleGuard = /not_authorized/.test(e.message);
+}
+check("create_brief_bundle rejects non-member workspaces", bundleGuard);
+
+let emptySourceGuard = false;
+try {
+  await db.query(
+    "select public.create_brief_bundle($1, 'x', null, '[]'::jsonb, null, null, null, 'manual', '   ', '{}'::jsonb, '[]'::jsonb)",
+    [SEED_WS]
+  );
+} catch (e) {
+  emptySourceGuard = /source_required/.test(e.message);
+}
+check("create_brief_bundle rejects empty source text", emptySourceGuard);
 
 console.log(failures === 0 ? "\nAll database checks passed ✔" : `\n${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

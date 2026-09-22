@@ -97,8 +97,7 @@ export async function createBrief(
 export async function updateBriefField(
   briefId: string,
   field: EditableBriefField,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  value: any,
+  value: unknown,
   userId: string
 ): Promise<void> {
   const supabase = createClient();

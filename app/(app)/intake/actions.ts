@@ -1,0 +1,174 @@
+"use server";
+
+/**
+ * Server actions for /intake.
+ *
+ * TESTING (see also the header comment in app/(app)/intake/page.tsx):
+ *   - generateBriefFromSource: called by the intake form on "Generate".
+ *     Runs the AI/heuristic generator, then saves brief + source +
+ *     questions atomically via the create_brief_bundle() RPC (Step 3/4
+ *     migration).
+ *   - saveBriefEdits: called by "Save brief"; each changed field goes
+ *     through the update_brief_field() RPC so every edit is logged in
+ *     brief_edit_history.
+ */
+
+import { revalidatePath } from "next/cache";
+
+import { createClient } from "@/lib/supabase/server";
+import { generateBriefContent, type GeneratorEngine } from "@/lib/ai/brief-generator";
+import type {
+  Brief,
+  BriefQuestion,
+  BriefSource,
+  EditableBriefField,
+} from "@/lib/types/brief";
+
+export interface GeneratedBriefBundle {
+  brief: Brief;
+  source: BriefSource;
+  questions: BriefQuestion[];
+  /** Which parser produced this draft (shown in the UI as a notice). */
+  engine: GeneratorEngine;
+}
+
+export type GenerateResult =
+  | { data: GeneratedBriefBundle; error?: never }
+  | { data?: never; error: string };
+
+const MIN_SOURCE_CHARS = 20;
+const MAX_SOURCE_CHARS = 20_000;
+
+export async function generateBriefFromSource(input: {
+  rawText: string;
+  sourceType?: "email" | "call_notes" | "chat" | "manual";
+}): Promise<GenerateResult> {
+  const rawText = input.rawText ?? "";
+  const trimmed = rawText.trim();
+
+  if (trimmed.length < MIN_SOURCE_CHARS) {
+    return { error: "Paste a bit more source text first — at least a sentence or two." };
+  }
+  if (rawText.length > MAX_SOURCE_CHARS) {
+    return { error: `Source text is too long (${MAX_SOURCE_CHARS.toLocaleString()} characters max).` };
+  }
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Your session has expired. Please log in again." };
+  }
+
+  const { data: membership } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!membership) {
+    return { error: "No workspace found for your account." };
+  }
+
+  // 1. Parse the source (OpenAI when configured, deterministic heuristic otherwise)
+  const { content, engine } = await generateBriefContent(trimmed);
+
+  // 2. Persist brief + source + questions + 'generated' history in ONE
+  //    transaction (server-side RPC).
+  const { data: briefId, error } = await supabase.rpc("create_brief_bundle", {
+    p_workspace_id: membership.workspace_id,
+    p_title: content.title,
+    p_objective: content.objective,
+    p_deliverables: content.deliverables,
+    p_budget_timeline: content.budget_timeline,
+    p_client_name: content.client_name,
+    p_owner_id: user.id,
+    p_source_type: input.sourceType ?? "manual",
+    p_raw_content: trimmed,
+    p_source_metadata: {
+      pasted_at: new Date().toISOString(),
+      char_count: trimmed.length,
+      engine,
+    },
+    p_questions: content.questions,
+  });
+
+  if (error || !briefId) {
+    return { error: error?.message ?? "Could not save the generated brief." };
+  }
+
+  // 3. Fetch the persisted rows back so the form edits real DB state.
+  const [{ data: brief }, { data: source }, { data: questions }] =
+    await Promise.all([
+      supabase.from("briefs").select("*").eq("id", briefId).single(),
+      supabase
+        .from("brief_sources")
+        .select("*")
+        .eq("brief_id", briefId)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .single(),
+      supabase
+        .from("brief_questions")
+        .select("*")
+        .eq("brief_id", briefId)
+        .order("created_at", { ascending: true }),
+    ]);
+
+  if (!brief) {
+    return { error: "Brief was created but could not be loaded." };
+  }
+
+  revalidatePath("/briefs");
+
+  return {
+    data: {
+      brief: brief as Brief,
+      source: source as BriefSource,
+      questions: (questions ?? []) as BriefQuestion[],
+      engine,
+    },
+  };
+}
+
+export type SaveEditsResult = { error?: string } | undefined;
+
+export async function saveBriefEdits(input: {
+  briefId: string;
+  changes: { field: EditableBriefField; value: unknown }[];
+}): Promise<SaveEditsResult> {
+  if (!input.briefId) return { error: "Missing brief id." };
+  if (!input.changes?.length) return { error: "Nothing to save." };
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Your session has expired. Please log in again." };
+  }
+
+  // Each changed field: one RPC call (atomic field update + history entry).
+  // The whitelist + membership check live inside update_brief_field().
+  for (const change of input.changes) {
+    const { error } = await supabase.rpc("update_brief_field", {
+      brief_uuid: input.briefId,
+      field_name: change.field,
+      new_value: change.value,
+      editor_id: user.id, // from the server session — never client-supplied
+    });
+
+    if (error) {
+      return { error: `Could not save ${change.field}: ${error.message}` };
+    }
+  }
+
+  revalidatePath(`/briefs/${input.briefId}`);
+
+  return { error: undefined };
+}
