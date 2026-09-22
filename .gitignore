@@ -17,8 +17,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# env files
+# env files (but keep the committed example)
 .env*
+!.env.local.example
 
 # typescript
 next-env.d.ts

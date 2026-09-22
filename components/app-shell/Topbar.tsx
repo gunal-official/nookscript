@@ -1,10 +1,19 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 
+import { LogoutButton } from "@/components/auth/logout-button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 
-export function Topbar() {
+export function Topbar({
+  initials,
+  name,
+  email,
+}: {
+  initials: string;
+  name?: string | null;
+  email?: string | null;
+}) {
   return (
     <header className="col-span-2 flex h-14 items-center justify-between border-b border-border bg-card px-5">
       <Link
@@ -23,11 +32,21 @@ export function Topbar() {
             className="h-9 w-64 border-border bg-muted pl-8 shadow-none"
           />
         </div>
-        <Avatar className="h-8 w-8">
-          <AvatarFallback className="bg-accent text-xs font-semibold text-white">
-            NS
-          </AvatarFallback>
-        </Avatar>
+
+        <div className="flex items-center gap-2">
+          <span className="hidden max-w-[160px] truncate text-sm text-muted-foreground md:inline">
+            {name ?? email}
+          </span>
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-accent text-xs font-semibold text-white">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+
+        <div className="h-4 w-px bg-border" />
+
+        <LogoutButton />
       </div>
     </header>
   );

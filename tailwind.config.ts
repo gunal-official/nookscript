@@ -26,6 +26,7 @@ const config = {
           foreground: "color-mix(in srgb, var(--text) 55%, transparent)",
         },
         border: "var(--border)",
+        error: "var(--error)",
         // shadcn-style semantic aliases mapped onto the design tokens
         background: "var(--bg)",
         foreground: "var(--text)",

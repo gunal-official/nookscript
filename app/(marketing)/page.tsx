@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 // Full v1 route surface per the build roadmap — temporary, for verifying the
 // shell + theme across every placeholder. Removed when Step 13 builds this page.
 const ROUTE_MAP: { href: string; label: string; step: number }[] = [
+  { href: "/login", label: "Log in", step: 2 },
+  { href: "/signup", label: "Sign up", step: 2 },
   { href: "/intake", label: "Intake", step: 4 },
   { href: "/intake/inbox", label: "Inbox", step: 12 },
   { href: "/briefs", label: "Briefs", step: 6 },

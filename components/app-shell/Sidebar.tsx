@@ -42,7 +42,7 @@ function NavItem({
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ workspaceName }: { workspaceName: string }) {
   const pathname = usePathname();
 
   const isActive = (href: string) =>
@@ -66,7 +66,7 @@ export function Sidebar() {
           Workspace
         </p>
         <nav className="flex flex-col gap-1">
-          <NavItem label="Acme Studio" href="#" />
+          <NavItem label={workspaceName} href="#" />
         </nav>
       </div>
     </aside>
