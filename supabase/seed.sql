@@ -189,3 +189,25 @@ insert into public.proposals (
   now() - interval '1 day',
   now() - interval '12 hours'
 ) on conflict (id) do nothing;
+
+-- ── Plan: generated from the Brightloop proposal (deliverables → tasks) ──
+
+insert into public.plans (
+  id, workspace_id, proposal_id, title, client_name, status,
+  budget_timeline, tasks, created_at, updated_at
+) values (
+  '00000000-0000-0000-0000-000000000030',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000020',
+  'Brightloop Co. — Brand Identity Refresh',
+  'Brightloop Co. (contact: Priya Raman, Head of Marketing)',
+  'not_started',
+  'Budget “around $8–12k, flexible if the logo lands”. Kickoff week of Sep 29; identity locked before the Nov 14 investor announcement.',
+  '[
+    {"id": "d1", "text": "Primary logo redesign + wordmark (vector masters)", "checked": false},
+    {"id": "d2", "text": "Brand palette, typography & usage guide (PDF)", "checked": false},
+    {"id": "d3", "text": "Social media kit — avatars + banners for LinkedIn and X", "checked": true}
+  ]'::jsonb,
+  now() - interval '12 hours',
+  now() - interval '6 hours'
+) on conflict (id) do nothing;

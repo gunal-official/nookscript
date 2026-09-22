@@ -35,9 +35,11 @@ const SEED_UID = "00000000-0000-0000-0000-000000000001";
 const SEED_WS = "00000000-0000-0000-0000-000000000002";
 const SEED_BRIEF = "00000000-0000-0000-0000-000000000010";
 const SEED_PROPOSAL = "00000000-0000-0000-0000-000000000020";
+const SEED_PLAN = "00000000-0000-0000-0000-000000000030";
 const FOREIGN_WS = "00000000-0000-0000-0000-000000000099";
 const FOREIGN_BRIEF = "00000000-0000-0000-0000-000000000098";
 const FOREIGN_PROPOSAL = "00000000-0000-0000-0000-000000000097";
+const FOREIGN_PLAN = "00000000-0000-0000-0000-000000000096";
 
 console.log("Starting PGlite (WASM Postgres)…");
 const db = new PGlite();
@@ -112,11 +114,11 @@ const { rows: rlsRows } = await db.query(
   `select relname, relrowsecurity from pg_class
     where relnamespace = 'public'::regnamespace
       and relname = any($1) order by relname`,
-  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "proposals", "workspaces", "workspace_members", "profiles"]]
+  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "proposals", "plans", "workspaces", "workspace_members", "profiles"]]
 );
 check(
-  "all 8 tables exist with RLS enabled",
-  rlsRows.length === 8 && rlsRows.every((r) => r.relrowsecurity),
+  "all 9 tables exist with RLS enabled",
+  rlsRows.length === 9 && rlsRows.every((r) => r.relrowsecurity),
   rlsRows.map((r) => `${r.relname}=${r.relrowsecurity}`).join(" ")
 );
 
@@ -191,6 +193,43 @@ try {
   fkRejected = /violates foreign key constraint/.test(e.message);
 }
 check("proposals.brief_id FK enforces a real brief", fkRejected);
+
+// ── Seed plan (Step 8) ──
+const { rows: [seedPlan] } = await db.query(
+  "select proposal_id, status, title, jsonb_array_length(tasks) as tcount from public.plans where id = $1",
+  [SEED_PLAN]
+);
+check(
+  "seed plan present (from Brightloop proposal, not_started, 3 tasks)",
+  seedPlan?.proposal_id === "00000000-0000-0000-0000-000000000020" &&
+    seedPlan?.status === "not_started" &&
+    seedPlan?.title === "Brightloop Co. — Brand Identity Refresh" &&
+    Number(seedPlan?.tcount) === 3,
+  seedPlan?.title
+);
+
+// ── plans constraints: status CHECK + proposal FK (Step 8) ──
+let planStatusRejected = false;
+try {
+  await db.query(
+    "insert into public.plans (workspace_id, proposal_id, title, status) values ($1, $2, 'x', 'active')",
+    [SEED_WS, "00000000-0000-0000-0000-000000000020"]
+  );
+} catch (e) {
+  planStatusRejected = /violates check constraint/.test(e.message);
+}
+check("plans.status CHECK rejects invalid value", planStatusRejected);
+
+let planFkRejected = false;
+try {
+  await db.query(
+    "insert into public.plans (workspace_id, proposal_id, title) values ($1, '00000000-0000-0000-0000-000000000077', 'x')",
+    [SEED_WS]
+  );
+} catch (e) {
+  planFkRejected = /violates foreign key constraint/.test(e.message);
+}
+check("plans.proposal_id FK enforces a real proposal", planFkRejected);
 
 // ── create_workspace() RPC ──
 await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
@@ -269,14 +308,15 @@ await db.exec(`
   grant select, insert, update, delete on
     public.workspaces, public.workspace_members, public.profiles,
     public.briefs, public.brief_sources, public.brief_questions, public.brief_edit_history,
-    public.proposals
+    public.proposals, public.plans
     to nstester;
 `);
-// a foreign workspace + brief + proposal the seed user does NOT belong to
+// a foreign workspace + brief + proposal + plan the seed user does NOT belong to
 await db.exec(`
   insert into public.workspaces (id, name) values ('${FOREIGN_WS}', 'Foreign Co') on conflict do nothing;
   insert into public.briefs (id, workspace_id, title) values ('${FOREIGN_BRIEF}', '${FOREIGN_WS}', 'Foreign brief') on conflict do nothing;
   insert into public.proposals (id, workspace_id, brief_id, title) values ('${FOREIGN_PROPOSAL}', '${FOREIGN_WS}', '${FOREIGN_BRIEF}', 'Foreign proposal') on conflict do nothing;
+  insert into public.plans (id, workspace_id, proposal_id, title) values ('${FOREIGN_PLAN}', '${FOREIGN_WS}', '${FOREIGN_PROPOSAL}', 'Foreign plan') on conflict do nothing;
 `);
 
 await db.query("set role nstester");
@@ -363,6 +403,47 @@ const { rows: [propAfter] } = await db.query(
 check(
   "proposals updated_at touch trigger fires",
   new Date(propAfter.updated_at) > new Date(propBefore.updated_at)
+);
+
+// ── RLS on plans (Step 8) ──
+const { rows: [planBefore] } = await db.query(
+  "select updated_at from public.plans where id = $1",
+  [SEED_PLAN]
+);
+
+await db.query("set role nstester");
+const { rows: visiblePlans } = await db.query("select id from public.plans");
+check(
+  "RLS: member sees own-workspace plans only",
+  visiblePlans.length === 1 && visiblePlans[0].id === SEED_PLAN,
+  `${visiblePlans.length} visible`
+);
+
+let insertPlanBlocked = false;
+try {
+  await db.query(
+    "insert into public.plans (workspace_id, proposal_id, title) values ($1, $2, 'nope')",
+    [FOREIGN_WS, FOREIGN_PROPOSAL]
+  );
+} catch (e) {
+  insertPlanBlocked = true;
+}
+check("RLS: cannot insert plan into foreign workspace", insertPlanBlocked);
+
+const { rows: updPl } = await db.query(
+  "update public.plans set status = 'in_progress' where id = $1 returning status",
+  [SEED_PLAN]
+);
+check("RLS: member can update plan status", updPl[0]?.status === "in_progress");
+await db.query("reset role");
+
+const { rows: [planAfter] } = await db.query(
+  "select updated_at from public.plans where id = $1",
+  [SEED_PLAN]
+);
+check(
+  "plans updated_at touch trigger fires",
+  new Date(planAfter.updated_at) > new Date(planBefore.updated_at)
 );
 
 // ── create_brief_bundle() RPC (Step 4 intake) ──

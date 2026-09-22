@@ -25,10 +25,11 @@ In the dashboard: **SQL Editor → New query** → paste + **Run** each file in
 with the CLI).
 
 This creates `workspaces` / `workspace_members` / `profiles`, the auth
-triggers, and the briefs schema: `briefs` / `brief_sources` /
-`brief_questions` / `brief_edit_history` — all RLS-scoped to workspace
-membership — plus the `create_workspace()` and `update_brief_field()` RPCs
-and the status-change history trigger.
+triggers, and the product schema: `briefs` / `brief_sources` /
+`brief_questions` / `brief_edit_history` / `proposals` / `plans` — all
+RLS-scoped to workspace membership — plus the `create_workspace()`,
+`update_brief_field()`, and `create_brief_bundle()` RPCs and the
+status-change history + updated_at touch triggers.
 
 To load demo data (the “Brightloop Co. — Brand Identity Refresh” brief,
 plus a login-able demo user `maya@nookscript.dev` / `password123`), run
@@ -55,9 +56,10 @@ Browser checklist (the “Confirm” list):
    flow (signup trigger, initials, owner-only member insert, anonymous reads)
    and prints a ✓/✗ report against your real project.
 3. **Schema logic, offline** — `npm run verify:db` applies all migrations
-   + seed data to an in-memory WASM Postgres (PGlite) and runs 19 functional
+   + seed data to an in-memory WASM Postgres (PGlite) and runs 36 functional
    and RLS assertions: triggers, RPCs, status-history logging, member-only
-   visibility, and the immutability of `brief_sources.raw_content`.
+   visibility on every product table, and the immutability of
+   `brief_sources.raw_content`.
 4. **Middleware** — in a logged-out/incognito window, visit `/intake` →
    redirected to `/login`. While logged in, `/login` and `/signup` bounce to
    `/intake`. `/`, `/about`, `/pricing`, `/vs/*`, `/share/*` stay public.
@@ -108,6 +110,10 @@ Browser checklist (the “Confirm” list):
 
 ## Verify Step 7 (/proposals)
 
+⚠ New migration in this step — re-apply to your live Supabase project
+before manual testing (`supabase db push`, or paste the new migration file
+into the SQL Editor), then re-run `supabase/seed.sql`.
+
 1. Run the migrations + seed (see above), then open `/proposals`: the
    seeded “Brightloop Co.” proposal renders — Draft badge, client name,
    “1/3 deliverables done”, “Updated … ago”. Status tabs and search filter
@@ -123,6 +129,29 @@ Browser checklist (the “Confirm” list):
    `/proposals/<new-id>`.
 5. A bogus or foreign-workspace id shows the “not found” state. DB-level
    proof: `npm run verify:db` (29 checks, incl. proposals CHECK/FK/RLS).
+
+## Verify Step 8 (/plans)
+
+⚠ New migration in this step — re-apply to your live Supabase project
+before manual testing (`supabase db push`, or paste
+`supabase/migrations/20260923010000_plans_schema.sql` into the SQL
+Editor), then re-run `supabase/seed.sql`.
+
+1. Open `/plans`: the seeded “Brightloop Co.” plan renders — Not started
+   badge, client name, “1/3 tasks done”, “Updated … ago”. Status tabs and
+   search filter client-side; there is intentionally no “New” button.
+2. Open the plan → click task checkboxes: they flip immediately
+   (optimistic) and persist — `plans.tasks` updates in the Table Editor
+   and the “N of M done” counter stays in sync.
+3. Change the status dropdown (Not started → In progress → Done):
+   `plans.status` updates; the list badge matches after navigating back.
+4. “Export as markdown” downloads a client-built `.md` (title, client,
+   budget & timeline, `- [x]` / `- [ ]` checklist) — nothing hits the
+   server.
+5. From the seeded proposal page, **Generate plan** copies fields and maps
+   deliverables → tasks (deterministic, ungated on proposal status), then
+   redirects to the new plan. DB-level proof: `npm run verify:db`
+   (36 checks, incl. plans CHECK/FK/RLS).
 
 ## Notes
 

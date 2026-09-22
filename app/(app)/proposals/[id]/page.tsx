@@ -18,6 +18,7 @@ import { ArrowLeft, ArrowUpRight, Check } from "lucide-react";
 
 import { getProposalById } from "@/lib/data/proposals";
 import { formatDate, isUuid, timeAgo } from "@/lib/utils";
+import { GeneratePlanButton } from "@/components/proposals/GeneratePlanButton";
 import { ProposalStatusBadge } from "@/components/proposals/ProposalStatusBadge";
 import { ProposalStatusSelect } from "@/components/proposals/ProposalStatusSelect";
 import { Badge } from "@/components/ui/badge";
@@ -213,6 +214,9 @@ export default async function ProposalDetailPage({
                 </p>
               </div>
             )}
+            <div className="border-t border-border pt-4">
+              <GeneratePlanButton proposalId={proposal.id} />
+            </div>
           </CardContent>
         </Card>
       </div>
