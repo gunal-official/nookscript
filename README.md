@@ -28,7 +28,7 @@ This creates `workspaces` / `workspace_members` / `profiles`, the auth
 triggers, and the product schema: `briefs` / `brief_sources` /
 `brief_questions` / `brief_edit_history` / `proposals` / `plans` /
 `updates` / `share_links` / `templates` / `team_invites` / `invoices` /
-`invoice_links` — all RLS-scoped to workspace membership —
+`invoice_links` / `time_entries` — all RLS-scoped to workspace membership —
 plus the `create_workspace()`, `update_brief_field()`,
 `create_brief_bundle()`, and public token-gated `get_shared_document()`
 + `get_shared_invoice()` RPCs and the status-change history +
@@ -439,6 +439,50 @@ button).
    migrations, incl. no-delete policies on both tables, per-workspace
    numbering, member RLS, and all four `get_shared_invoice` zero-row
    states).
+
+## Verify Step 18 (time entries — timer + hours log)
+
+⚠ New migration in this step — re-apply to your live Supabase project
+before testing: `supabase/migrations/20260924090000_time_entries_schema.sql`
+(SQL Editor → paste → Run), then re-run `supabase/seed.sql` (it adds four
+time entries to the demo workspace).
+
+Time entries are per-workspace rows of INTEGER MINUTES with a `worked_on`
+date (the day the work happened — backdateable; the log groups by it, not
+by created_at) and an optional brief link (null = general time). The
+timer itself is NOT in the database: it is ephemeral client state
+(localStorage, survives refresh) in the app shell, and stopping it writes
+the entry. There is no public surface. One deliberate exception to the
+no-delete house pattern: **this is the only table with a member delete
+policy** — a time entry is a personal work log, not an audit record.
+
+1. **The log** — /time shows the four seeded entries grouped by day
+   (Today, then older dates): "Concept exploration — first visual
+   directions" (3h 40m, today, linked to the Brightloop brief), "Kickoff —
+   discovery call…" (2h 15m), "Portfolio refresh + client outreach"
+   (1h, general — no brief chip), "Phase-two proposal polish" (1h 30m).
+   The header shows the today total and the month total (computed from
+   the rows, never stored).
+2. **Log time by hand** — "Log time" opens the form: description,
+   minutes, a `worked_on` date (defaults to today — backdating works),
+   optional brief. Saving appears in the right day group; the totals
+   move.
+3. **The floating timer** — a pill sits bottom-right on EVERY app page
+   (start it on /invoices, navigate to /briefs — it keeps running).
+   Stop → the same log form opens with the elapsed time prefilled
+   (seconds round to the nearest minute, minimum 1). Refresh mid-run →
+   the timer survives (localStorage).
+4. **Edit + delete** — each row has edit (all fields, same form) and
+   delete (the only delete in the product). Deleting a row removes it
+   from the log and the totals; the DB-level proof shows the delete
+   policy is member-scoped (a foreign workspace's entry is undeletable).
+5. **Brief filter** — filter the log to one brief; general entries only
+   appear when "All" is selected.
+6. **DB-level proof** — `npm run verify:db` (113 checks / 14
+   migrations, incl. the duration_minutes CHECK (0 and negatives
+   rejected), the brief FK + nullable general rows, member RLS, the
+   member-can-delete / foreign-cannot-delete pair, and the
+   updated_at touch trigger).
 
 ## Notes
 

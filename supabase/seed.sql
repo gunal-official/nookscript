@@ -452,3 +452,66 @@ insert into public.invoice_links (
   null,
   now() - interval '4 days'
 ) on conflict (id) do nothing;
+
+-- ── Time entries (Step 18): four rows on the demo workspace ──
+-- Three are attributed to the Brightloop brief (…0010), one is general
+-- (brief_id null) — together they prove the brief filter, the "general"
+-- bucket, and the per-day grouping in the log. One row lands on TODAY
+-- (…0072) so the "Today" group + today total are visible on first open.
+-- Total: 505 min (8h 25m) over the last three days.
+
+insert into public.time_entries (
+  id, workspace_id, brief_id, description, worked_on, duration_minutes,
+  created_at, updated_at
+) values (
+  '00000000-0000-0000-0000-000000000071',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000010',
+  'Kickoff — discovery call + brand audit notes',
+  now() - interval '1 day',
+  135,
+  now() - interval '1 day',
+  now() - interval '1 day'
+) on conflict (id) do nothing;
+
+insert into public.time_entries (
+  id, workspace_id, brief_id, description, worked_on, duration_minutes,
+  created_at, updated_at
+) values (
+  '00000000-0000-0000-0000-000000000072',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000010',
+  'Concept exploration — first visual directions',
+  now(),
+  220,
+  now(),
+  now()
+) on conflict (id) do nothing;
+
+insert into public.time_entries (
+  id, workspace_id, brief_id, description, worked_on, duration_minutes,
+  created_at, updated_at
+) values (
+  '00000000-0000-0000-0000-000000000073',
+  '00000000-0000-0000-0000-000000000002',
+  null,
+  'Portfolio refresh + client outreach',
+  now() - interval '2 days',
+  60,
+  now() - interval '2 days',
+  now() - interval '2 days'
+) on conflict (id) do nothing;
+
+insert into public.time_entries (
+  id, workspace_id, brief_id, description, worked_on, duration_minutes,
+  created_at, updated_at
+) values (
+  '00000000-0000-0000-0000-000000000074',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000010',
+  'Phase-two proposal polish',
+  now() - interval '3 days',
+  90,
+  now() - interval '3 days',
+  now() - interval '3 days'
+) on conflict (id) do nothing;

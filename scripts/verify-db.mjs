@@ -19,6 +19,9 @@
  *   - invoices (Step 17): status CHECK, per-workspace unique numbers, one
  *     link per invoice, and get_shared_invoice() returns zero rows for
  *     invalid / revoked / draft-invoice tokens (all indistinguishable)
+ *   - time_entries (Step 18): duration CHECK (integer minutes > 0),
+ *     brief_id FK + nullable general rows, and the schema's ONE delete
+ *     policy (documented exception: personal work log, not audit data)
  *
  * Note: PGlite runs as a single superuser, so RLS is exercised via a
  * dedicated non-owner role (`nstester`) with a faked `auth.uid()`.
@@ -62,11 +65,19 @@ const SEED_INVOICE_LINK_DRAFT = "00000000-0000-0000-0000-000000000067";
 const DRAFT_INVOICE_TOKEN = "00000000-0000-0000-0000-000000000069";
 const SEED_INVOICE_LINK_SENT = "00000000-0000-0000-0000-000000000068";
 const SENT_INVOICE_TOKEN = "00000000-0000-0000-0000-000000000070";
+const SEED_TIME_ENTRY_YESTERDAY = "00000000-0000-0000-0000-000000000071";
+const SEED_TIME_ENTRY_TODAY = "00000000-0000-0000-0000-000000000072";
+const SEED_TIME_ENTRY_GENERAL = "00000000-0000-0000-0000-000000000073";
+const SEED_TIME_ENTRY_3DAYS = "00000000-0000-0000-0000-000000000074";
 // Step 17 fixtures (verify-db only, like the share-link ones above):
 const REVOKED_INVOICE = "00000000-0000-0000-0000-000000000091";
 const REVOKED_INVOICE_TOKEN = "00000000-0000-0000-0000-000000000089";
 const REVOKED_INVOICE_LINK = "00000000-0000-0000-0000-000000000093";
 const FOREIGN_INVOICE = "00000000-0000-0000-0000-000000000092";
+// Step 18 fixtures (verify-db only): TEMP_ = a member-scoped probe row we
+// may legally mutate; FOREIGN_ = a row in Foreign Co for the RLS probes.
+const TEMP_TIME_ENTRY = "00000000-0000-0000-0000-000000000095";
+const FOREIGN_TIME_ENTRY = "00000000-0000-0000-0000-000000000094";
 
 console.log("Starting PGlite (WASM Postgres)…");
 const db = new PGlite();
@@ -392,6 +403,28 @@ check(
   seedInvoiceLinks.map((l) => l.token).join(" ")
 );
 
+// ── Seed time entries (Step 18) ──
+const { rows: seedTimeEntries } = await db.query(
+  "select id, brief_id, duration_minutes from public.time_entries where id = any($1) order by worked_on desc, created_at",
+  [
+    [
+      SEED_TIME_ENTRY_YESTERDAY,
+      SEED_TIME_ENTRY_TODAY,
+      SEED_TIME_ENTRY_GENERAL,
+      SEED_TIME_ENTRY_3DAYS,
+    ],
+  ]
+);
+check(
+  "seed time entries present (3 brief-linked + 1 general, 505 min total)",
+  seedTimeEntries.length === 4 &&
+    seedTimeEntries.filter((t) => t.brief_id === SEED_BRIEF).length === 3 &&
+    seedTimeEntries.filter((t) => t.brief_id === null).length === 1 &&
+    seedTimeEntries.reduce((sum, t) => sum + Number(t.duration_minutes), 0) ===
+      505,
+  seedTimeEntries.map((t) => `${t.duration_minutes}m`).join(" + ")
+);
+
 // ── invoices constraints: status CHECK + per-workspace unique number ──
 let invoiceStatusRejected = false;
 try {
@@ -510,7 +543,8 @@ await db.exec(`
     public.workspaces, public.workspace_members, public.profiles,
     public.briefs, public.brief_sources, public.brief_questions, public.brief_edit_history,
     public.proposals, public.plans, public.updates, public.share_links, public.templates,
-    public.team_invites, public.invoices, public.invoice_links
+    public.team_invites, public.invoices, public.invoice_links,
+    public.time_entries
     to nstester;
 `);
 // fixtures the seed user does NOT belong to, plus one own-workspace REVOKED
@@ -873,6 +907,148 @@ check(
   missingInvoice.length === 0
 );
 await db.query("reset role");
+
+// ── time_entries constraints + RLS (Step 18) ──
+let zeroDurationRejected = false;
+try {
+  await db.query(
+    "insert into public.time_entries (workspace_id, description, duration_minutes) values ($1, 'x', 0)",
+    [SEED_WS]
+  );
+} catch (e) {
+  zeroDurationRejected = true;
+}
+check("time_entries.duration_minutes CHECK rejects 0", zeroDurationRejected);
+
+let negativeDurationRejected = false;
+try {
+  await db.query(
+    "insert into public.time_entries (workspace_id, description, duration_minutes) values ($1, 'x', -5)",
+    [SEED_WS]
+  );
+} catch (e) {
+  negativeDurationRejected = true;
+}
+check(
+  "time_entries.duration_minutes CHECK rejects negatives",
+  negativeDurationRejected
+);
+
+let missingDescriptionRejected = false;
+try {
+  await db.query(
+    "insert into public.time_entries (workspace_id, description, duration_minutes) values ($1, null, 5)",
+    [SEED_WS]
+  );
+} catch (e) {
+  missingDescriptionRejected = true;
+}
+check("time_entries.description NOT NULL rejects null", missingDescriptionRejected);
+
+let timeBriefFkRejected = false;
+try {
+  await db.query(
+    "insert into public.time_entries (workspace_id, brief_id, description, duration_minutes) values ($1, '10000000-0000-0000-0000-000000000000', 'x', 5)",
+    [SEED_WS]
+  );
+} catch (e) {
+  timeBriefFkRejected = true;
+}
+check("time_entries.brief_id FK enforces a real brief", timeBriefFkRejected);
+
+// Fixture rows for the RLS probes (created as superuser, like the
+// Step 17 invoice fixtures).
+await db.query(
+  "insert into public.time_entries (id, workspace_id, description, duration_minutes) values ($1, $2, 'rls probe', 5)",
+  [TEMP_TIME_ENTRY, SEED_WS]
+);
+await db.query(
+  "insert into public.time_entries (id, workspace_id, description, duration_minutes) values ($1, $2, 'foreign probe', 5)",
+  [FOREIGN_TIME_ENTRY, FOREIGN_WS]
+);
+
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+await db.query("set role nstester");
+const { rows: visibleTimeEntries } = await db.query(
+  "select id from public.time_entries"
+);
+check(
+  "RLS: member sees own-workspace time entries only",
+  visibleTimeEntries.length === 5 &&
+    visibleTimeEntries.every((t) =>
+      [
+        SEED_TIME_ENTRY_YESTERDAY,
+        SEED_TIME_ENTRY_TODAY,
+        SEED_TIME_ENTRY_GENERAL,
+        SEED_TIME_ENTRY_3DAYS,
+        TEMP_TIME_ENTRY,
+      ].includes(t.id)
+    ),
+  `${visibleTimeEntries.length} visible`
+);
+
+let insertTimeEntryBlocked = false;
+try {
+  await db.query(
+    "insert into public.time_entries (workspace_id, description, duration_minutes) values ($1, 'x', 5)",
+    [FOREIGN_WS]
+  );
+} catch (e) {
+  insertTimeEntryBlocked = true;
+}
+check(
+  "RLS: cannot insert time entry into foreign workspace",
+  insertTimeEntryBlocked
+);
+
+// The documented exception: a member CAN delete their own entry…
+let deleteTimeEntryPossible = false;
+try {
+  const { rowCount } = await db.query(
+    "delete from public.time_entries where id = $1",
+    [TEMP_TIME_ENTRY]
+  );
+  deleteTimeEntryPossible = rowCount === 1;
+} catch (e) {
+  deleteTimeEntryPossible = false;
+}
+check(
+  "RLS: member CAN delete own time entry (the schema's one delete policy)",
+  deleteTimeEntryPossible
+);
+
+// …but never someone else's workspace's.
+let deleteForeignTimeEntryPossible = false;
+try {
+  const { rowCount } = await db.query(
+    "delete from public.time_entries where id = $1",
+    [FOREIGN_TIME_ENTRY]
+  );
+  deleteForeignTimeEntryPossible = rowCount === 1;
+} catch (e) {
+  deleteForeignTimeEntryPossible = false;
+}
+check(
+  "RLS: cannot delete a foreign workspace's time entry",
+  !deleteForeignTimeEntryPossible
+);
+await db.query("reset role");
+
+// updated_at trigger keeps touching (like every other table).
+await db.query(
+  "update public.time_entries set description = 'rls probe (touched)' where id = $1",
+  [SEED_TIME_ENTRY_YESTERDAY]
+);
+const { rows: touchedEntry } = await db.query(
+  "select (updated_at >= created_at) as touched, description from public.time_entries where id = $1",
+  [SEED_TIME_ENTRY_YESTERDAY]
+);
+check(
+  "time_entries updated_at touch trigger fires on update",
+  touchedEntry.length === 1 &&
+    touchedEntry[0].touched === true &&
+    touchedEntry[0].description === "rls probe (touched)"
+);
 
 // ── templates: owner-only writes (Step 11) — the first "member ✗ / owner ✓" split ──
 
