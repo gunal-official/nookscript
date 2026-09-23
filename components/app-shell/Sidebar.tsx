@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { label: "Intake", href: "/intake" },
+  { label: "Inbox", href: "/intake/inbox" },
   { label: "Briefs", href: "/briefs" },
   { label: "Proposals", href: "/proposals" },
   { label: "Plans", href: "/plans" },
@@ -45,8 +46,11 @@ function NavItem({
 export function Sidebar({ workspaceName }: { workspaceName: string }) {
   const pathname = usePathname();
 
-  const isActive = (href: string) =>
-    href !== "#" && (pathname === href || pathname.startsWith(`${href}/`));
+  // Only ONE item highlights: pick the longest matching prefix, so
+  // /intake/inbox lights "Inbox" and not also its parent-prefix "Intake".
+  const activeHref = NAV_ITEMS.map((item) => item.href)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.length - a.length)[0];
 
   return (
     <aside className="flex flex-col border-r border-border bg-muted p-3">
@@ -56,7 +60,7 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
             key={item.label}
             label={item.label}
             href={item.href}
-            active={isActive(item.href)}
+            active={item.href === activeHref}
           />
         ))}
       </nav>

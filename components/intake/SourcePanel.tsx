@@ -23,15 +23,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { BriefSource } from "@/lib/types/brief";
+import { SourceBubbles } from "@/components/intake/SourceBubbles";
 
 export const MIN_SOURCE_CHARS = 20;
-
-function toMessages(raw: string): string[] {
-  return raw
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-}
 
 export function SourcePanel({
   mode,
@@ -58,7 +52,6 @@ export function SourcePanel({
     rawText.trim().length >= MIN_SOURCE_CHARS && !generating;
 
   if (mode === "thread") {
-    const messages = toMessages(rawText);
     return (
       <Card className="flex flex-col overflow-hidden">
         <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 border-b border-border bg-muted/60 px-5 py-3.5">
@@ -81,18 +74,7 @@ export function SourcePanel({
         </CardHeader>
 
         <CardContent className="space-y-3 bg-muted/40 p-5">
-          {messages.map((msg, i) => (
-            <div key={i} className="flex gap-2.5">
-              <span className="mt-1 h-6 w-6 shrink-0 rounded-full bg-accent text-center text-[11px] font-semibold leading-6 text-white">
-                {i === 0 ? "S" : "·"}
-              </span>
-              <div className="min-w-0 flex-1 rounded-lg border border-border bg-card px-4 py-3">
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
-                  {msg}
-                </p>
-              </div>
-            </div>
-          ))}
+          <SourceBubbles text={rawText} />
           <p className="pt-1 text-xs text-muted-foreground">
             The original pasted text is stored verbatim and never edited.
           </p>

@@ -22,6 +22,7 @@ import type {
   BriefQuestion,
   BriefSource,
   EditableBriefField,
+  SourceType,
 } from "@/lib/types/brief";
 
 export interface GeneratedBriefBundle {
@@ -133,6 +134,65 @@ export async function generateBriefFromSource(input: {
       engine,
     },
   };
+}
+
+const MIN_REPLY_CHARS = 5;
+
+export type AddSourceResult = { error?: string } | undefined;
+
+/**
+ * Step 12 — thread a new source ("reply") onto an EXISTING brief, from
+ * /intake/inbox or the brief detail Sources card. Goes through the
+ * add_brief_source() RPC so the immutable brief_sources row and the
+ * 'source_added' brief_edit_history entry are written atomically
+ * (membership is re-checked inside the RPC — any workspace member may add).
+ */
+export async function addSourceToBrief(input: {
+  briefId: string;
+  sourceType: SourceType;
+  rawContent: string;
+}): Promise<AddSourceResult> {
+  if (!input.briefId) return { error: "Missing brief id." };
+
+  const rawContent = input.rawContent ?? "";
+  const trimmed = rawContent.trim();
+
+  if (trimmed.length < MIN_REPLY_CHARS) {
+    return { error: "Write at least a short sentence — replies need some substance." };
+  }
+  if (rawContent.length > MAX_SOURCE_CHARS) {
+    return { error: `Reply is too long (${MAX_SOURCE_CHARS.toLocaleString()} characters max).` };
+  }
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Your session has expired. Please log in again." };
+  }
+
+  const { error } = await supabase.rpc("add_brief_source", {
+    p_brief_id: input.briefId,
+    p_source_type: input.sourceType,
+    p_raw_content: trimmed,
+    p_metadata: {
+      pasted_at: new Date().toISOString(),
+      char_count: trimmed.length,
+    },
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  // Both views of the thread show the new source (server action re-renders
+  // the current route; these cover navigation to the other surface).
+  revalidatePath("/intake/inbox");
+  revalidatePath(`/briefs/${input.briefId}`);
+
+  return { error: undefined };
 }
 
 export type SaveEditsResult = { error?: string } | undefined;

@@ -161,9 +161,26 @@ const { rows: counts } = await db.query(`
     (select count(*)::int from public.brief_edit_history where brief_id = '${SEED_BRIEF}') as history
 `);
 check(
-  "seed: 1 source, 1 open + 2 resolved questions, 2 history entries",
-  counts[0].sources === 1 && counts[0].open_q === 1 && counts[0].resolved_q === 2 && counts[0].history === 2,
+  "seed: 2 sources, 1 open + 2 resolved questions, 3 history entries",
+  counts[0].sources === 2 && counts[0].open_q === 1 && counts[0].resolved_q === 2 && counts[0].history === 3,
   JSON.stringify(counts[0])
+);
+
+// ── Seed threading (Step 12): the follow-up source must be newer than the
+// original, and its 'source_added' audit row must exist exactly as the
+// add_brief_source() RPC would write it ──
+const { rows: [threadSeed] } = await db.query(`
+  select
+    (select created_at from public.brief_sources where id = '00000000-0000-0000-0000-000000000054')
+      > (select created_at from public.brief_sources where id = '00000000-0000-0000-0000-000000000011') as followup_is_newer,
+    (select count(*)::int from public.brief_edit_history
+      where brief_id = '${SEED_BRIEF}' and action_type = 'source_added'
+        and description = 'added a new source (email)') as source_added_rows
+`);
+check(
+  "seed follow-up source (.0054) threads after the original (.0011), with a 'source_added' audit row",
+  threadSeed?.followup_is_newer === true && threadSeed?.source_added_rows === 1,
+  JSON.stringify(threadSeed)
 );
 
 // ── Seed proposal (Step 7) ──
@@ -712,6 +729,113 @@ try {
   foreignTplBlocked = true;
 }
 check("RLS: owner cannot insert template into foreign workspace", foreignTplBlocked);
+await db.query("reset role");
+
+// ── add_brief_source() RPC (Step 12 inbox threading) ──
+// atomic pair: insert brief_sources row + log 'source_added' history row,
+// guarded by workspace membership via workspace_id_of_brief().
+
+// happy path as a plain MEMBER (Leo) — members, not just owners, may thread
+await db.query("select set_config('app.jwt_sub', $1, false)", [MEMBER_UID]);
+await db.query("set role nstester");
+const NEW_SOURCE_RAW = "Follow-up from Priya: keep two hero layout candidates open for now.";
+let newSourceId = null;
+let addSourceErr = null;
+try {
+  const { rows: [src] } = await db.query(
+    "select public.add_brief_source($1, $2, $3, $4) as id",
+    [
+      SEED_BRIEF,
+      "email",
+      NEW_SOURCE_RAW,
+      JSON.stringify({
+        pasted_at: new Date().toISOString(),
+        char_count: NEW_SOURCE_RAW.length,
+      }),
+    ]
+  );
+  newSourceId = src?.id ?? null;
+} catch (e) {
+  addSourceErr = e;
+}
+check(
+  "add_brief_source: member can thread a source onto a brief",
+  Boolean(newSourceId) && addSourceErr === null,
+  addSourceErr ? String(addSourceErr.message).slice(0, 80) : newSourceId
+);
+
+const { rows: [insertedSource] } = await db.query(
+  "select source_type, raw_content, metadata->>'char_count' as char_count from public.brief_sources where id = $1",
+  [newSourceId]
+);
+check(
+  "add_brief_source: inserted brief_sources row is correct (type/content/metadata)",
+  insertedSource?.source_type === "email" &&
+    insertedSource?.raw_content === NEW_SOURCE_RAW &&
+    Number(insertedSource?.char_count) === NEW_SOURCE_RAW.length
+);
+
+const { rows: [addedHist] } = await db.query(
+  "select action_type, description, user_id from public.brief_edit_history where brief_id = $1 order by created_at desc limit 1",
+  [SEED_BRIEF]
+);
+check(
+  "add_brief_source: 'source_added' history row logged with the caller as actor",
+  addedHist?.action_type === "source_added" &&
+    addedHist?.description === "added a new source (email)" &&
+    addedHist?.user_id === MEMBER_UID
+);
+
+// unauthorized: the demo owner is NOT a member of the foreign workspace
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+let foreignSourceId = null;
+let foreignSourceErr = null;
+try {
+  const { rows: [f] } = await db.query(
+    "select public.add_brief_source($1, 'email', 'unauthorized marker text here', '{}'::jsonb) as id",
+    [FOREIGN_BRIEF]
+  );
+  foreignSourceId = f?.id ?? null;
+} catch (e) {
+  foreignSourceErr = e;
+}
+check(
+  "add_brief_source rejects non-member workspaces",
+  foreignSourceId === null && foreignSourceErr !== null,
+  foreignSourceErr
+    ? String(foreignSourceErr.message).slice(0, 80)
+    : "unexpectedly succeeded"
+);
+
+// a rejected call must leave NOTHING behind (the pair is one transaction)
+const { rows: [atomicity] } = await db.query(
+  `select
+    (select count(*)::int from public.brief_sources
+      where brief_id = $1 and raw_content like 'unauthorized marker%') as leftover_sources,
+    (select count(*)::int from public.brief_edit_history
+      where brief_id = $2 and action_type = 'source_added') as leftover_history`,
+  [FOREIGN_BRIEF, FOREIGN_BRIEF]
+);
+check(
+  "add_brief_source rejection is atomic — no partial source/history rows",
+  atomicity?.leftover_sources === 0 && atomicity?.leftover_history === 0,
+  JSON.stringify(atomicity)
+);
+
+// bad source_type guard (explicit, mirroring create_brief_bundle)
+let badTypeErr = null;
+try {
+  await db.query(
+    "select public.add_brief_source($1, 'tweet', 'a realistic reply from the client here', '{}'::jsonb)",
+    [SEED_BRIEF]
+  );
+} catch (e) {
+  badTypeErr = e;
+}
+check(
+  "add_brief_source rejects invalid source_type",
+  badTypeErr !== null && /bad_source_type/.test(String(badTypeErr.message))
+);
 await db.query("reset role");
 
 // ── create_brief_bundle() RPC (Step 4 intake) ──

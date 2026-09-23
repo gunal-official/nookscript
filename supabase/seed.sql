@@ -309,3 +309,40 @@ Maya',
   now() - interval '2 days',
   now() - interval '2 days'
 ) on conflict (id) do nothing;
+
+-- ── Follow-up source: Priya''s reply threaded onto the same brief ──
+-- Demonstrates 1:many brief_sources threading + the /intake/inbox view.
+-- Dated AFTER the original …0011 email (−2 days vs −4).
+
+insert into public.brief_sources (id, brief_id, source_type, raw_content, metadata, created_at)
+values (
+  '00000000-0000-0000-0000-000000000054',
+  '00000000-0000-0000-0000-000000000010',
+  'email',
+  'Hi Maya,
+
+Thanks for the quick brief — the deliverables list matches exactly what I had in mind, and the open questions are fair ones.
+
+On the website reskin: let''s officially keep it OUT of scope for this phase. If the identity lands well we''ll scope phase two separately in December. So please treat "web reskin" as a maybe-later note, not a deliverable.
+
+One small add — can you include an email signature refresh in the palette/typography guide? The sales team keeps asking.
+
+Best,
+Priya Raman
+Head of Marketing, Brightloop Co.',
+  '{"from": "priya@brightloop.co", "subject": "Re: Brand refresh — kickoff details", "received_at": "2026-09-20T15:08:00+05:30"}'::jsonb,
+  now() - interval '2 days'
+) on conflict (id) do nothing;
+
+-- …and the audit entry the add_brief_source() RPC would have written for it
+-- (same action_type + description shape the RPC generates).
+
+insert into public.brief_edit_history (id, brief_id, user_id, action_type, description, created_at)
+values (
+  '00000000-0000-0000-0000-000000000017',
+  '00000000-0000-0000-0000-000000000010',
+  '00000000-0000-0000-0000-000000000001',
+  'source_added',
+  'added a new source (email)',
+  now() - interval '2 days'
+) on conflict (id) do nothing;

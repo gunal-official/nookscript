@@ -229,6 +229,43 @@ Editor). If you don’t, `/settings` shows its load-error state.
 5. DB-level proof: `npm run verify:db` (59 checks, incl. the
    member-view/member-✗-insert/owner-CRUD template assertions).
 
+## Verify Step 12 (/intake/inbox — threaded sources)
+
+⚠ New migration in this step — re-apply to your live Supabase project
+(`supabase db push`, or paste
+`supabase/migrations/20260923050000_add_brief_source_rpc.sql` into the SQL
+Editor). Without it, **"Add to thread" replies fail** (the RPC doesn't
+exist) — the page itself keeps rendering. Live-drift probe (run in the SQL
+Editor; `null`/missing row = apply the migration first):
+
+```sql
+select to_regclass('public.share_links') as share_links,
+       to_regclass('public.templates') as templates,
+       to_regclass('public.updates') as updates,
+       to_regclass('public.plans') as plans;
+select proname from pg_proc
+ where proname in ('get_shared_document', 'add_brief_source', 'create_brief_bundle');
+```
+
+1. Log in with the seeded demo user and open **Inbox** (new sidebar item,
+   `/intake/inbox`): the Brightloop thread shows **both seeded emails** —
+   the kickoff plus Priya's phase-two follow-up — as chat bubbles,
+   oldest-first, threaded and sorted by most-recent source.
+2. **Thread a follow-up** — type a reply at the bottom of a thread and
+   click *Add to thread*: an optimistic bubble appears, then the real row
+   lands (atomic `add_brief_source()` RPC: `brief_sources` insert +
+   `source_added` audit entry in one transaction).
+3. **Shared thread** — open the Brightloop brief detail: the same reply
+   appears in its **Sources card** (which also has its own composer now),
+   and a `source_added` entry appears in the History card. `raw_content`
+   stays immutable — `brief_sources` still has zero UPDATE policies.
+4. Generate a brand-new brief from `/intake` → its source shows up here
+   as a new thread instantly.
+5. DB-level proof: `npm run verify:db` (66 checks, incl. member-thread
+   happy path, foreign-workspace rejection with **atomicity** (no partial
+   rows), `bad_source_type` guard, and the seeded thread-ordering
+   assertion).
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

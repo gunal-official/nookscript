@@ -27,6 +27,7 @@ import { GenerateProposalButton } from "@/components/briefs/GenerateProposalButt
 import { ResolveQuestionDialog } from "@/components/briefs/ResolveQuestionDialog";
 import { StatusBadge } from "@/components/briefs/StatusBadge";
 import { StatusSelect } from "@/components/briefs/StatusSelect";
+import { AddSourceForm } from "@/components/intake/AddSourceForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -370,6 +371,10 @@ export default async function BriefDetailPage({
                   No sources attached.
                 </p>
               )}
+              {/* Step 12: thread a follow-up source onto this brief — the
+                  same composer as /intake/inbox; the reply lands here AND
+                  in the inbox thread for this brief. */}
+              <AddSourceForm briefId={brief.id} />
             </CardContent>
           </Card>
 
