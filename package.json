@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
-    "verify:db": "node scripts/verify-db.mjs"
+    "verify:db": "node scripts/verify-db.mjs",
+    "verify:live": "node scripts/verify-live-schema.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.1.0",

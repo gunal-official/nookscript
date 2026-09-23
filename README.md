@@ -46,6 +46,32 @@ npm run dev
 
 Open http://localhost:3000.
 
+## Verify live schema (offline-vs-live drift probe)
+
+`npm run verify:db` proofs the committed migrations against a FRESH
+in-memory Postgres — it cannot see whether your REAL hosted project
+actually has the latest schema applied. That gap bit us in Step 10: the
+offline gate passed 100% while `/share/:token` 404ed at runtime with
+PGRST205 (“table not found”) because the `share_links` migration had never
+been run on the live project.
+
+Close it with the live probe:
+
+```bash
+npm run verify:live
+```
+
+It connects to your hosted project with the **anon key** (from
+`.env.local` — so unlike `verify:db`, this one needs real project
+credentials) and checks that all **12 tables + 5 app-facing RPCs** the
+migrations promise are visible to the app (17 items). It is read-only:
+table checks use `select * limit 0`, and RPC checks call each function
+with guard-tripping arguments so it dies inside the function’s own
+auth/membership guard with nothing written. A failure names the exact
+missing object and its migration file (“did you forget to run
+`supabase db push`?”); exit code is `1` on any miss, `0` when clean —
+safe to wire into CI or a pre-deploy check later.
+
 ## Verify Step 2 (auth + workspaces)
 
 Browser checklist (the “Confirm” list):
