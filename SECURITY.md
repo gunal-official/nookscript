@@ -1,5 +1,41 @@
 # Security
 
+## Production checklist (things code alone cannot fix)
+
+Items wired **in code** (Step 14) live in the repo; the items below are the
+human-side checklist that must be confirmed in dashboards before real
+users touch this app.
+
+**Rate limiting**
+- ✅ In-code: `/share/*` is capped at 30 req/min per IP by an in-memory
+  sliding-window limiter (middleware). Documented limitation: in-memory
+  state does NOT survive redeploys and is NOT shared across serverless
+  instances — in a multi-instance deploy the effective ceiling multiplies
+  by instance count. Treat as casual-abuse mitigation; the durable-store
+  upgrade (e.g. Upstash Redis) is future work.
+- ⚠️ Login/signup abuse protection is **delegated entirely to Supabase**:
+  those pages are client components whose auth calls go browser→Supabase
+  Auth API directly, so this repo's middleware never sees them. Confirm
+  the project's auth rate limits in the Supabase dashboard (**Project →
+  Authentication → Rate Limits**). Do not "fix" this in middleware — it
+  would be ineffective and misleading.
+- ⚠️ README's local-setup step says to turn **Confirm email OFF** (single-
+  step signup). That is a development convenience — reconsider enabling
+  email confirmation before accepting real signups (bot-signup friction +
+  deliverability sanity).
+- [ ] **Backups**: confirm the Supabase project tier + backup settings in
+  the dashboard (scheduled snapshots on free; PITR is a paid-tier option).
+  Nothing in the repo can verify this. Decide a restore story for client
+  data (`brief_sources`, share links) — these are client communications.
+- [ ] **Observability**: Sentry only activates when `SENTRY_DSN` is set —
+  the wiring ships inert by default, so set the env var in production or
+  error tracking silently stays off. Wire source-map upload separately
+  (Sentry wizard) if stack traces should be readable.
+- [ ] **CI gate**: `.github/workflows/verify.yml` runs tsc + build +
+  verify:db on every push — but `npm run verify:live` is **intentionally
+  not automated** (it needs production credentials). Run it manually
+  before every production deploy.
+
 ## Known vulnerabilities (npm audit) — deferred by decision
 
 **Status as of 2026-09-23:** `npm audit` reports **5 vulnerabilities (4 high, 1 critical)**, all inside the Next.js dependency tree:

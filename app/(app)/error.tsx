@@ -13,6 +13,13 @@ export default function AppError({
 }) {
   useEffect(() => {
     console.error(error);
+    // Step 14: also report to Sentry when configured — lazy import so the
+    // SDK chunk is never loaded with SENTRY_DSN unset (fully inert).
+    if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+      import("@sentry/nextjs").then((Sentry) => {
+        Sentry.captureException(error);
+      });
+    }
   }, [error]);
 
   return (

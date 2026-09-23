@@ -33,11 +33,13 @@ const SWEEP_THRESHOLD = 5_000; // Map size that triggers an idle-key sweep
 const hits = new Map<string, number[]>();
 
 function sweep(now: number) {
-  for (const [key, timestamps] of hits) {
+  // Map#forEach (not for..of) — the project targets pre-es2015 iteration
+  // support, so the iterator protocol isn't available at the type level.
+  hits.forEach((timestamps, key) => {
     const active = timestamps.filter((t) => now - t < WINDOW_MS);
     if (active.length === 0) hits.delete(key);
     else hits.set(key, active);
-  }
+  });
 }
 
 /** True when the key has already used its window budget (caller should
