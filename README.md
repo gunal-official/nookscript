@@ -525,6 +525,37 @@ no delete anywhere and no money fields (the invoices hold the value).
    standalone rows, member RLS, the no-delete proof, and the
    updated_at touch trigger).
 
+## Verify Step 20 (reports — the platform rollup)
+
+No new migration in this step — reports are computed live from the
+Step 17–19 tables (invoices, time_entries, contracts). Everything is
+pure TS in `lib/reports.ts`; nothing is stored that can drift.
+
+/reports is a single server-rendered page (no client island — fixed
+windows, no picker): **Money** (Collected = paid, Outstanding = sent,
+Draft; void excluded and counted), **Time** (Today / This month /
+All time, keyed on `worked_on`, plus per-brief bars for this month —
+hours only, since invoices are deliberately not brief-linked), and
+**Contracts** (status counts + "expiring within 30 days" + "expired",
+both derived from `expires_on`).
+
+1. **Money** — with the seeds: Collected $0.00 (0 paid) · Outstanding
+   $3,150.00 (1 sent — INV-0002 incl. 5% tax) · Draft $1,950.00
+   (1 draft). Pay INV-0002 on its detail page → navigate back → the
+   dollar moves from Outstanding to Collected.
+2. **Time** — Today 3h 40m · This month 8h 25m · All time 8h 25m
+   (the four seeded days; re-seeding near a month boundary can split
+   month/all-time). By brief: Brightloop brief 7h 25m, "General — no
+   brief" 1h. Log time or edit an entry's date → the numbers follow.
+3. **Contracts** — Signed 1 · Sent 0 · Draft 1 · Expiring within 30
+   days 0 · Expired 0. Set an expiry on the draft (near-future or in
+   the past) → the derived counters move with no status change.
+4. **Empty states** — a fresh workspace (no platform data) renders all
+   three cards with their "No … yet" copy.
+5. **DB-level proof** — unchanged: `npm run verify:db` (120 checks /
+   15 migrations — every input table is already proven; the
+   aggregation is app-side TS, covered by the rendered values above).
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through
