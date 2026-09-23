@@ -2,22 +2,34 @@
 
 /**
  * Team card on /settings (Step 15): the workspace roster, plus — for
- * owners only — invite management. Delivery is copy-link (no email is
- * sent anywhere): the owner creates a targeted invite, copies its URL,
- * and sends it through their own mail/chat. Members see the roster
- * read-only with ZERO invite controls rendered (hide-don't-disable; the
- * server actions and RLS re-gate the same checks).
+ * owners only — invite management, role management (Step 22), and
+ * removal (Step 21). Invite delivery is copy-link (no email is sent
+ * anywhere): the owner creates a targeted invite, copies its URL, and
+ * sends it through their own mail/chat. Members see the roster
+ * read-only with ZERO management controls rendered (hide-don't-disable;
+ * the server actions and RLS re-gate the same checks).
  *
- * Revoke uses the same inline two-click confirm as template delete.
- * Absolute invite URLs resolve window.location.origin after mount —
- * ShareLinkPanel precedent (SSR renders nothing url-shaped, so no
- * hydration mismatch and the copy button needs no placeholder).
+ * Destructive / role controls use the same inline two-click confirm as
+ * template delete and invite revoke. Absolute invite URLs resolve
+ * window.location.origin after mount — ShareLinkPanel precedent (SSR
+ * renders nothing url-shaped, so no hydration mismatch and the copy
+ * button needs no placeholder).
  */
 
 import { useEffect, useState } from "react";
-import { Ban, Check, Copy, Loader2, Trash2, UserPlus } from "lucide-react";
+import {
+  Ban,
+  Check,
+  Copy,
+  Crown,
+  Loader2,
+  Trash2,
+  UserMinus,
+  UserPlus,
+} from "lucide-react";
 
 import {
+  changeMemberRoleAction,
   createTeamInviteAction,
   removeMemberAction,
   revokeTeamInviteAction,
@@ -39,17 +51,25 @@ import { formatDate, getInitials } from "@/lib/utils";
 function MemberRow({
   member,
   removable,
+  roleChange,
 }: {
   member: TeamMember;
   /** True when the viewer (an owner) may remove this member: not their
    *  own row, and not the workspace's last owner. */
   removable: boolean;
+  /** The role the viewer (an owner) may change this member TO: never
+   *  their own row, and never the last owner (they can't be demoted).
+   *  null = no role control. */
+  roleChange: "owner" | "member" | null;
 }) {
   const initials =
     member.avatar_initials || getInitials(member.full_name ?? "?");
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingRole, setConfirmingRole] = useState(false);
+  const [rolePending, setRolePending] = useState(false);
+  const [roleError, setRoleError] = useState<string | null>(null);
 
   async function handleRemove() {
     setPending(true);
@@ -62,6 +82,24 @@ function MemberRow({
     }
     // On success the row disappears via revalidated server props.
   }
+
+  async function handleRoleChange() {
+    if (!roleChange) return;
+    setRolePending(true);
+    setRoleError(null);
+    const result = await changeMemberRoleAction({
+      userId: member.user_id,
+      role: roleChange,
+    });
+    setRolePending(false);
+    if (result?.error) {
+      setRoleError(result.error);
+      setConfirmingRole(false);
+    }
+    // On success the badge updates via revalidated server props.
+  }
+
+  const isPromotion = roleChange === "owner";
 
   return (
     <li className="py-3 first:pt-0 last:pb-0">
@@ -83,7 +121,32 @@ function MemberRow({
           {member.role}
         </Badge>
 
-        {removable && !confirming && (
+        {roleChange && !confirmingRole && !confirming && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={
+              isPromotion
+                ? "shrink-0 text-muted-foreground hover:text-foreground"
+                : "shrink-0 text-muted-foreground hover:text-error"
+            }
+            onClick={() => setConfirmingRole(true)}
+            aria-label={
+              isPromotion
+                ? `Make ${member.full_name ?? "member"} an owner`
+                : `Make ${member.full_name ?? "member"} a member`
+            }
+          >
+            {isPromotion ? (
+              <Crown className="h-3.5 w-3.5" />
+            ) : (
+              <UserMinus className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        )}
+
+        {removable && !confirming && !confirmingRole && (
           <Button
             type="button"
             variant="ghost"
@@ -94,6 +157,35 @@ function MemberRow({
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
+        )}
+
+        {roleChange && confirmingRole && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">
+              {isPromotion ? "Make owner?" : "Make member?"}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmingRole(false)}
+              disabled={rolePending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant={isPromotion ? "default" : "destructive"}
+              size="sm"
+              onClick={handleRoleChange}
+              disabled={rolePending}
+            >
+              {rolePending && (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              )}
+              {isPromotion ? "Make owner" : "Make member"}
+            </Button>
+          </div>
         )}
 
         {removable && confirming && (
@@ -124,6 +216,7 @@ function MemberRow({
         )}
       </div>
       {error && <p className="mt-1 text-xs text-error">{error}</p>}
+      {roleError && <p className="mt-1 text-xs text-error">{roleError}</p>}
     </li>
   );
 }
@@ -271,6 +364,17 @@ export function TeamCard({
     member.user_id !== currentUserId &&
     !(member.role === "owner" && ownerCount === 1);
 
+  // Role changes (Step 22): owners can flip anyone else's role —
+  // members up to owner, owners down to member — except the workspace's
+  // last owner (demoting them would leave it ownerless).
+  const roleChangeFor = (
+    member: TeamMember
+  ): "owner" | "member" | null => {
+    if (!isOwner || member.user_id === currentUserId) return null;
+    if (member.role === "member") return "owner";
+    return ownerCount > 1 ? "member" : null;
+  };
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
@@ -292,7 +396,7 @@ export function TeamCard({
           Everyone who can see this workspace.{" "}
           {!isOwner && (
             <span className="italic">
-              View only — owners manage invites and removals.
+              View only — owners manage invites, roles, and removals.
             </span>
           )}
         </CardDescription>
@@ -304,6 +408,7 @@ export function TeamCard({
               key={member.user_id}
               member={member}
               removable={isRemovable(member)}
+              roleChange={roleChangeFor(member)}
             />
           ))}
         </ul>

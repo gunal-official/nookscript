@@ -1,8 +1,9 @@
 /**
  * /settings — workspace configuration: name, team roster + invites
- * (Step 15) + member removal (Step 21), and templates (Step 11).
- * Owner-managed, member-readable. No detail routes — template
- * create/edit happens in a dialog, invites inline on the Team card.
+ * (Step 15) + role management (Step 22) + member removal (Step 21),
+ * and templates (Step 11). Owner-managed, member-readable. No detail
+ * routes — template create/edit happens in a dialog, team controls
+ * inline on the Team card.
  *
  * HOW TO TEST (locally — ⚠ apply the templates migration + seed first):
  *   1. Open /settings as the seeded demo user (an OWNER): two seeded
@@ -13,15 +14,17 @@
  *      user as 'member'): as that user the same page shows the same
  *      templates with NO management controls and a "View only" note —
  *      RLS (is_workspace_owner) backs the UI.
- *   3. Team card (Step 21): as the owner, every member row has a trash
- *      control EXCEPT your own row and (when you are the only owner)
- *      the last owner's row. Trash → inline "Remove?" → Confirm
- *      removes the member (roster revalidates). Self-removal and
- *      last-owner removal are rejected by the action even if the UI is
- *      bypassed.
+ *   3. Team card (Steps 21–22): as the owner, member rows get a trash
+ *      control (remove) and a crown control (promote to owner); owner
+ *      rows get a demote control — but never on your own row, and never
+ *      for the last owner (removal or demotion). Each opens an inline
+ *      two-click confirm; the badge/roster revalidates on success.
+ *      Self-changes and last-owner changes are rejected by the actions
+ *      even if the UI is bypassed (and by the DB policy).
  *   4. DB-level proof: npm run verify:db (member-select ✓, member-insert
  *      ✗, owner insert/update/delete ✓ — incl. the Step 21
- *      member-cannot-delete / owner-can-delete pair).
+ *      member-cannot-delete / owner-can-delete pair and the Step 22
+ *      role-change quartet).
  */
 
 import { TeamCard } from "@/components/settings/TeamCard";

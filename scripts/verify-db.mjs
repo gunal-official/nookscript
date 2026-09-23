@@ -27,6 +27,9 @@
  *     delete policy (legal/financial document — void is the cancel)
  *   - member removal (Step 21): the Step-2 owner-only DELETE policy on
  *     workspace_members — plain member ✗ / owner ✓
+ *   - role management (Step 22): the new UPDATE policy on
+ *     workspace_members — plain member ✗, promote ✓, demote-with-
+ *     remaining-owner ✓, self-change ✗, row reassignment ✗
  *
  * Note: PGlite runs as a single superuser, so RLS is exercised via a
  * dedicated non-owner role (`nstester`) with a faked `auth.uid()`.
@@ -1670,6 +1673,97 @@ const { rows: nulled } = await db.query(
   "select * from public.get_workspace_members()"
 );
 check("null active pointer resolves to first-joined workspace", nulled.length === 3);
+await db.query("reset role");
+
+// ── workspace_members UPDATE policy (Step 22: role management) ──
+// Invites only ever grant 'member' — this policy is the only path to
+// an owner role. The probes net out (Leo is promoted, then demoted) so
+// the Step-21 delete section that follows sees the seeded roles.
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+await db.query("set role nstester");
+const { rows: lastOwnerRows } = await db.query(
+  "select public.is_last_owner($1, $2) as sole, public.is_last_owner($1, $3) as not_last",
+  [SEED_WS, SEED_UID, TEAMMATE_UID]
+);
+check(
+  "is_last_owner() identifies the sole owner (and not a member)",
+  lastOwnerRows[0].sole === true && lastOwnerRows[0].not_last === false
+);
+
+// a plain member acting on another member — USING fails (not an owner)
+await db.query("select set_config('app.jwt_sub', $1, false)", [MEMBER_UID]);
+await db.query("set role nstester");
+let memberRoleChangeBlocked = true;
+try {
+  const { rowCount } = await db.query(
+    "update public.workspace_members set role = 'owner' where workspace_id = $1 and user_id = $2",
+    [SEED_WS, TEAMMATE_UID]
+  );
+  memberRoleChangeBlocked = rowCount === 0;
+} catch (e) {
+  memberRoleChangeBlocked = true;
+}
+check("RLS: plain member CANNOT change a role", memberRoleChangeBlocked);
+
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+await db.query("set role nstester");
+// promote Leo (member → owner)
+let promotePossible = false;
+try {
+  const { rowCount } = await db.query(
+    "update public.workspace_members set role = 'owner' where workspace_id = $1 and user_id = $2",
+    [SEED_WS, MEMBER_UID]
+  );
+  promotePossible = rowCount === 1;
+} catch (e) {
+  promotePossible = false;
+}
+check("RLS: owner CAN promote a member", promotePossible);
+// demote Leo back (owner → member) — Maya remains the other owner
+let demotePossible = false;
+try {
+  const { rowCount } = await db.query(
+    "update public.workspace_members set role = 'member' where workspace_id = $1 and user_id = $2",
+    [SEED_WS, MEMBER_UID]
+  );
+  demotePossible = rowCount === 1;
+} catch (e) {
+  demotePossible = false;
+}
+check(
+  "RLS: owner CAN demote an owner (when another owner remains)",
+  demotePossible
+);
+// self-demotion — blocked (the only path to an ownerless workspace)
+let selfRoleChangeBlocked = true;
+try {
+  const { rowCount } = await db.query(
+    "update public.workspace_members set role = 'member' where workspace_id = $1 and user_id = $2",
+    [SEED_WS, SEED_UID]
+  );
+  selfRoleChangeBlocked = rowCount === 0;
+} catch (e) {
+  selfRoleChangeBlocked = true;
+}
+check(
+  "RLS: owner CANNOT change their OWN role (self-guard + last-owner)",
+  selfRoleChangeBlocked
+);
+// identity pinning: reassigning the membership to another user
+let reassignBlocked = true;
+try {
+  const { rowCount } = await db.query(
+    "update public.workspace_members set user_id = $2 where workspace_id = $1 and user_id = $3",
+    [SEED_WS, TEAMMATE_UID, MEMBER_UID]
+  );
+  reassignBlocked = rowCount === 0;
+} catch (e) {
+  reassignBlocked = true;
+}
+check(
+  "RLS: membership rows cannot be reassigned (identity pinned)",
+  reassignBlocked
+);
 await db.query("reset role");
 
 // ── workspace_members delete policy (Step 21: member removal) ──

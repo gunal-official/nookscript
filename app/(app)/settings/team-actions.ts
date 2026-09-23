@@ -119,6 +119,93 @@ export async function revokeTeamInviteAction(input: {
 }
 
 /**
+ * Change a member's role in the ACTIVE workspace (Step 22 — role
+ * management, the Step 15 follow-up). Invites only ever grant
+ * 'member', so promoting is the only path to an owner role.
+ *
+ * Guards (defense in depth — the UI hides the same cases, and the
+ * Step-22 UPDATE policy on workspace_members enforces them at the DB
+ * level):
+ *   * owner-gated (role check here + is_workspace_owner in RLS);
+ *   * NO SELF-ROLE-CHANGES — "leaving" (including self-demotion) is a
+ *     different action (recorded cut, like Step 21's self-removal);
+ *   * NO LAST-OWNER DEMOTION — a workspace must always keep at least
+ *     one owner.
+ */
+export async function changeMemberRoleAction(input: {
+  userId: string;
+  role: "owner" | "member";
+}): Promise<TeamActionResult> {
+  if (!isUuid(input.userId ?? "")) {
+    return { error: "Unknown member." };
+  }
+  if (input.role !== "owner" && input.role !== "member") {
+    return { error: "Unknown role." };
+  }
+
+  const { supabase, user, membership } = await getMembership();
+  if (!user || !membership) {
+    return { error: "Your session has expired. Please log in again." };
+  }
+  if (membership.role !== "owner") {
+    return { error: "Only workspace owners can change roles." };
+  }
+  if (user.id === input.userId) {
+    return {
+      error:
+        "You can’t change your own role — leaving a workspace is a different action (not available yet).",
+    };
+  }
+
+  // The target's membership (RLS-scoped to our workspaces; a non-member
+  // or foreign id resolves to no row).
+  const {
+    data: target,
+    error: targetError,
+  } = await supabase
+    .from("workspace_members")
+    .select("user_id, role")
+    .eq("workspace_id", membership.workspace_id)
+    .eq("user_id", input.userId)
+    .maybeSingle();
+
+  if (targetError) return { error: targetError.message };
+  if (!target) {
+    return { error: "That person is no longer a member of this workspace." };
+  }
+
+  // Idempotent no-op when the role is already what was requested.
+  if (target.role !== input.role) {
+    // Last-owner guard: demoting the sole owner would leave the
+    // workspace without one.
+    if (target.role === "owner" && input.role === "member") {
+      const { count, error: countError } = await supabase
+        .from("workspace_members")
+        .select("user_id", { count: "exact", head: true })
+        .eq("workspace_id", membership.workspace_id)
+        .eq("role", "owner");
+      if (countError) return { error: countError.message };
+      if ((count ?? 0) <= 1) {
+        return {
+          error: "You can’t demote the last owner of a workspace.",
+        };
+      }
+    }
+
+    const { error } = await supabase
+      .from("workspace_members")
+      .update({ role: input.role })
+      .eq("workspace_id", membership.workspace_id)
+      .eq("user_id", input.userId);
+
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath("/settings");
+  return { error: undefined };
+}
+
+/**
  * Remove a member from the ACTIVE workspace (Step 21 — closes out the
  * Step 15 team feature). The owner-only DELETE policy on
  * workspace_members has existed since Step 2; this is the first app

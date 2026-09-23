@@ -582,6 +582,38 @@ remove control; the action re-checks both server-side.
    migrations, incl. the new plain-member-cannot-delete /
    owner-can-delete pair on `workspace_members`).
 
+## Verify Step 22 (role management — Step 15 follow-up)
+
+Invites only ever grant `member`, so before this step there was no way
+to become (or stop being) an owner after the workspace was created.
+Step 22 adds the missing UPDATE policy (migration 16) and the app
+surface.
+
+**DB invariants** (migration 16, house style — `auth.uid()` helpers,
+no `to` clause): owner-gated both directions; **no self role-changes**
+(the only path to an ownerless workspace is the last owner demoting
+themselves — "leaving", a different unbuilt action, same cut as
+Step 21's self-removal); **last-owner guard** via the new
+`is_last_owner()` helper (a demotion that would leave zero owners is
+rejected); **identity pinned** — an update may change `role` and
+nothing else (reassigning the membership to another user fails).
+
+1. **The controls** — as an owner, /settings → Team: every member row
+   has a crown ("Make owner"); every owner row EXCEPT the last owner's
+   has a UserMinus ("Make member"); your own row has neither (nor the
+   remove control). Members see no role controls at all.
+2. **Two-click confirm** — crown → "Make owner?" / demote →
+   "Make member?" (destructive) → confirm → the badge flips
+   (revalidated roster).
+3. **Guards** — the action rejects self role-changes, last-owner
+   demotions, non-owner callers, unknown/foreign ids, and bad role
+   values even when the UI is bypassed; the UPDATE policy re-enforces
+   all of it at the DB level.
+4. **DB-level proof** — `npm run verify:db` (128 checks / 16
+   migrations, incl. the new role-change set: plain-member ✗,
+   promote ✓, demote-with-remaining-owner ✓, self-change ✗,
+   reassignment ✗, plus the `is_last_owner()` unit check).
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through
