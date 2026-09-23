@@ -23,6 +23,7 @@ import { ArrowLeft, ArrowUpRight } from "lucide-react";
 
 import { getUpdateById } from "@/lib/data/updates";
 import { getShareLinkForUpdate } from "@/lib/data/shares";
+import { getTemplates } from "@/lib/data/templates";
 import { formatDate, isUuid, timeAgo } from "@/lib/utils";
 import { ExportUpdateMarkdownButton } from "@/components/updates/ExportUpdateMarkdownButton";
 import { ShareLinkPanel } from "@/components/updates/ShareLinkPanel";
@@ -88,7 +89,10 @@ export default async function UpdateDetailPage({
     return <NotFoundState />;
   }
 
-  const shareLink = await getShareLinkForUpdate(params.id);
+  const [shareLink, templates] = await Promise.all([
+    getShareLinkForUpdate(params.id),
+    getTemplates(), // for the composer's "Insert template" affordance
+  ]);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -129,6 +133,7 @@ export default async function UpdateDetailPage({
               updateId={update.id}
               initialTitle={update.title}
               initialBody={update.body}
+              templates={templates}
             />
           </CardContent>
         </Card>
