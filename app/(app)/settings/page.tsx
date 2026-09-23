@@ -17,26 +17,30 @@
  */
 
 import { TemplatesList } from "@/components/settings/TemplatesList";
-import { getCurrentUserRole, getTemplates } from "@/lib/data/templates";
+import { WorkspaceNameCard } from "@/components/settings/WorkspaceNameCard";
+import { getTemplates } from "@/lib/data/templates";
+import { getWorkspaceInfo } from "@/lib/data/workspace";
 
 export default async function SettingsPage() {
-  const [templates, role] = await Promise.all([
+  const [templates, workspace] = await Promise.all([
     getTemplates(),
-    getCurrentUserRole(),
+    getWorkspaceInfo(),
   ]);
+  const isOwner = workspace?.role === "owner";
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="mb-6">
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div>
         <h1 className="font-display text-2xl font-bold tracking-tight">
           Settings
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Workspace configuration — templates are reusable text snippets.
+          Workspace configuration — name, plus reusable text snippets.
         </p>
       </div>
 
-      <TemplatesList templates={templates} isOwner={role === "owner"} />
+      {workspace && <WorkspaceNameCard name={workspace.name} isOwner={isOwner} />}
+      <TemplatesList templates={templates} isOwner={isOwner} />
     </div>
   );
 }

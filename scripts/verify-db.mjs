@@ -838,6 +838,50 @@ check(
 );
 await db.query("reset role");
 
+// ── workspaces rename policy (post-roadmap item): owner-only UPDATE ──
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+await db.query("set role nstester");
+const { rowCount: renameCount } = await db.query(
+  "update public.workspaces set name = 'Atelier North (renamed)' where id = $1",
+  [SEED_WS]
+);
+const { rows: [renamedWs] } = await db.query(
+  "select name from public.workspaces where id = $1",
+  [SEED_WS]
+);
+check(
+  "RLS: OWNER can rename the workspace",
+  renameCount === 1 && renamedWs?.name === "Atelier North (renamed)",
+  renamedWs?.name
+);
+
+await db.query("select set_config('app.jwt_sub', $1, false)", [MEMBER_UID]);
+const { rowCount: memberRenameCount } = await db.query(
+  "update public.workspaces set name = 'hijacked name' where id = $1",
+  [SEED_WS]
+);
+const { rows: [afterMemberAttempt] } = await db.query(
+  "select name from public.workspaces where id = $1",
+  [SEED_WS]
+);
+check(
+  "RLS: plain member CANNOT rename the workspace (owner-only)",
+  memberRenameCount === 0 && afterMemberAttempt?.name === "Atelier North (renamed)"
+);
+
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+const { rowCount: foreignRenameCount } = await db.query(
+  "update public.workspaces set name = 'hijacked' where id = $1",
+  [FOREIGN_WS]
+);
+check(
+  "RLS: cannot rename a foreign workspace",
+  foreignRenameCount === 0
+);
+// restore the seeded name so the file stays self-describing
+await db.query("update public.workspaces set name = 'Atelier North' where id = $1", [SEED_WS]);
+await db.query("reset role");
+
 // ── create_brief_bundle() RPC (Step 4 intake) ──
 await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
 const { rows: [bundle] } = await db.query(

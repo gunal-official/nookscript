@@ -72,6 +72,13 @@ missing object and its migration file (“did you forget to run
 `supabase db push`?”); exit code is `1` on any miss, `0` when clean —
 safe to wire into CI or a pre-deploy check later.
 
+Known gap (future work, not wired now): the probe verifies tables and
+RPCs **exist** — it does not check POLICIES. Post-roadmap, the workspace
+rename UPDATE policy (`20260923060000_workspaces_rename_policy.sql`, the
+10th migration) is the first schema object in that category; a policy-aware
+version of `verify:live` could probe it by attempting an owner-scoped
+rename probe against a scratch workspace.
+
 ## Verify Step 2 (auth + workspaces)
 
 Browser checklist (the “Confirm” list):

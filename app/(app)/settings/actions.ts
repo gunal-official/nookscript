@@ -46,6 +46,38 @@ async function getMembership() {
 }
 
 const NOT_OWNER = "Only workspace owners can manage templates.";
+const RENAME_NOT_OWNER = "Only workspace owners can rename the workspace.";
+
+/**
+ * Rename the caller's workspace (post-roadmap item). Owner-only — re-checked
+ * here as defense in depth, with the workspaces UPDATE policy
+ * (is_workspace_owner) as the final gate. Revalidates the full layout so
+ * the sidebar name updates everywhere immediately.
+ */
+export async function updateWorkspaceName(input: {
+  name: string;
+}): Promise<ActionResult> {
+  const name = input.name?.trim() ?? "";
+  if (!name) return { error: "Workspace name can't be empty." };
+  if (name.length > 80) return { error: "Keep the name under 80 characters." };
+
+  const { supabase, membership } = await getMembership();
+  if (!membership) {
+    return { error: "Your session has expired. Please log in again." };
+  }
+  if (membership.role !== "owner") return { error: RENAME_NOT_OWNER };
+
+  const { error } = await supabase
+    .from("workspaces")
+    .update({ name })
+    .eq("id", membership.workspace_id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/settings");
+  revalidatePath("/", "layout"); // sidebar shows the name on every app page
+  return { error: undefined };
+}
 
 export async function createTemplate(input: {
   title: string;
