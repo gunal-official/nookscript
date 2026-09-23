@@ -52,3 +52,16 @@ export function isUuid(value: string): boolean {
     value
   );
 }
+
+/** 123456 → "$1,234.56" (USD, pinned for v1 — Step 17). */
+export function formatMoney(cents: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(cents / 100);
+}
+
+/** 1 → "INV-0001" (per-workspace sequence, zero-padded for display). */
+export function invoiceNumberLabel(invoiceNumber: number): string {
+  return `INV-${String(invoiceNumber).padStart(4, "0")}`;
+}

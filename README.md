@@ -27,11 +27,12 @@ with the CLI).
 This creates `workspaces` / `workspace_members` / `profiles`, the auth
 triggers, and the product schema: `briefs` / `brief_sources` /
 `brief_questions` / `brief_edit_history` / `proposals` / `plans` /
-`updates` / `share_links` / `templates` / `team_invites` — all RLS-scoped
-to workspace membership —
+`updates` / `share_links` / `templates` / `team_invites` / `invoices` /
+`invoice_links` — all RLS-scoped to workspace membership —
 plus the `create_workspace()`, `update_brief_field()`,
 `create_brief_bundle()`, and public token-gated `get_shared_document()`
-RPCs and the status-change history + updated_at touch triggers.
++ `get_shared_invoice()` RPCs and the status-change history +
+updated_at touch triggers.
 
 To load demo data (the “Brightloop Co. — Brand Identity Refresh” brief,
 plus a login-able demo user `maya@nookscript.dev` / `password123`), run
@@ -390,6 +391,54 @@ across your own workspaces; single-workspace accounts see no UI change.
 6. **DB-level proof** — `npm run verify:db` (91 checks / 12 migrations,
    incl. the pointer column + FK, owner-only profile writes, and the
    members RPC's pointer/fallback/stale-pointer healing).
+
+## Verify Step 17 (invoices — platform phase)
+
+⚠ New migration in this step — re-apply to your live Supabase project
+before testing: `supabase/migrations/20260923090000_invoices_schema.sql`
+(SQL Editor → paste → Run), then re-run `supabase/seed.sql` (it adds two
+invoices + their public links to the demo workspace).
+
+Invoices are standalone (no brief/plan link), per-workspace, and
+sequentially numbered (INV-0001 is your first). Money is integer cents
+in the DB; the dollar totals you see are computed, never stored. The
+lifecycle is draft → sent → paid, plus **void** as the audit-safe
+cancel — there is deliberately no delete anywhere (no policy, no
+button).
+
+1. **The list** — /invoices shows the two seeded invoices: INV-0001
+   (Draft, "Brand refresh — phase one", no tax) and INV-0002 (Sent,
+   tax-included total). The Draft/Sent/Paid/Void tabs (with counts)
+   filter; search matches title, client, or number.
+2. **Create on the list** — "New invoice": client name is free text
+   with `<datalist>` suggestions from the workspace's briefs (type
+   "Bright"), title, optional due date → saving creates a DRAFT with
+   the next per-workspace number and redirects to its composer.
+3. **The composer** — line items (description / qty / unit price in
+   dollars), tax %, due date, notes; totals (subtotal → tax → total)
+   render live and are the exact math on the client's form. "Unsaved
+   changes" chip → Save persists (items stored as integer-cents jsonb).
+4. **Status + audit stamps** — Sent → Paid stamps `invoices.paid_at`
+   (shown in Details); Paid → Sent clears it; Void keeps every stamp —
+   the row is never destroyed. `sent_at` is stamped on first send and
+   never overwritten.
+5. **The public form** — Link panel: Create → copy the
+   `/invoice/<token>` URL → open it in an INCOGNITO window (seed
+   demo: `http://localhost:3000/invoice/00000000-0000-0000-0000-000000000070`):
+   a clean read-only form (number, billed to, line items, totals, due
+   date, notes, from-line) with a Print button — the v1 export story.
+6. **What never renders** — the DRAFT invoice's seeded link (token
+   `…0069`), a revoked link, a voided invoice, and a garbage URL all
+   show the SAME generic "unavailable" state — a visitor cannot tell
+   which kind of link they have (indistinguishable by design, proven
+   at the DB level).
+7. **Double-click race** — two creates at once race the number: the
+   loser hits `unique(workspace_id, invoice_number)` and gets a
+   friendly "just taken" message (share_links precedent).
+8. **DB-level proof** — `npm run verify:db` (103 checks / 13
+   migrations, incl. no-delete policies on both tables, per-workspace
+   numbering, member RLS, and all four `get_shared_invoice` zero-row
+   states).
 
 ## Notes
 

@@ -19,6 +19,7 @@ const APP_PREFIXES = [
   "/proposals",
   "/plans",
   "/updates",
+  "/invoices", // app route — note the S; the PUBLIC form lives at /invoice/<token>
   "/settings",
   "/onboarding",
 ];
@@ -46,9 +47,10 @@ function redirect(request: NextRequest, pathname: string) {
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Step 14 rate limit (extended Step 15): public routes that hit
+  // Step 14 rate limit (extended Steps 15+17): public routes that hit
   // Postgres on every request (/share/* documents, /invite/* token
-  // probes) — capped per-IP. Runs BEFORE the session work so an abuser
+  // probes, /invoice/* token-gated invoice forms) — capped per-IP.
+  // Runs BEFORE the session work so an abuser
   // doesn't even cost an auth lookup. In-memory only: resets on redeploy
   // and doesn't share state across serverless instances (see
   // lib/rate-limit.ts — durable-store upgrade is noted there and in
@@ -114,6 +116,7 @@ export async function updateSession(request: NextRequest) {
     return redirect(request, "/intake");
   }
 
-  // Marketing (/, /about, /pricing, /vs/*), /share/*, /invite/*: fully public.
+  // Marketing (/, /about, /pricing, /vs/*), /share/*, /invite/*,
+  // /invoice/* (public token-gated invoice forms): fully public.
   return supabaseResponse;
 }

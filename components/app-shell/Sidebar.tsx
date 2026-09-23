@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { label: "Proposals", href: "/proposals" },
   { label: "Plans", href: "/plans" },
   { label: "Updates", href: "/updates" },
+  { label: "Invoices", href: "/invoices" },
   { label: "Settings", href: "/settings" },
 ];
 
