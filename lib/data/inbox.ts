@@ -15,7 +15,7 @@ import type { InboxThread } from "@/lib/types/inbox";
  * of crashing the route.
  */
 export async function getInboxThreads(): Promise<InboxThread[] | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },

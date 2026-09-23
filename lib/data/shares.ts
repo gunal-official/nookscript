@@ -21,7 +21,7 @@ import type { ShareLink, SharedDocument } from "@/lib/types/share";
 export async function getShareLinkForUpdate(
   updateId: string
 ): Promise<ShareLink | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("share_links")
@@ -38,7 +38,7 @@ export async function getShareLinkForUpdate(
 export async function getSharedDocumentByToken(
   token: string
 ): Promise<SharedDocument | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase.rpc("get_shared_document", {
     p_token: token,

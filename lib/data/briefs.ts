@@ -22,7 +22,7 @@ import type {
 export async function getBriefsForWorkspace(
   workspaceId: string
 ): Promise<Brief[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("briefs")
@@ -42,7 +42,7 @@ export async function getBriefsForWorkspace(
  * here, keeping it a single query.
  */
 export async function getBriefs(): Promise<BriefSummary[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("briefs")
@@ -80,7 +80,7 @@ export async function getBriefs(): Promise<BriefSummary[]> {
 export async function getBriefById(
   briefId: string
 ): Promise<BriefWithDetails | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("briefs")
@@ -106,7 +106,7 @@ export async function createBrief(
   workspaceId: string,
   data: Partial<Brief>
 ): Promise<Brief> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data: inserted, error } = await supabase
     .from("briefs")
@@ -143,7 +143,7 @@ export async function updateBriefField(
   value: unknown,
   userId: string
 ): Promise<void> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { error } = await supabase.rpc("update_brief_field", {
     brief_uuid: briefId,
@@ -166,7 +166,7 @@ export async function resolveQuestion(
   answerText: string,
   answeredBy: string
 ): Promise<BriefQuestion> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data: question, error } = await supabase
     .from("brief_questions")

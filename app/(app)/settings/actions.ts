@@ -22,7 +22,7 @@ export type ActionResult = { error?: string } | undefined;
 /** Session + workspace membership (+role). Null = not authenticated or no
  *  workspace yet. */
 async function getMembership() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

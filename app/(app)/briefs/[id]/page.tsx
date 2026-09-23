@@ -97,7 +97,7 @@ export default async function BriefDetailPage({
   }
 
   // For the "Answered by" default and history attribution ("You").
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

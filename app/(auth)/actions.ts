@@ -25,7 +25,7 @@ export async function createWorkspaceAction(input: {
     return { error: "Workspace name must be 80 characters or fewer." };
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

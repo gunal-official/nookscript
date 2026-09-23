@@ -54,7 +54,7 @@ export async function generateBriefFromSource(input: {
     return { error: `Source text is too long (${MAX_SOURCE_CHARS.toLocaleString()} characters max).` };
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -164,7 +164,7 @@ export async function addSourceToBrief(input: {
     return { error: `Reply is too long (${MAX_SOURCE_CHARS.toLocaleString()} characters max).` };
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -204,7 +204,7 @@ export async function saveBriefEdits(input: {
   if (!input.briefId) return { error: "Missing brief id." };
   if (!input.changes?.length) return { error: "Nothing to save." };
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

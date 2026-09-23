@@ -17,7 +17,7 @@ import type {
 
 /** Summary rows for the /plans list, most recently updated first. */
 export async function getPlans(): Promise<PlanSummary[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("plans")
@@ -54,7 +54,7 @@ export async function getPlans(): Promise<PlanSummary[]> {
 export async function getPlanById(
   planId: string
 ): Promise<PlanWithProposal | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("plans")

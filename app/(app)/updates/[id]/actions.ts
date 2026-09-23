@@ -28,7 +28,7 @@ export async function updateUpdateStatus(input: {
     return { error: "Invalid status." };
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -55,7 +55,7 @@ export async function updateUpdateStatus(input: {
 }): Promise<ActionResult> {
   if (!input.title?.trim()) return { error: "Title is required." };
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -81,7 +81,7 @@ export async function updateUpdateStatus(input: {
 export async function createShareLink(input: {
   updateId: string;
 }): Promise<ActionResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -123,7 +123,7 @@ export async function revokeShareLink(input: {
   shareId: string;
   updateId: string;
 }): Promise<ActionResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -145,7 +145,7 @@ export async function regenerateShareLink(input: {
   shareId: string;
   updateId: string;
 }): Promise<ActionResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

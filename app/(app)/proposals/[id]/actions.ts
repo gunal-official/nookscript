@@ -34,7 +34,7 @@ export async function updateProposalStatus(input: {
     return { error: "Invalid status." };
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -66,7 +66,7 @@ export async function updateProposalStatus(input: {
 export async function createPlanFromProposal(input: {
   proposalId: string;
 }): Promise<ActionResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

@@ -14,7 +14,7 @@ import type { Template } from "@/lib/types/template";
 /** All templates for the workspace, most recently touched first —
  *  consistent with the other entity lists. */
 export async function getTemplates(): Promise<Template[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("templates")
@@ -32,7 +32,7 @@ export async function getTemplates(): Promise<Template[]> {
  * here keeps permission checks explicit where they're needed.
  */
 export async function getCurrentUserRole(): Promise<"owner" | "member" | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

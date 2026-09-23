@@ -17,7 +17,7 @@ import type {
 
 /** Summary rows for the /proposals list, most recently updated first. */
 export async function getProposals(): Promise<ProposalSummary[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("proposals")
@@ -54,7 +54,7 @@ export async function getProposals(): Promise<ProposalSummary[]> {
 export async function getProposalById(
   proposalId: string
 ): Promise<ProposalWithBrief | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("proposals")

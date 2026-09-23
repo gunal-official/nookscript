@@ -31,7 +31,7 @@ export async function updatePlanStatus(input: {
     return { error: "Invalid status." };
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -60,7 +60,7 @@ export async function toggleTask(input: {
   planId: string;
   taskId: string;
 }): Promise<ActionResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -104,7 +104,7 @@ export async function toggleTask(input: {
 export async function composeUpdateFromPlan(input: {
   planId: string;
 }): Promise<ActionResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

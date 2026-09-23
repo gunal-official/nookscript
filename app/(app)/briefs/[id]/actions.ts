@@ -29,7 +29,7 @@ export async function resolveBriefQuestion(input: {
   if (!input.answerText?.trim()) return { error: "Answer is required." };
   if (!input.answeredBy?.trim()) return { error: "Who answered is required." };
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -64,7 +64,7 @@ export async function updateBriefStatus(input: {
     return { error: "Invalid status." };
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -95,7 +95,7 @@ export async function updateBriefStatus(input: {
 export async function createProposalFromBrief(input: {
   briefId: string;
 }): Promise<ActionResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

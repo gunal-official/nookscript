@@ -18,7 +18,7 @@ const EXCERPT_LENGTH = 140;
 
 /** Summary rows for the /updates list, most recently updated first. */
 export async function getUpdates(): Promise<UpdateSummary[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("updates")
@@ -57,7 +57,7 @@ export async function getUpdates(): Promise<UpdateSummary[]> {
 export async function getUpdateById(
   updateId: string
 ): Promise<UpdateWithPlan | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("updates")
