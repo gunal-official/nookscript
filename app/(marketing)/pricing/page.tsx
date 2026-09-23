@@ -20,6 +20,9 @@ export const metadata: Metadata = {
 
 // No dollar amounts — there is no billing system yet, and inventing prices
 // on a public page would be a false claim. Early-access framing only.
+// NOTE: Templates, share links, and inbox threading are genuinely available
+// to every workspace TODAY — they live in the Free list because that's
+// what's true in code; the Pro list is forward-looking roadmap only.
 const TIERS: {
   name: string;
   badge?: string;
@@ -29,13 +32,16 @@ const TIERS: {
 }[] = [
   {
     name: "Free",
-    blurb: "For trying it on real client work, on your own.",
+    blurb: "The full product as it exists today — early access.",
     features: [
       "Solo use · 1 workspace",
       "Intake → briefs (AI or built-in parser)",
       "Proposals from briefs",
       "Plans from proposals",
       "Updates from plans",
+      "Public, revocable share links",
+      "Workspace templates",
+      "Inbox threading — replies onto brief source threads",
       "Full edit history on briefs",
     ],
     cta: { label: "Sign up free", href: "/signup", primary: true },
@@ -43,13 +49,13 @@ const TIERS: {
   {
     name: "Pro",
     badge: "Early access",
-    blurb: "The client-facing layer, while we shape it with early users.",
+    blurb: "Nothing here exists yet — this is the shape of the roadmap.",
     features: [
       "Everything in Free",
-      "Public, revocable share links",
-      "Workspace templates",
-      "Inbox threading — replies onto brief source threads",
-      "Priority input on what ships next",
+      "Custom domains for share links — planned",
+      "Team roles beyond owner/member — planned",
+      "Priority support — planned",
+      "Early builds of whatever ships next",
     ],
     cta: {
       label: "Request access",
@@ -67,8 +73,9 @@ export default function PricingPage() {
     <div className="mx-auto max-w-3xl px-6 py-16 text-center">
       <h1 className="font-display text-3xl font-bold tracking-tight">Pricing</h1>
       <p className="mt-3 text-sm text-muted-foreground sm:text-base">
-        Free while in early access — paid tiers land before general
-        availability, and early users keep the Free tier as-is.
+        Everything that exists today is free during early access — paid
+        plans land before general availability, and early users keep the
+        Free tier as-is.
       </p>
 
       <div className="mt-10 grid gap-5 text-left sm:grid-cols-2">
