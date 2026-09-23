@@ -19,10 +19,12 @@
 
 import { PlansList } from "@/components/plans/PlansList";
 import { getPlans } from "@/lib/data/plans";
+import { getWorkspaceContext } from "@/lib/data/workspace-context";
 
 export default async function PlansPage() {
-  // RLS scopes this to the current user's workspaces automatically.
-  const plans = await getPlans();
+  // Scoped to the caller's ACTIVE workspace (Step 16).
+  const context = await getWorkspaceContext();
+  const plans = context ? await getPlans(context.id) : [];
 
   return (
     <div className="mx-auto max-w-6xl">

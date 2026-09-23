@@ -357,6 +357,40 @@ expire after 14 days, and are revocable.
    incl. owner-only invite RLS, the one-pending-per-email index, preview
    indistinguishability, every accept guard, and the members RPC).
 
+## Verify Step 16 (workspace switcher — active-workspace scoping)
+
+⚠ New migration in this step — re-apply to your live Supabase project
+before testing: `supabase/migrations/20260923080000_active_workspace.sql`
+(SQL Editor → paste → Run), then re-run `supabase/seed.sql` (it adds a
+SECOND, deliberately empty workspace — "Harbor Lane Studio" — for Maya).
+
+Users with two workspaces (e.g. created one + joined one via invite) can
+now switch between them. Every list, the inbox, settings, and every
+create action pin the ACTIVE workspace — two workspaces' briefs and
+updates no longer merge into one list. Detail deep-links stay openable
+across your own workspaces; single-workspace accounts see no UI change.
+
+1. **The switcher** — sidebar "Workspace" section: with the seed applied,
+   Maya sees a dropdown (Atelier North / Harbor Lane Studio) instead of
+   the old static label. Single-workspace accounts still see the plain
+   label — nothing changes for them.
+2. **Switching** — pick Harbor Lane Studio: sidebar name changes, and
+   /briefs, /proposals, /plans, /updates, /intake/inbox all show EMPTY
+   states (that workspace has no content yet). Settings → Team shows its
+   one-member roster (Maya alone).
+3. **Creation pins active** — while Harbor Lane is active, generate a
+   brief from /intake: it appears in Harbor Lane's /briefs, NOT Atelier
+   North's — switch back and Atelier's lists are exactly as before.
+4. **Role follows the workspace** — an owner in one workspace and a
+   member in another sees owner controls only while the owned workspace
+   is active (Settings cards re-gate per switch).
+5. **Persistence** — refresh or log in on another device: the selection
+   sticks (profiles.active_workspace_id; NULL = first-joined fallback,
+   which is every pre-Step-16 account).
+6. **DB-level proof** — `npm run verify:db` (91 checks / 12 migrations,
+   incl. the pointer column + FK, owner-only profile writes, and the
+   members RPC's pointer/fallback/stale-pointer healing).
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

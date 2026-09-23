@@ -12,6 +12,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/utils";
 
@@ -20,8 +21,8 @@ export type TeamActionResult = { error?: string } | undefined;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000; // 14 days (spec)
 
-/** Session + workspace membership (+role). Null when logged out or when
- *  no workspace exists yet (pre-onboarding). */
+/** Session + ACTIVE workspace membership (+role) via the Step-16
+ *  resolver. Null when logged out or when no workspace exists yet. */
 async function getMembership() {
   const supabase = await createClient();
   const {
@@ -29,21 +30,14 @@ async function getMembership() {
   } = await supabase.auth.getUser();
   if (!user) return { supabase, user: null, membership: null };
 
-  const { data } = await supabase
-    .from("workspace_members")
-    .select("workspace_id, role")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const context = await getWorkspaceContext();
 
   return {
     supabase,
     user,
-    membership: (data ?? null) as {
-      workspace_id: string;
-      role: "owner" | "member";
-    } | null,
+    membership: context
+      ? { workspace_id: context.id, role: context.role }
+      : null,
   };
 }
 

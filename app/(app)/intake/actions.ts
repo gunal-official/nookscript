@@ -15,6 +15,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import { generateBriefContent, type GeneratorEngine } from "@/lib/ai/brief-generator";
 import type {
@@ -63,15 +64,10 @@ export async function generateBriefFromSource(input: {
     return { error: "Your session has expired. Please log in again." };
   }
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership) {
+  // Briefs are created in the ACTIVE workspace (Step 16 resolver) — the
+  // one the sidebar is showing — never a background first-joined one.
+  const context = await getWorkspaceContext();
+  if (!context) {
     return { error: "No workspace found for your account." };
   }
 
@@ -81,7 +77,7 @@ export async function generateBriefFromSource(input: {
   // 2. Persist brief + source + questions + 'generated' history in ONE
   //    transaction (server-side RPC).
   const { data: briefId, error } = await supabase.rpc("create_brief_bundle", {
-    p_workspace_id: membership.workspace_id,
+    p_workspace_id: context.id,
     p_title: content.title,
     p_objective: content.objective,
     p_deliverables: content.deliverables,

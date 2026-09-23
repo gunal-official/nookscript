@@ -22,10 +22,14 @@ import { Plus } from "lucide-react";
 import { BriefsList } from "@/components/briefs/BriefsList";
 import { Button } from "@/components/ui/button";
 import { getBriefs } from "@/lib/data/briefs";
+import { getWorkspaceContext } from "@/lib/data/workspace-context";
 
 export default async function BriefsPage() {
-  // RLS scopes this to the current user's workspaces automatically.
-  const briefs = await getBriefs();
+  // Scoped to the caller's ACTIVE workspace (Step 16); the (app) layout
+  // guarantees a membership exists, so an empty context here is only a
+  // theoretical race — render the empty state rather than crash.
+  const context = await getWorkspaceContext();
+  const briefs = context ? await getBriefs(context.id) : [];
 
   return (
     <div className="mx-auto max-w-6xl">

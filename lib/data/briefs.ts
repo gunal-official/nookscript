@@ -35,13 +35,16 @@ export async function getBriefsForWorkspace(
 }
 
 /**
- * Summary rows for the /briefs list, most recently updated first.
- * No explicit workspace filter — RLS (is_workspace_member) already scopes
- * the query to the current user's workspaces. Question statuses ride along
- * as an embedded resource (same pattern as getBriefById) and are counted
- * here, keeping it a single query.
+ * Summary rows for the /briefs list, most recently updated first, scoped
+ * to the caller's ACTIVE workspace (Step 16). RLS (is_workspace_member)
+ * stays the security gate; the explicit filter exists so a user with two
+ * workspaces never sees them merged. Question statuses ride along as an
+ * embedded resource (same pattern as getBriefById) and are counted here,
+ * keeping it a single query.
  */
-export async function getBriefs(): Promise<BriefSummary[]> {
+export async function getBriefs(
+  workspaceId: string
+): Promise<BriefSummary[]> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -49,6 +52,7 @@ export async function getBriefs(): Promise<BriefSummary[]> {
     .select(
       "id, title, client_name, status, updated_at, questions:brief_questions(status)"
     )
+    .eq("workspace_id", workspaceId)
     .order("updated_at", { ascending: false });
 
   if (error) throw error;

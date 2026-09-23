@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import {
+  WorkspaceSwitcher,
+  type SwitcherWorkspace,
+} from "@/components/app-shell/WorkspaceSwitcher";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -43,7 +47,13 @@ function NavItem({
   );
 }
 
-export function Sidebar({ workspaceName }: { workspaceName: string }) {
+export function Sidebar({
+  workspaces,
+  activeWorkspaceId,
+}: {
+  workspaces: SwitcherWorkspace[];
+  activeWorkspaceId: string;
+}) {
   const pathname = usePathname();
 
   // Only ONE item highlights: pick the longest matching prefix, so
@@ -69,9 +79,10 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
         <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Workspace
         </p>
-        <nav className="flex flex-col gap-1">
-          <NavItem label={workspaceName} href="#" />
-        </nav>
+        <WorkspaceSwitcher
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+        />
       </div>
     </aside>
   );

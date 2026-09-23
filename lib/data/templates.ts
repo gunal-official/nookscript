@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import type { Template } from "@/lib/types/template";
 
@@ -11,14 +12,16 @@ import type { Template } from "@/lib/types/template";
  * UI/actions can hide or short-circuit affordances non-owners can't use.
  */
 
-/** All templates for the workspace, most recently touched first —
- *  consistent with the other entity lists. */
-export async function getTemplates(): Promise<Template[]> {
+/** All templates for the ACTIVE workspace (Step 16 — explicit filter so
+ *  multi-workspace users never see merged lists; RLS remains the gate),
+ *  most recently touched first. */
+export async function getTemplates(workspaceId: string): Promise<Template[]> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("templates")
     .select("*")
+    .eq("workspace_id", workspaceId)
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
@@ -26,25 +29,13 @@ export async function getTemplates(): Promise<Template[]> {
 }
 
 /**
- * The current user's role in their first-joined workspace ("owner" |
- * "member" | null). The (app)/layout.tsx shell fetches role for its own
- * use but doesn't expose it to pages, and duplicating that query shape
- * here keeps permission checks explicit where they're needed.
+ * The current user's role in their ACTIVE workspace ("owner" | "member" |
+ * null) — resolved via the shared workspace-context resolver (Step 16),
+ * so someone who owns one workspace and is a member of another gets the
+ * role of the workspace they're actually looking at. The (app) shell
+ * resolves role for its own use but doesn't expose it to pages.
  */
 export async function getCurrentUserRole(): Promise<"owner" | "member" | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data } = await supabase
-    .from("workspace_members")
-    .select("role")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  return (data?.role as "owner" | "member" | undefined) ?? null;
+  const context = await getWorkspaceContext();
+  return context?.role ?? null;
 }

@@ -9,20 +9,24 @@ import type {
 
 /**
  * Server-side data access for updates. Same conventions as
- * lib/data/plans.ts: cookie-authenticated server client, RLS scopes every
- * read to the current user's workspaces — no manual workspace_id filters
- * anywhere. Call only with an active session.
+ * lib/data/plans.ts: cookie-authenticated server client. List reads pin
+ * the caller's ACTIVE workspace explicitly (Step 16 — RLS is the security
+ * gate; the filter keeps multi-workspace users' lists unmerged).
+ * Call only with an active session.
  */
 
 const EXCERPT_LENGTH = 140;
 
 /** Summary rows for the /updates list, most recently updated first. */
-export async function getUpdates(): Promise<UpdateSummary[]> {
+export async function getUpdates(
+  workspaceId: string
+): Promise<UpdateSummary[]> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("updates")
     .select("id, title, client_name, status, updated_at, body")
+    .eq("workspace_id", workspaceId)
     .order("updated_at", { ascending: false });
 
   if (error) throw error;

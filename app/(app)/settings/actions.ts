@@ -15,33 +15,22 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 
 export type ActionResult = { error?: string } | undefined;
 
-/** Session + workspace membership (+role). Null = not authenticated or no
- *  workspace yet. */
+/** Session + ACTIVE workspace membership (+role) via the Step-16
+ *  resolver. Null = not authenticated or no workspace yet. */
 async function getMembership() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { supabase, membership: null };
-
-  const { data } = await supabase
-    .from("workspace_members")
-    .select("workspace_id, role")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const context = await getWorkspaceContext();
 
   return {
     supabase,
-    membership: (data ?? null) as {
-      workspace_id: string;
-      role: "owner" | "member";
-    } | null,
+    membership: context
+      ? { workspace_id: context.id, role: context.role }
+      : null,
   };
 }
 

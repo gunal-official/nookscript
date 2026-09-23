@@ -18,10 +18,12 @@
 
 import { ProposalsList } from "@/components/proposals/ProposalsList";
 import { getProposals } from "@/lib/data/proposals";
+import { getWorkspaceContext } from "@/lib/data/workspace-context";
 
 export default async function ProposalsPage() {
-  // RLS scopes this to the current user's workspaces automatically.
-  const proposals = await getProposals();
+  // Scoped to the caller's ACTIVE workspace (Step 16).
+  const context = await getWorkspaceContext();
+  const proposals = context ? await getProposals(context.id) : [];
 
   return (
     <div className="mx-auto max-w-6xl">

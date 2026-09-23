@@ -22,12 +22,15 @@ import { TemplatesList } from "@/components/settings/TemplatesList";
 import { WorkspaceNameCard } from "@/components/settings/WorkspaceNameCard";
 import { getPendingInvites, getTeamMembers } from "@/lib/data/team";
 import { getTemplates } from "@/lib/data/templates";
-import { getWorkspaceInfo } from "@/lib/data/workspace";
+import { getWorkspaceContext } from "@/lib/data/workspace-context";
 
 export default async function SettingsPage() {
-  const [templates, workspace, members, pendingInvites] = await Promise.all([
-    getTemplates(),
-    getWorkspaceInfo(),
+  // Everything on this page — name, roster, invites, templates — renders
+  // for the ACTIVE workspace (Step 16); the (app) layout guarantees a
+  // membership exists.
+  const workspace = await getWorkspaceContext();
+  const [templates, members, pendingInvites] = await Promise.all([
+    workspace ? getTemplates(workspace.id) : Promise.resolve([]),
     getTeamMembers(),
     getPendingInvites(),
   ]);

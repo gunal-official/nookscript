@@ -18,10 +18,12 @@
 
 import { UpdatesList } from "@/components/updates/UpdatesList";
 import { getUpdates } from "@/lib/data/updates";
+import { getWorkspaceContext } from "@/lib/data/workspace-context";
 
 export default async function UpdatesPage() {
-  // RLS scopes this to the current user's workspaces automatically.
-  const updates = await getUpdates();
+  // Scoped to the caller's ACTIVE workspace (Step 16).
+  const context = await getWorkspaceContext();
+  const updates = context ? await getUpdates(context.id) : [];
 
   return (
     <div className="mx-auto max-w-6xl">
