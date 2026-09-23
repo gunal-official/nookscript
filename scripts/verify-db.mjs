@@ -49,6 +49,9 @@ const REVOKED_SHARE_TOKEN = "00000000-0000-0000-0000-000000000052";
 const REVOKED_SHARE_LINK = "00000000-0000-0000-0000-000000000053";
 const FOREIGN_SHARE_LINK = "00000000-0000-0000-0000-000000000094";
 const MEMBER_UID = "00000000-0000-0000-0000-000000000070";
+const TEAMMATE_UID = "00000000-0000-0000-0000-000000000071";
+const SEED_INVITE_TOKEN = "00000000-0000-0000-0000-000000000063";
+const EXPIRED_INVITE_TOKEN = "00000000-0000-0000-0000-000000000066";
 
 console.log("Starting PGlite (WASM Postgres)…");
 const db = new PGlite();
@@ -123,11 +126,11 @@ const { rows: rlsRows } = await db.query(
   `select relname, relrowsecurity from pg_class
     where relnamespace = 'public'::regnamespace
       and relname = any($1) order by relname`,
-  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "proposals", "plans", "updates", "share_links", "templates", "workspaces", "workspace_members", "profiles"]]
+  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "proposals", "plans", "updates", "share_links", "templates", "workspaces", "workspace_members", "profiles", "team_invites"]]
 );
 check(
-  "all 12 tables exist with RLS enabled",
-  rlsRows.length === 12 && rlsRows.every((r) => r.relrowsecurity),
+  "all 13 tables exist with RLS enabled",
+  rlsRows.length === 13 && rlsRows.every((r) => r.relrowsecurity),
   rlsRows.map((r) => `${r.relname}=${r.relrowsecurity}`).join(" ")
 );
 
@@ -418,7 +421,8 @@ await db.exec(`
   grant select, insert, update, delete on
     public.workspaces, public.workspace_members, public.profiles,
     public.briefs, public.brief_sources, public.brief_questions, public.brief_edit_history,
-    public.proposals, public.plans, public.updates, public.share_links, public.templates
+    public.proposals, public.plans, public.updates, public.share_links, public.templates,
+    public.team_invites
     to nstester;
 `);
 // fixtures the seed user does NOT belong to, plus one own-workspace REVOKED
@@ -444,6 +448,25 @@ await db.exec(`
     now(), now(), '', '', '', ''
   ) on conflict (id) do nothing;
   insert into public.workspace_members (workspace_id, user_id, role) values ('${SEED_WS}', '${MEMBER_UID}', 'member') on conflict (workspace_id, user_id) do nothing;
+  -- Step 15 fixtures: the invite accepter (NOT a member of any workspace —
+  -- inserted after the seed, so its catch-all member insert missed them)
+  -- and an EXPIRED invite addressed to the member user.
+  insert into auth.users (
+    id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+    confirmation_token, email_change, email_change_token_new, recovery_token
+  ) values (
+    '${TEAMMATE_UID}', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+    'teammate@brightloop.co', 'pglite-test-password-hash', now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Tess Amara"}'::jsonb,
+    now(), now(), '', '', '', ''
+  ) on conflict (id) do nothing;
+  insert into public.team_invites (
+    id, workspace_id, email, token, invited_by, expires_at
+  ) values (
+    '00000000-0000-0000-0000-000000000065', '${SEED_WS}', 'leo@nookscript.dev',
+    '${EXPIRED_INVITE_TOKEN}', '${SEED_UID}', now() - interval '1 day'
+  ) on conflict do nothing;
 `);
 
 await db.query("set role nstester");
@@ -937,6 +960,155 @@ try {
   emptySourceGuard = /source_required/.test(e.message);
 }
 check("create_brief_bundle rejects empty source text", emptySourceGuard);
+
+// ── Step 15: team_invites (RLS + token RPCs + members list) ──
+await db.query("reset role");
+
+// owner reads invites; members are blind to the table
+await db.query("set role nstester");
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+const { rows: ownerInvites } = await db.query(
+  "select email from public.team_invites where token = $1",
+  [SEED_INVITE_TOKEN]
+);
+check(
+  "RLS: owner sees workspace invites",
+  ownerInvites.length === 1 && ownerInvites[0].email === "teammate@brightloop.co",
+  JSON.stringify(ownerInvites)
+);
+
+await db.query("select set_config('app.jwt_sub', $1, false)", [MEMBER_UID]);
+const { rows: memberInvites } = await db.query("select id from public.team_invites");
+check("RLS: member sees ZERO invites (owner-only table)", memberInvites.length === 0);
+
+let memberInviteBlocked = false;
+try {
+  await db.query(
+    "insert into public.team_invites (workspace_id, email, invited_by, expires_at) values ($1, 'nope@x.co', $2, now() + interval '14 days')",
+    [SEED_WS, MEMBER_UID]
+  );
+} catch (e) {
+  memberInviteBlocked = true;
+}
+check("RLS: member cannot create invites", memberInviteBlocked);
+
+// one PENDING invite per (workspace, email): owner insert passes RLS but
+// the partial unique index rejects the duplicate
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+let dupPendingBlocked = false;
+try {
+  await db.query(
+    "insert into public.team_invites (workspace_id, email, invited_by, expires_at) values ($1, 'teammate@brightloop.co', $2, now() + interval '14 days')",
+    [SEED_WS, SEED_UID]
+  );
+} catch (e) {
+  dupPendingBlocked = /duplicate key/.test(e.message);
+}
+check("duplicate PENDING invite per (workspace, email) is rejected", dupPendingBlocked);
+
+// public preview probe: indistinguishable zero rows for unknown tokens
+const { rows: previewBad } = await db.query(
+  "select * from public.get_team_invite_preview('00000000-0000-0000-0000-0000000000ff')"
+);
+check("get_team_invite_preview: unknown token → zero rows", previewBad.length === 0);
+
+const { rows: previewOk } = await db.query(
+  "select * from public.get_team_invite_preview($1)",
+  [SEED_INVITE_TOKEN]
+);
+check(
+  "get_team_invite_preview: live token → workspace name only",
+  previewOk.length === 1 &&
+    previewOk[0].workspace_name === "Atelier North" &&
+    Object.keys(previewOk[0]).sort().join(",") === "expires_at,workspace_name",
+  JSON.stringify(previewOk[0] ?? null)
+);
+
+// accept guards: expired → generic invalid; wrong email → mismatch
+await db.query("select set_config('app.jwt_sub', $1, false)", [MEMBER_UID]);
+let expiredGuard = false;
+try {
+  await db.query("select public.accept_team_invite($1)", [EXPIRED_INVITE_TOKEN]);
+} catch (e) {
+  expiredGuard = /invite_invalid_or_expired/.test(e.message);
+}
+check("accept_team_invite: expired token → invite_invalid_or_expired", expiredGuard);
+
+let mismatchGuard = false;
+try {
+  await db.query("select public.accept_team_invite($1)", [SEED_INVITE_TOKEN]);
+} catch (e) {
+  mismatchGuard = /invite_email_mismatch/.test(e.message);
+}
+check("accept_team_invite: wrong account email → invite_email_mismatch", mismatchGuard);
+
+// happy path: targeted user accepts → member row + consumed invite
+await db.query("select set_config('app.jwt_sub', $1, false)", [TEAMMATE_UID]);
+const { rows: [acceptRow] } = await db.query(
+  "select public.accept_team_invite($1) as ws",
+  [SEED_INVITE_TOKEN]
+);
+check("accept_team_invite: invitee joins, workspace id returned", acceptRow?.ws === SEED_WS);
+
+await db.query("reset role");
+const { rows: [newMember] } = await db.query(
+  `select wm.role, ti.accepted_at is not null as consumed, ti.accepted_by
+     from public.workspace_members wm, public.team_invites ti
+    where wm.workspace_id = $1 and wm.user_id = $2 and ti.token = $3`,
+  [SEED_WS, TEAMMATE_UID, SEED_INVITE_TOKEN]
+);
+check(
+  "accept writes 'member' row + stamps accepted_at/accepted_by",
+  newMember?.role === "member" &&
+    newMember.consumed === true &&
+    newMember.accepted_by === TEAMMATE_UID,
+  JSON.stringify(newMember)
+);
+
+// single-use: second accept of the consumed token fails like an invalid one
+await db.query("set role nstester");
+await db.query("select set_config('app.jwt_sub', $1, false)", [TEAMMATE_UID]);
+let secondAccept = false;
+try {
+  await db.query("select public.accept_team_invite($1)", [SEED_INVITE_TOKEN]);
+} catch (e) {
+  secondAccept = /invite_invalid_or_expired/.test(e.message);
+}
+check("accept_team_invite: consumed token → invite_invalid_or_expired (single-use)", secondAccept);
+
+const { rows: previewAfter } = await db.query(
+  "select * from public.get_team_invite_preview($1)",
+  [SEED_INVITE_TOKEN]
+);
+check("preview returns zero rows for an accepted token (indistinguishable)", previewAfter.length === 0);
+
+// members list RPC: owner and member both read it; outsiders get zero rows
+const { rows: membersOwner } = await db.query(
+  "select * from public.get_workspace_members()"
+);
+// (jwt still TEAMMATE — a member) → members can read the list too
+check(
+  "get_workspace_members: member sees the roster (Maya + Leo + Tess)",
+  membersOwner.length === 3 &&
+    membersOwner[0].full_name === "Maya Chen" &&
+    membersOwner[0].role === "owner" &&
+    membersOwner.filter((m) => m.role === "member").length === 2,
+  `${membersOwner.length} rows`
+);
+
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+const { rows: membersAsOwner } = await db.query(
+  "select * from public.get_workspace_members()"
+);
+check("get_workspace_members: owner sees the same roster", membersAsOwner.length === 3);
+
+await db.query("select set_config('app.jwt_sub', $1, false)", ["00000000-0000-0000-0000-000000000090"]);
+const { rows: membersOutsider } = await db.query(
+  "select * from public.get_workspace_members()"
+);
+check("get_workspace_members: non-member → zero rows", membersOutsider.length === 0);
+await db.query("reset role");
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
 
 console.log(failures === 0 ? "\nAll database checks passed ✔" : `\n${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

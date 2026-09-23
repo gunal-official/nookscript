@@ -346,3 +346,23 @@ values (
   'added a new source (email)',
   now() - interval '2 days'
 ) on conflict (id) do nothing;
+
+-- ── Team invite: a PENDING invite on the demo workspace (Step 15) ──
+-- Token is deterministic so local manual testing has a stable URL:
+--   http://localhost:3000/invite/00000000-0000-0000-0000-000000000063
+-- Accept it by creating the account teammate@brightloop.co (any password)
+-- via that link — or watch the email-mismatch guard by opening it while
+-- logged in as maya@nookscript.dev. "on conflict do nothing" (no target)
+-- so a re-run survives both the id and the pending-email unique index.
+
+insert into public.team_invites (
+  id, workspace_id, email, token, invited_by, expires_at, created_at
+) values (
+  '00000000-0000-0000-0000-000000000062',
+  '00000000-0000-0000-0000-000000000002',
+  'teammate@brightloop.co',
+  '00000000-0000-0000-0000-000000000063',
+  '00000000-0000-0000-0000-000000000001',
+  now() + interval '14 days',
+  now() - interval '1 day'
+) on conflict do nothing;
