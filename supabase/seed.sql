@@ -347,6 +347,18 @@ values (
   now() - interval '2 days'
 ) on conflict (id) do nothing;
 
+-- ── Second workspace for Maya (Step 16): proves the workspace switcher ──
+-- Membership ONLY — deliberately zero product rows, so switching to it
+-- shows empty states and every count-based check elsewhere is untouched.
+
+insert into public.workspaces (id, name)
+values ('00000000-0000-0000-0000-000000000064', 'Harbor Lane Studio')
+on conflict (id) do nothing;
+
+insert into public.workspace_members (workspace_id, user_id, role)
+values ('00000000-0000-0000-0000-000000000064', '00000000-0000-0000-0000-000000000001', 'owner')
+on conflict (workspace_id, user_id) do nothing;
+
 -- ── Team invite: a PENDING invite on the demo workspace (Step 15) ──
 -- Token is deterministic so local manual testing has a stable URL:
 --   http://localhost:3000/invite/00000000-0000-0000-0000-000000000063

@@ -52,6 +52,7 @@ const MEMBER_UID = "00000000-0000-0000-0000-000000000070";
 const TEAMMATE_UID = "00000000-0000-0000-0000-000000000071";
 const SEED_INVITE_TOKEN = "00000000-0000-0000-0000-000000000063";
 const EXPIRED_INVITE_TOKEN = "00000000-0000-0000-0000-000000000066";
+const SECOND_WS = "00000000-0000-0000-0000-000000000064";
 
 console.log("Starting PGlite (WASM Postgres)…");
 const db = new PGlite();
@@ -1109,6 +1110,83 @@ const { rows: membersOutsider } = await db.query(
 check("get_workspace_members: non-member → zero rows", membersOutsider.length === 0);
 await db.query("reset role");
 await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+
+// ── Step 16: active workspace (profiles pointer + resolver) ──
+const { rows: [awsCol] } = await db.query(
+  `select data_type from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles'
+      and column_name = 'active_workspace_id'`
+);
+check("profiles.active_workspace_id column exists (uuid)", awsCol?.data_type === "uuid");
+
+const { rows: [awsFk] } = await db.query(
+  `select c.confdeltype from pg_constraint c
+     join pg_class t on t.oid = c.conrelid
+     join pg_attribute a on a.attrelid = t.oid and a.attnum = any(c.conkey)
+    where t.relname = 'profiles' and c.contype = 'f'
+      and a.attname = 'active_workspace_id'`
+);
+check(
+  "active_workspace_id FK references workspaces, ON DELETE SET NULL",
+  awsFk?.confdeltype === "n",
+  `confdeltype=${awsFk?.confdeltype}`
+);
+
+// RLS: the existing profiles update-own policy governs the pointer
+await db.query("set role nstester");
+const { rowCount: selfSet } = await db.query(
+  "update public.profiles set active_workspace_id = $1 where id = $2",
+  [SECOND_WS, SEED_UID]
+);
+check("RLS: user can set their OWN active workspace", selfSet === 1);
+
+await db.query("select set_config('app.jwt_sub', $1, false)", [MEMBER_UID]);
+const { rowCount: foreignSet } = await db.query(
+  "update public.profiles set active_workspace_id = $1 where id = $2",
+  [SECOND_WS, SEED_UID] // Leo tries to move MAYA's pointer
+);
+check("RLS: cannot set another user's active workspace", foreignSet === 0);
+
+// resolver: pointer → pointer's roster (ws B has Maya alone)
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+const { rows: wsBMembers } = await db.query(
+  "select * from public.get_workspace_members()"
+);
+check(
+  "get_workspace_members follows the active pointer (ws B = Maya alone)",
+  wsBMembers.length === 1 && wsBMembers[0].user_id === SEED_UID,
+  `${wsBMembers.length} rows`
+);
+
+// resolver: stale pointer (not a member of it) heals to first-joined
+await db.query("reset role");
+await db.query(
+  "update public.profiles set active_workspace_id = $1 where id = $2",
+  [FOREIGN_WS, SEED_UID]
+);
+await db.query("set role nstester");
+const { rows: healed } = await db.query(
+  "select * from public.get_workspace_members()"
+);
+check(
+  "stale active pointer falls back to first-joined workspace",
+  healed.length === 3 && healed[0].full_name === "Maya Chen",
+  `${healed.length} rows`
+);
+
+// resolver: NULL pointer (every pre-existing account) → first-joined.
+// Also restores Maya's pointer so fixture state stays canonical.
+await db.query("reset role");
+await db.query(
+  "update public.profiles set active_workspace_id = null where id = $1",
+  [SEED_UID]
+);
+await db.query("set role nstester");
+const { rows: nulled } = await db.query(
+  "select * from public.get_workspace_members()"
+);
+check("null active pointer resolves to first-joined workspace", nulled.length === 3);
+await db.query("reset role");
 
 console.log(failures === 0 ? "\nAll database checks passed ✔" : `\n${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
