@@ -7,7 +7,8 @@ human-side checklist that must be confirmed in dashboards before real
 users touch this app.
 
 **Rate limiting**
-- ✅ In-code: `/share/*` is capped at 30 req/min per IP by an in-memory
+- ✅ In-code: `/share/*` and `/invite/*` (public routes that probe
+  Postgres per request) share a 30 req/min per-IP cap via an in-memory
   sliding-window limiter (middleware). Documented limitation: in-memory
   state does NOT survive redeploys and is NOT shared across serverless
   instances — in a multi-instance deploy the effective ceiling multiplies

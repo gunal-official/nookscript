@@ -1,7 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { clientKey, rateLimitExceeded } from "@/lib/rate-limit";
+import {
+  clientKey,
+  RATE_LIMITED_PREFIXES,
+  rateLimitExceeded,
+} from "@/lib/rate-limit";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 /**
@@ -42,18 +46,22 @@ function redirect(request: NextRequest, pathname: string) {
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Step 14 rate limit: /share/* is the only public route that hits
-  // Postgres on every request — cap it per-IP. Runs BEFORE the session
-  // work so an abuser doesn't even cost an auth lookup. In-memory only:
-  // resets on redeploy and doesn't share state across serverless
-  // instances (see lib/rate-limit.ts — durable-store upgrade is noted
-  // there and in SECURITY.md as future work). Login/signup are NOT
-  // rate-limited here by design: their auth calls go browser→Supabase
-  // directly (never touching this server), so protection belongs to
-  // Supabase's dashboard auth limits.
-  if (pathname.startsWith("/share") && rateLimitExceeded(clientKey(request))) {
+  // Step 14 rate limit (extended Step 15): public routes that hit
+  // Postgres on every request (/share/* documents, /invite/* token
+  // probes) — capped per-IP. Runs BEFORE the session work so an abuser
+  // doesn't even cost an auth lookup. In-memory only: resets on redeploy
+  // and doesn't share state across serverless instances (see
+  // lib/rate-limit.ts — durable-store upgrade is noted there and in
+  // SECURITY.md as future work). Login/signup are NOT rate-limited here
+  // by design: their auth calls go browser→Supabase directly (never
+  // touching this server), so protection belongs to Supabase's dashboard
+  // auth limits.
+  if (
+    RATE_LIMITED_PREFIXES.some((p) => pathname.startsWith(p)) &&
+    rateLimitExceeded(clientKey(request))
+  ) {
     return new NextResponse(
-      "Too many requests — shared links are rate limited. Try again in about a minute.",
+      "Too many requests — these links are rate limited. Try again in about a minute.",
       { status: 429, headers: { "content-type": "text/plain; charset=utf-8" } }
     );
   }
@@ -106,6 +114,6 @@ export async function updateSession(request: NextRequest) {
     return redirect(request, "/intake");
   }
 
-  // Marketing (/, /about, /pricing, /vs/*) and /share/*: fully public.
+  // Marketing (/, /about, /pricing, /vs/*), /share/*, /invite/*: fully public.
   return supabaseResponse;
 }

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 
 import { AuthCard } from "@/components/auth/AuthCard";
 import { ConfigNotice } from "@/components/auth/ConfigNotice";
@@ -11,13 +11,33 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-export default function LoginPage() {
+/**
+ * Reads ?next=, so it must sit behind a Suspense boundary (Next 14
+ * prerendering rule) — the exported page is just the wrapper.
+ */
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const configured = isSupabaseConfigured();
+
+  // Where to land after login — used by the /invite flow (Step 15).
+  // Open-redirect guard: same-site absolute paths only, never "//host".
+  const nextParam = searchParams.get("next");
+  const next =
+    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+      ? nextParam
+      : "/intake";
+
+  // If we got here from an invite link, keep the token on the way to
+  // signup so a brand-new invitee doesn't lose it.
+  const inviteMatch = next.match(/^\/invite\/([0-9a-f-]{36})$/i);
+  const signupHref = inviteMatch
+    ? `/signup?invite=${inviteMatch[1]}`
+    : "/signup";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,7 +60,7 @@ export default function LoginPage() {
 
     // Session cookie is already set by the browser client; middleware and
     // server components will pick it up.
-    router.replace("/intake");
+    router.replace(next);
     router.refresh();
   }
 
@@ -51,7 +71,7 @@ export default function LoginPage() {
       footer={
         <>
           Don’t have an account?{" "}
-          <Link href="/signup" className="text-accent hover:underline">
+          <Link href={signupHref} className="text-accent hover:underline">
             Sign up
           </Link>
         </>
@@ -101,5 +121,13 @@ export default function LoginPage() {
         </Button>
       </form>
     </AuthCard>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

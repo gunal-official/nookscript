@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 
 import { createWorkspaceAction } from "@/app/(auth)/actions";
+import { acceptTeamInviteAction } from "@/app/invite/actions";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { ConfigNotice } from "@/components/auth/ConfigNotice";
 import { Badge } from "@/components/ui/badge";
@@ -11,18 +13,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { isUuid } from "@/lib/utils";
 
 /**
- * Single-step signup: creates the auth user → the profiles row is created by
- * the on_auth_user_created trigger → the workspace + owner membership are
- * created by the createWorkspaceAction server action (via SECURITY DEFINER
- * RPC), all in one submit.
+ * Single-step signup, with an invite-aware variant (Step 15):
+ *
+ * Default: creates the auth user → profiles row via trigger → workspace +
+ * owner membership via createWorkspaceAction, all in one submit.
+ *
+ * ?invite=<token>: the user is joining an EXISTING workspace — the
+ * workspace-name field disappears and success calls
+ * acceptTeamInviteAction instead of createWorkspaceAction, so invitees
+ * never end up owning a fresh empty workspace.
  *
  * If the Supabase project has email confirmation ON, signUp returns no
- * session; we then show a "confirm your email" notice and the workspace is
- * collected on first login via /onboarding instead.
+ * session; we then show a "confirm your email" notice. Default flow
+ * collects the workspace name on first login via /onboarding; the invite
+ * flow asks the user to re-open the invite link after logging in (the
+ * token lives in the link, so nothing is lost).
  */
-export default function SignupPage() {
+function SignupForm() {
+  const searchParams = useSearchParams();
+  const inviteParam = searchParams.get("invite");
+  const inviteToken = inviteParam && isUuid(inviteParam) ? inviteParam : null;
+
   const [fullName, setFullName] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
   const [email, setEmail] = useState("");
@@ -59,21 +73,26 @@ export default function SignupPage() {
     }
 
     // 2. Email confirmation enabled → no session yet. Fall back to the
-    //    confirm-then-onboard flow.
+    //    confirm-then-onboard flow (or re-open-the-invite-link flow).
     if (!data.session || !data.user) {
       setPending(false);
       setNotice(
-        "Account created — check your email to confirm it, then log in. You’ll name your workspace on the way in."
+        inviteToken
+          ? "Account created — check your email to confirm it, then log in and re-open your invite link to join the workspace."
+          : "Account created — check your email to confirm it, then log in. You’ll name your workspace on the way in."
       );
       return;
     }
 
-    // 3. Session exists (email confirmation OFF) → create the workspace +
-    //    membership server-side, then the action redirects to /intake.
-    const result = await createWorkspaceAction({
-      workspaceName,
-      userId: data.user.id,
-    });
+    // 3. Session exists (email confirmation OFF) → join the inviting
+    //    workspace, or create a new one, server-side. Both actions
+    //    redirect to /intake on success.
+    const result = inviteToken
+      ? await acceptTeamInviteAction({ token: inviteToken })
+      : await createWorkspaceAction({
+          workspaceName,
+          userId: data.user.id,
+        });
 
     if (result?.error) {
       setError(result.error);
@@ -98,12 +117,21 @@ export default function SignupPage() {
 
   return (
     <AuthCard
-      title="Create your workspace"
-      subtitle="One account for you, one workspace for your work."
+      title={inviteToken ? "Join your team" : "Create your workspace"}
+      subtitle={
+        inviteToken
+          ? "Create your account to accept the workspace invite."
+          : "One account for you, one workspace for your work."
+      }
       footer={
         <>
           Already have an account?{" "}
-          <Link href="/login" className="text-accent hover:underline">
+          <Link
+            href={
+              inviteToken ? `/login?next=/invite/${inviteToken}` : "/login"
+            }
+            className="text-accent hover:underline"
+          >
             Log in
           </Link>
         </>
@@ -140,6 +168,12 @@ export default function SignupPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
+          {inviteToken && (
+            <p className="text-xs text-muted-foreground">
+              Use the address the invite was sent to — the accept step
+              checks it.
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">
@@ -158,23 +192,25 @@ export default function SignupPage() {
           />
         </div>
 
-        <div className="space-y-1.5">
-          <label
-            htmlFor="workspace-name"
-            className="text-sm font-medium text-text"
-          >
-            Workspace name
-          </label>
-          <Input
-            id="workspace-name"
-            type="text"
-            required
-            maxLength={80}
-            placeholder="Acme Studio"
-            value={workspaceName}
-            onChange={(e) => setWorkspaceName(e.target.value)}
-          />
-        </div>
+        {!inviteToken && (
+          <div className="space-y-1.5">
+            <label
+              htmlFor="workspace-name"
+              className="text-sm font-medium text-text"
+            >
+              Workspace name
+            </label>
+            <Input
+              id="workspace-name"
+              type="text"
+              required
+              maxLength={80}
+              placeholder="Acme Studio"
+              value={workspaceName}
+              onChange={(e) => setWorkspaceName(e.target.value)}
+            />
+          </div>
+        )}
 
         {error && <p className="text-sm text-error">{error}</p>}
 
@@ -183,9 +219,23 @@ export default function SignupPage() {
           className="w-full"
           disabled={pending || !configured}
         >
-          {pending ? "Creating…" : "Create workspace"}
+          {pending
+            ? inviteToken
+              ? "Joining…"
+              : "Creating…"
+            : inviteToken
+              ? "Create account & join"
+              : "Create workspace"}
         </Button>
       </form>
     </AuthCard>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
   );
 }

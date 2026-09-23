@@ -27,7 +27,8 @@ with the CLI).
 This creates `workspaces` / `workspace_members` / `profiles`, the auth
 triggers, and the product schema: `briefs` / `brief_sources` /
 `brief_questions` / `brief_edit_history` / `proposals` / `plans` /
-`updates` / `share_links` — all RLS-scoped to workspace membership —
+`updates` / `share_links` / `templates` / `team_invites` — all RLS-scoped
+to workspace membership —
 plus the `create_workspace()`, `update_brief_field()`,
 `create_brief_bundle()`, and public token-gated `get_shared_document()`
 RPCs and the status-change history + updated_at touch triggers.
@@ -318,6 +319,43 @@ content only).
    Sign up, theme toggle) and `SiteFooter` via the new
    `app/(marketing)/layout.tsx`; all four pages stay public per the
    existing middleware config, and each ships its own `metadata` title.
+
+## Verify Step 15 (team invites — /settings Team card + /invite/:token)
+
+⚠ New migration in this step — re-apply to your live Supabase project
+before testing: `supabase/migrations/20260923070000_team_invites_schema.sql`
+(SQL Editor → paste → Run), then re-run `supabase/seed.sql` for the seeded
+pending invite.
+
+The real invite-and-join flow: an owner invites a **specific email**,
+copies the generated link (no email is ever sent — delivery is the
+owner's own mail/chat), and the invitee joins as `member` whether they
+already have an account or sign up from the link. Invites are single-use,
+expire after 14 days, and are revocable.
+
+1. **Seed fixture** — logged out, open
+   `/invite/00000000-0000-0000-0000-000000000063` → "Join Atelier North"
+   with *Create an account* / *Log in to accept*. Garbage or revoked
+   tokens render the same "Invite unavailable" card — dead states are
+   indistinguishable by design.
+2. **Join by signing up** — from that page: *Create an account* → signup
+   shows "Join your team" with **no workspace-name field**. Sign up as
+   `teammate@brightloop.co` (any password) → you land on `/intake` as a
+   **member** of Atelier North; `/settings` → Team lists Maya (owner) +
+   you, with invite controls hidden from you.
+3. **Email targeting** — open the same link while logged in as
+   `maya@nookscript.dev` and click *Join workspace* → blocked with
+   "sent to a different email address" (the RPC compares account emails).
+4. **Owner side** — as Maya: `/settings` → Team shows the roster; invite
+   a new address → the pending row appears with a copy-link button and a
+   two-click revoke. Revoking kills the link immediately (invitees see
+   "Invite unavailable").
+5. **Rate limit** — `/invite/*` now shares the Step-14 per-IP bucket with
+   `/share/*` (30/min) since it's a public route that probes Postgres on
+   every load. Login/signup remain delegated to Supabase dashboard limits.
+6. **DB-level proof** — `npm run verify:db` (84 checks / 11 migrations,
+   incl. owner-only invite RLS, the one-pending-per-email index, preview
+   indistinguishability, every accept guard, and the members RPC).
 
 ## Notes
 

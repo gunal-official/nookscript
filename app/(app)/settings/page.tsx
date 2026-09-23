@@ -1,7 +1,8 @@
 /**
- * /settings — workspace configuration. Step 11 scope: templates only
- * (title + body snippets), owner-managed, member-readable. No detail
- * routes — create/edit happen in a dialog.
+ * /settings — workspace configuration: name, team roster + invites
+ * (Step 15), and templates (Step 11). Owner-managed, member-readable.
+ * No detail routes — template create/edit happens in a dialog, invites
+ * inline on the Team card.
  *
  * HOW TO TEST (locally — ⚠ apply the templates migration + seed first):
  *   1. Open /settings as the seeded demo user (an OWNER): two seeded
@@ -16,15 +17,19 @@
  *      ✗, owner insert/update/delete ✓).
  */
 
+import { TeamCard } from "@/components/settings/TeamCard";
 import { TemplatesList } from "@/components/settings/TemplatesList";
 import { WorkspaceNameCard } from "@/components/settings/WorkspaceNameCard";
+import { getPendingInvites, getTeamMembers } from "@/lib/data/team";
 import { getTemplates } from "@/lib/data/templates";
 import { getWorkspaceInfo } from "@/lib/data/workspace";
 
 export default async function SettingsPage() {
-  const [templates, workspace] = await Promise.all([
+  const [templates, workspace, members, pendingInvites] = await Promise.all([
     getTemplates(),
     getWorkspaceInfo(),
+    getTeamMembers(),
+    getPendingInvites(),
   ]);
   const isOwner = workspace?.role === "owner";
 
@@ -35,11 +40,18 @@ export default async function SettingsPage() {
           Settings
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Workspace configuration — name, plus reusable text snippets.
+          Workspace configuration — name, team, and reusable text snippets.
         </p>
       </div>
 
       {workspace && <WorkspaceNameCard name={workspace.name} isOwner={isOwner} />}
+      {workspace && (
+        <TeamCard
+          members={members}
+          pendingInvites={pendingInvites}
+          isOwner={isOwner}
+        />
+      )}
       <TemplatesList templates={templates} isOwner={isOwner} />
     </div>
   );

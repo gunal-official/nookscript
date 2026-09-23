@@ -1,13 +1,14 @@
 /**
  * Step 14 — lightweight in-memory sliding-window rate limiter.
  *
- * SCOPE: applied ONLY to /share/* (the one unauthenticated route that
- * hits Postgres on every request). Login/signup are intentionally NOT
- * covered — those are client-component flows whose traffic goes straight
- * to Supabase's hosted auth API, never touching this server, so their
- * abuse protection lives in Supabase's dashboard auth rate limits (see
- * SECURITY.md → Production checklist). (app) routes require a session
- * and are likewise out of scope.
+ * SCOPE: applied ONLY to unauthenticated routes that hit Postgres on
+ * every request — /share/* (Step 14) and /invite/* (Step 15's public
+ * token-probe page). Login/signup are intentionally NOT covered — those
+ * are client-component flows whose traffic goes straight to Supabase's
+ * hosted auth API, never touching this server, so their abuse protection
+ * lives in Supabase's dashboard auth rate limits (see SECURITY.md →
+ * Production checklist). (app) routes require a session and are likewise
+ * out of scope.
  *
  * ⚠ KNOWN LIMITATION (documented, accepted for now):
  * state lives in-process in a Map → it does NOT survive redeploys, and
@@ -29,6 +30,9 @@
 const WINDOW_MS = 60_000; // 1 minute
 const LIMIT = 30; // requests per key per window
 const SWEEP_THRESHOLD = 5_000; // Map size that triggers an idle-key sweep
+
+/** URL prefixes the middleware rate-limits (all share one key space). */
+export const RATE_LIMITED_PREFIXES = ["/share", "/invite"] as const;
 
 const hits = new Map<string, number[]>();
 
