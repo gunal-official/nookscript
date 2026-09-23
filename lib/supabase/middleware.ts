@@ -21,6 +21,7 @@ const APP_PREFIXES = [
   "/updates",
   "/invoices", // app route — note the S; the PUBLIC form lives at /invoice/<token>
   "/time",
+  "/contracts",
   "/settings",
   "/onboarding",
 ];

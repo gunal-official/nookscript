@@ -48,11 +48,19 @@ export default async function AppLayout({
 
   return (
     <div className="grid h-dvh grid-cols-[220px_1fr] grid-rows-[56px_1fr] overflow-hidden">
-      <Topbar initials={initials} name={fullName} email={user.email} />
-      <Sidebar
-        workspaces={context.workspaces}
-        activeWorkspaceId={context.id}
-      />
+      {/* Topbar + sidebar are print:hidden so browser print of any app
+          page (the v1 export story — e.g. the contract document on
+          /contracts/:id) yields a clean document, not the app chrome.
+          Wrappers carry the grid placement the components used to. */}
+      <div className="col-span-2 print:hidden">
+        <Topbar initials={initials} name={fullName} email={user.email} />
+      </div>
+      <div className="print:hidden">
+        <Sidebar
+          workspaces={context.workspaces}
+          activeWorkspaceId={context.id}
+        />
+      </div>
       <main className="overflow-y-auto bg-bg px-8 pb-12 pt-6">{children}</main>
       <TimeTimer briefs={briefs.map((b) => ({ id: b.id, title: b.title }))} />
     </div>

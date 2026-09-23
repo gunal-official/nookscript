@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { label: "Updates", href: "/updates" },
   { label: "Invoices", href: "/invoices" },
   { label: "Time", href: "/time" },
+  { label: "Contracts", href: "/contracts" },
   { label: "Settings", href: "/settings" },
 ];
 
@@ -65,7 +66,7 @@ export function Sidebar({
     .sort((a, b) => b.length - a.length)[0];
 
   return (
-    <aside className="flex flex-col border-r border-border bg-muted p-3">
+    <aside className="flex h-full flex-col border-r border-border bg-muted p-3">
       <nav className="flex flex-col gap-1">
         {NAV_ITEMS.map((item) => (
           <NavItem
