@@ -515,3 +515,47 @@ insert into public.time_entries (
   now() - interval '3 days',
   now() - interval '3 days'
 ) on conflict (id) do nothing;
+
+-- ── Contracts (Step 19): one signed + one draft on the demo workspace ──
+-- …0075 is the signed Brightloop engagement: it proves the badge, the
+-- sent_at/signed_at audit stamps (visible in Details), and the signed_by
+-- field. …0076 is a draft for a NEW client name (free text beyond the
+-- briefs' datalist) with no brief link — the standalone bucket.
+
+insert into public.contracts (
+  id, workspace_id, brief_id, client_name, title, status, terms,
+  expires_on, signed_by, sent_at, signed_at, created_at, updated_at
+) values (
+  '00000000-0000-0000-0000-000000000075',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000010',
+  'Brightloop Co.',
+  'Brand refresh — engagement agreement',
+  'signed',
+  E'Scope: brand discovery, visual identity (logo, type, color, usage) and rollout templates for web and social.\nFee and payment terms as set out in invoices INV-0001 and INV-0002.\nEither party may cancel scheduled work with 14 days written notice.',
+  null,
+  'Dana Whitfield (Brightloop)',
+  now() - interval '12 days',
+  now() - interval '9 days',
+  now() - interval '13 days',
+  now() - interval '9 days'
+) on conflict (id) do nothing;
+
+insert into public.contracts (
+  id, workspace_id, brief_id, client_name, title, status, terms,
+  expires_on, signed_by, sent_at, signed_at, created_at, updated_at
+) values (
+  '00000000-0000-0000-0000-000000000076',
+  '00000000-0000-0000-0000-000000000002',
+  null,
+  'Fern & Fable Bakery',
+  'Seasonal packaging — engagement agreement',
+  'draft',
+  '',
+  null,
+  '',
+  null,
+  null,
+  now() - interval '1 day',
+  now() - interval '1 day'
+) on conflict (id) do nothing;

@@ -22,6 +22,9 @@
  *   - time_entries (Step 18): duration CHECK (integer minutes > 0),
  *     brief_id FK + nullable general rows, and the schema's ONE delete
  *     policy (documented exception: personal work log, not audit data)
+ *   - contracts (Step 19): status CHECK (draft/sent/signed/void),
+ *     brief_id FK + nullable standalone rows, member RLS, and NO
+ *     delete policy (legal/financial document — void is the cancel)
  *
  * Note: PGlite runs as a single superuser, so RLS is exercised via a
  * dedicated non-owner role (`nstester`) with a faked `auth.uid()`.
@@ -69,6 +72,8 @@ const SEED_TIME_ENTRY_YESTERDAY = "00000000-0000-0000-0000-000000000071";
 const SEED_TIME_ENTRY_TODAY = "00000000-0000-0000-0000-000000000072";
 const SEED_TIME_ENTRY_GENERAL = "00000000-0000-0000-0000-000000000073";
 const SEED_TIME_ENTRY_3DAYS = "00000000-0000-0000-0000-000000000074";
+const SEED_CONTRACT_SIGNED = "00000000-0000-0000-0000-000000000075";
+const SEED_CONTRACT_DRAFT = "00000000-0000-0000-0000-000000000076";
 // Step 17 fixtures (verify-db only, like the share-link ones above):
 const REVOKED_INVOICE = "00000000-0000-0000-0000-000000000091";
 const REVOKED_INVOICE_TOKEN = "00000000-0000-0000-0000-000000000089";
@@ -78,6 +83,9 @@ const FOREIGN_INVOICE = "00000000-0000-0000-0000-000000000092";
 // may legally mutate; FOREIGN_ = a row in Foreign Co for the RLS probes.
 const TEMP_TIME_ENTRY = "00000000-0000-0000-0000-000000000095";
 const FOREIGN_TIME_ENTRY = "00000000-0000-0000-0000-000000000094";
+// Step 19 fixtures (verify-db only), continuing the fixture-id run.
+const TEMP_CONTRACT = "00000000-0000-0000-0000-000000000096";
+const FOREIGN_CONTRACT = "00000000-0000-0000-0000-000000000097";
 
 console.log("Starting PGlite (WASM Postgres)…");
 const db = new PGlite();
@@ -425,6 +433,25 @@ check(
   seedTimeEntries.map((t) => `${t.duration_minutes}m`).join(" + ")
 );
 
+// ── Seed contracts (Step 19) ──
+const { rows: seedContracts } = await db.query(
+  "select id, status, client_name, brief_id, signed_by, sent_at, signed_at from public.contracts where id = any($1) order by created_at",
+  [[SEED_CONTRACT_DRAFT, SEED_CONTRACT_SIGNED]]
+);
+check(
+  "seed contracts present (1 draft + 1 signed with audit stamps)",
+  seedContracts.length === 2 &&
+    seedContracts.some((c) => c.status === "draft" && c.brief_id === null && c.sent_at === null && c.signed_at === null) &&
+    seedContracts.some((c) =>
+      c.status === "signed" &&
+      c.brief_id === SEED_BRIEF &&
+      c.signed_by === "Dana Whitfield (Brightloop)" &&
+      c.sent_at !== null &&
+      c.signed_at !== null
+    ),
+  seedContracts.map((c) => c.status).join(" + ")
+);
+
 // ── invoices constraints: status CHECK + per-workspace unique number ──
 let invoiceStatusRejected = false;
 try {
@@ -544,7 +571,7 @@ await db.exec(`
     public.briefs, public.brief_sources, public.brief_questions, public.brief_edit_history,
     public.proposals, public.plans, public.updates, public.share_links, public.templates,
     public.team_invites, public.invoices, public.invoice_links,
-    public.time_entries
+    public.time_entries, public.contracts
     to nstester;
 `);
 // fixtures the seed user does NOT belong to, plus one own-workspace REVOKED
@@ -1048,6 +1075,104 @@ check(
   touchedEntry.length === 1 &&
     touchedEntry[0].touched === true &&
     touchedEntry[0].description === "rls probe (touched)"
+);
+
+// ── contracts constraints + RLS (Step 19) ──
+let contractStatusRejected = false;
+try {
+  await db.query(
+    "insert into public.contracts (workspace_id, client_name, title, status) values ($1, 'x', 'x', 'accepted')",
+    [SEED_WS]
+  );
+} catch (e) {
+  contractStatusRejected = true;
+}
+check(
+  "contracts.status CHECK rejects invalid value",
+  contractStatusRejected
+);
+
+let contractBriefFkRejected = false;
+try {
+  await db.query(
+    "insert into public.contracts (workspace_id, brief_id, client_name, title) values ($1, '10000000-0000-0000-0000-000000000000', 'x', 'x')",
+    [SEED_WS]
+  );
+} catch (e) {
+  contractBriefFkRejected = true;
+}
+check("contracts.brief_id FK enforces a real brief", contractBriefFkRejected);
+
+// Fixture rows for the RLS probes (superuser, like the Step 17/18 ones).
+await db.query(
+  "insert into public.contracts (id, workspace_id, client_name, title) values ($1, $2, 'rls probe', 'x')",
+  [TEMP_CONTRACT, SEED_WS]
+);
+await db.query(
+  "insert into public.contracts (id, workspace_id, client_name, title) values ($1, $2, 'foreign probe', 'x')",
+  [FOREIGN_CONTRACT, FOREIGN_WS]
+);
+
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+await db.query("set role nstester");
+const { rows: visibleContracts } = await db.query(
+  "select id from public.contracts"
+);
+check(
+  "RLS: member sees own-workspace contracts only",
+  visibleContracts.length === 3 &&
+    visibleContracts.every((c) =>
+      [SEED_CONTRACT_SIGNED, SEED_CONTRACT_DRAFT, TEMP_CONTRACT].includes(
+        c.id
+      )
+    ),
+  `${visibleContracts.length} visible`
+);
+
+let insertContractBlocked = false;
+try {
+  await db.query(
+    "insert into public.contracts (workspace_id, client_name, title) values ($1, 'x', 'x')",
+    [FOREIGN_WS]
+  );
+} catch (e) {
+  insertContractBlocked = true;
+}
+check(
+  "RLS: cannot insert contract into foreign workspace",
+  insertContractBlocked
+);
+
+let deleteContractPossible = false;
+try {
+  const { rowCount } = await db.query(
+    "delete from public.contracts where id = $1",
+    [SEED_CONTRACT_DRAFT]
+  );
+  deleteContractPossible = rowCount === 1;
+} catch (e) {
+  deleteContractPossible = false;
+}
+check(
+  "RLS: contracts have NO delete policy — void is the only cancel",
+  !deleteContractPossible
+);
+await db.query("reset role");
+
+// updated_at trigger keeps touching (like every other table).
+await db.query(
+  "update public.contracts set terms = 'touched' where id = $1",
+  [SEED_CONTRACT_DRAFT]
+);
+const { rows: touchedContract } = await db.query(
+  "select (updated_at >= created_at) as touched, terms from public.contracts where id = $1",
+  [SEED_CONTRACT_DRAFT]
+);
+check(
+  "contracts updated_at touch trigger fires on update",
+  touchedContract.length === 1 &&
+    touchedContract[0].touched === true &&
+    touchedContract[0].terms === "touched"
 );
 
 // ── templates: owner-only writes (Step 11) — the first "member ✗ / owner ✓" split ──

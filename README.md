@@ -28,7 +28,8 @@ This creates `workspaces` / `workspace_members` / `profiles`, the auth
 triggers, and the product schema: `briefs` / `brief_sources` /
 `brief_questions` / `brief_edit_history` / `proposals` / `plans` /
 `updates` / `share_links` / `templates` / `team_invites` / `invoices` /
-`invoice_links` / `time_entries` — all RLS-scoped to workspace membership —
+`invoice_links` / `time_entries` / `contracts` — all RLS-scoped to workspace
+membership —
 plus the `create_workspace()`, `update_brief_field()`,
 `create_brief_bundle()`, and public token-gated `get_shared_document()`
 + `get_shared_invoice()` RPCs and the status-change history +
@@ -482,6 +483,46 @@ policy** — a time entry is a personal work log, not an audit record.
    migrations, incl. the duration_minutes CHECK (0 and negatives
    rejected), the brief FK + nullable general rows, member RLS, the
    member-can-delete / foreign-cannot-delete pair, and the
+   updated_at touch trigger).
+
+## Verify Step 19 (contracts — engagement agreements)
+
+⚠ New migration in this step — re-apply to your live Supabase project
+before testing: `supabase/migrations/20260925090000_contracts_schema.sql`
+(SQL Editor → paste → Run), then re-run `supabase/seed.sql` (it adds two
+contracts to the demo workspace).
+
+Contracts are per-workspace engagement documents: a free-text
+client name (with `<datalist>` suggestions from the briefs), a single
+plain-text terms field, and an optional brief link (null = standalone).
+The lifecycle mirrors invoices — draft → sent → signed, plus **void**
+as the audit-safe cancel — with `sent_at` stamped on first send and
+`signed_at` stamped on signed (cleared again when leaving signed).
+"Expired" is derived from `expires_on`, never a stored status. There is
+no delete anywhere and no money fields (the invoices hold the value).
+
+1. **The list** — /contracts shows the two seeded contracts:
+   "Brand refresh — engagement agreement" (Signed badge, Brightloop)
+   and "Seasonal packaging — engagement agreement" (Draft badge,
+   Fern & Fable Bakery, no brief chip). The Draft/Sent/Signed/Void tabs
+   (with counts) filter; search matches title or client.
+2. **Create on the list** — "New contract": client (free text with
+   datalist suggestions), title, optional brief, optional expiry →
+   saving creates a DRAFT and redirects to its composer.
+3. **The composer** — title, client, brief, the terms textarea,
+   expiry date, signed-by; Save persists.
+4. **Status + audit stamps** — Sent stamps `sent_at` (shown in Details,
+   never overwritten on re-send); Signed stamps `signed_at`; Signed →
+   Draft/Sent CLEARS `signed_at`; Void keeps every stamp. The row is
+   never destroyed.
+5. **Print** — the detail page has a Print button (reused client
+   island); browser print is the v1 export story (no PDF endpoint,
+   no e-sign).
+6. **Bogus / foreign ids** render the "not found" state (RLS hides
+   them identically).
+7. **DB-level proof** — `npm run verify:db` (120 checks / 15
+   migrations, incl. the status CHECK, the brief FK + nullable
+   standalone rows, member RLS, the no-delete proof, and the
    updated_at touch trigger).
 
 ## Notes
