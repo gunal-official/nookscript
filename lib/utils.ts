@@ -65,3 +65,21 @@ export function formatMoney(cents: number): string {
 export function invoiceNumberLabel(invoiceNumber: number): string {
   return `INV-${String(invoiceNumber).padStart(4, "0")}`;
 }
+
+/** 95 → "1h 35m" · 45 → "45m" · 120 → "2h" (time entries, Step 18). */
+export function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+/** Local-timezone "YYYY-MM-DD" for today — the default date for new time
+ *  entries (and the key for the log's "Today" group). */
+export function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}

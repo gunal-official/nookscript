@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 
 import { Sidebar } from "@/components/app-shell/Sidebar";
 import { Topbar } from "@/components/app-shell/Topbar";
+import { TimeTimer } from "@/components/time/TimeTimer";
+import { getBriefs } from "@/lib/data/briefs";
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import { getInitials } from "@/lib/utils";
@@ -40,6 +42,10 @@ export default async function AppLayout({
   const initials =
     profile?.avatar_initials || getInitials(fullName ?? user.email);
 
+  // The floating timer's brief picker (Step 18) — id + title only, so
+  // the cost per (app) render is one small query.
+  const briefs = await getBriefs(context.id);
+
   return (
     <div className="grid h-dvh grid-cols-[220px_1fr] grid-rows-[56px_1fr] overflow-hidden">
       <Topbar initials={initials} name={fullName} email={user.email} />
@@ -48,6 +54,7 @@ export default async function AppLayout({
         activeWorkspaceId={context.id}
       />
       <main className="overflow-y-auto bg-bg px-8 pb-12 pt-6">{children}</main>
+      <TimeTimer briefs={briefs.map((b) => ({ id: b.id, title: b.title }))} />
     </div>
   );
 }
