@@ -15,10 +15,11 @@
  */
 
 import { useEffect, useState } from "react";
-import { Ban, Check, Copy, Loader2, UserPlus } from "lucide-react";
+import { Ban, Check, Copy, Loader2, Trash2, UserPlus } from "lucide-react";
 
 import {
   createTeamInviteAction,
+  removeMemberAction,
   revokeTeamInviteAction,
 } from "@/app/(app)/settings/team-actions";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -35,27 +36,94 @@ import { Input } from "@/components/ui/input";
 import type { PendingInvite, TeamMember } from "@/lib/data/team";
 import { formatDate, getInitials } from "@/lib/utils";
 
-function MemberRow({ member }: { member: TeamMember }) {
+function MemberRow({
+  member,
+  removable,
+}: {
+  member: TeamMember;
+  /** True when the viewer (an owner) may remove this member: not their
+   *  own row, and not the workspace's last owner. */
+  removable: boolean;
+}) {
   const initials =
     member.avatar_initials || getInitials(member.full_name ?? "?");
+  const [confirming, setConfirming] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleRemove() {
+    setPending(true);
+    setError(null);
+    const result = await removeMemberAction({ userId: member.user_id });
+    setPending(false);
+    if (result?.error) {
+      setError(result.error);
+      setConfirming(false);
+    }
+    // On success the row disappears via revalidated server props.
+  }
+
   return (
-    <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-      <Avatar className="h-8 w-8 shrink-0">
-        <AvatarFallback className="bg-accent text-xs font-semibold text-white">
-          {initials}
-        </AvatarFallback>
-      </Avatar>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium leading-snug">
-          {member.full_name ?? "Unnamed user"}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Joined {formatDate(member.joined_at)}
-        </p>
+    <li className="py-3 first:pt-0 last:pb-0">
+      <div className="flex items-center gap-3">
+        <Avatar className="h-8 w-8 shrink-0">
+          <AvatarFallback className="bg-accent text-xs font-semibold text-white">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium leading-snug">
+            {member.full_name ?? "Unnamed user"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Joined {formatDate(member.joined_at)}
+          </p>
+        </div>
+        <Badge variant={member.role === "owner" ? "default" : "secondary"}>
+          {member.role}
+        </Badge>
+
+        {removable && !confirming && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="shrink-0 text-muted-foreground hover:text-error"
+            onClick={() => setConfirming(true)}
+            aria-label={`Remove ${member.full_name ?? "member"}`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
+
+        {removable && confirming && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Remove?</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirming(false)}
+              disabled={pending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleRemove}
+              disabled={pending}
+            >
+              {pending && (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              )}
+              Remove
+            </Button>
+          </div>
+        )}
       </div>
-      <Badge variant={member.role === "owner" ? "default" : "secondary"}>
-        {member.role}
-      </Badge>
+      {error && <p className="mt-1 text-xs text-error">{error}</p>}
     </li>
   );
 }
@@ -177,10 +245,14 @@ export function TeamCard({
   members,
   pendingInvites,
   isOwner,
+  currentUserId,
 }: {
   members: TeamMember[];
   pendingInvites: PendingInvite[];
   isOwner: boolean;
+  /** The signed-in user's id — their own row never gets a remove
+   *  control (self-removal is "leaving", a different, unbuilt action). */
+  currentUserId: string | null;
 }) {
   const [origin, setOrigin] = useState<string | null>(null);
   const [email, setEmail] = useState("");
@@ -190,6 +262,14 @@ export function TeamCard({
   useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
+
+  // The last owner can never be removed (a workspace must keep one
+  // owner); every other member's row is removable for owners.
+  const ownerCount = members.filter((m) => m.role === "owner").length;
+  const isRemovable = (member: TeamMember) =>
+    isOwner &&
+    member.user_id !== currentUserId &&
+    !(member.role === "owner" && ownerCount === 1);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -212,7 +292,7 @@ export function TeamCard({
           Everyone who can see this workspace.{" "}
           {!isOwner && (
             <span className="italic">
-              View only — owners manage invites.
+              View only — owners manage invites and removals.
             </span>
           )}
         </CardDescription>
@@ -220,7 +300,11 @@ export function TeamCard({
       <CardContent className="p-5">
         <ul className="divide-y divide-border">
           {members.map((member) => (
-            <MemberRow key={member.user_id} member={member} />
+            <MemberRow
+              key={member.user_id}
+              member={member}
+              removable={isRemovable(member)}
+            />
           ))}
         </ul>
 

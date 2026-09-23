@@ -25,6 +25,8 @@
  *   - contracts (Step 19): status CHECK (draft/sent/signed/void),
  *     brief_id FK + nullable standalone rows, member RLS, and NO
  *     delete policy (legal/financial document — void is the cancel)
+ *   - member removal (Step 21): the Step-2 owner-only DELETE policy on
+ *     workspace_members — plain member ✗ / owner ✓
  *
  * Note: PGlite runs as a single superuser, so RLS is exercised via a
  * dedicated non-owner role (`nstester`) with a faked `auth.uid()`.
@@ -1668,6 +1670,47 @@ const { rows: nulled } = await db.query(
   "select * from public.get_workspace_members()"
 );
 check("null active pointer resolves to first-joined workspace", nulled.length === 3);
+await db.query("reset role");
+
+// ── workspace_members delete policy (Step 21: member removal) ──
+// The owner-only DELETE policy has existed since the Step 2 migration;
+// Step 21 adds the app surface and this finally exercises it. Tess
+// (TEAMMATE_UID) is a plain member of the seeded workspace — the probe
+// deletes her membership, and runs LAST so no earlier roster-count
+// check sees the change.
+await db.query("select set_config('app.jwt_sub', $1, false)", [MEMBER_UID]);
+await db.query("set role nstester");
+let memberDeleteBlocked = true;
+try {
+  const { rowCount } = await db.query(
+    "delete from public.workspace_members where workspace_id = $1 and user_id = $2",
+    [SEED_WS, TEAMMATE_UID]
+  );
+  memberDeleteBlocked = rowCount === 0;
+} catch (e) {
+  memberDeleteBlocked = true;
+}
+check(
+  "RLS: plain member CANNOT delete a workspace member",
+  memberDeleteBlocked
+);
+
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+await db.query("set role nstester");
+let ownerDeletePossible = false;
+try {
+  const { rowCount } = await db.query(
+    "delete from public.workspace_members where workspace_id = $1 and user_id = $2",
+    [SEED_WS, TEAMMATE_UID]
+  );
+  ownerDeletePossible = rowCount === 1;
+} catch (e) {
+  ownerDeletePossible = false;
+}
+check(
+  "RLS: owner CAN delete a workspace member (removal path)",
+  ownerDeletePossible
+);
 await db.query("reset role");
 
 console.log(failures === 0 ? "\nAll database checks passed ✔" : `\n${failures} check(s) FAILED`);

@@ -556,6 +556,32 @@ both derived from `expires_on`).
    15 migrations — every input table is already proven; the
    aggregation is app-side TS, covered by the rendered values above).
 
+## Verify Step 21 (member removal — Step 15 follow-up)
+
+No new migration — the owner-only DELETE policy on `workspace_members`
+has existed since Step 2; this step adds the app surface that finally
+uses it. Removal is owner-only, two-click, and carries two guards: you
+cannot remove yourself ("leaving" a workspace is a different action,
+not built yet), and the LAST OWNER of a workspace can never be removed
+(a workspace must always keep one owner — transferring ownership is
+role management, a future step). Those rows simply don't render a
+remove control; the action re-checks both server-side.
+
+1. **The control** — as an owner, /settings → Team: every member row
+   has a trash control EXCEPT your own row and (when you are the only
+   owner) the last owner's row. Members (non-owners) see no controls
+   at all.
+2. **Two-click remove** — trash → inline "Remove?" + Cancel/Remove
+   (the revoke pattern) → confirm → the row disappears (revalidated
+   roster).
+3. **Guards** — the action rejects self-removal, last-owner removal,
+   non-owner callers, and unknown/foreign ids even when the UI is
+   bypassed; RLS (`is_workspace_owner` on the delete policy) rejects a
+   plain member's attempt at the DB level.
+4. **DB-level proof** — `npm run verify:db` (122 checks / 15
+   migrations, incl. the new plain-member-cannot-delete /
+   owner-can-delete pair on `workspace_members`).
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

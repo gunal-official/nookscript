@@ -1,8 +1,8 @@
 /**
  * /settings — workspace configuration: name, team roster + invites
- * (Step 15), and templates (Step 11). Owner-managed, member-readable.
- * No detail routes — template create/edit happens in a dialog, invites
- * inline on the Team card.
+ * (Step 15) + member removal (Step 21), and templates (Step 11).
+ * Owner-managed, member-readable. No detail routes — template
+ * create/edit happens in a dialog, invites inline on the Team card.
  *
  * HOW TO TEST (locally — ⚠ apply the templates migration + seed first):
  *   1. Open /settings as the seeded demo user (an OWNER): two seeded
@@ -13,8 +13,15 @@
  *      user as 'member'): as that user the same page shows the same
  *      templates with NO management controls and a "View only" note —
  *      RLS (is_workspace_owner) backs the UI.
- *   3. DB-level proof: npm run verify:db (member-select ✓, member-insert
- *      ✗, owner insert/update/delete ✓).
+ *   3. Team card (Step 21): as the owner, every member row has a trash
+ *      control EXCEPT your own row and (when you are the only owner)
+ *      the last owner's row. Trash → inline "Remove?" → Confirm
+ *      removes the member (roster revalidates). Self-removal and
+ *      last-owner removal are rejected by the action even if the UI is
+ *      bypassed.
+ *   4. DB-level proof: npm run verify:db (member-select ✓, member-insert
+ *      ✗, owner insert/update/delete ✓ — incl. the Step 21
+ *      member-cannot-delete / owner-can-delete pair).
  */
 
 import { TeamCard } from "@/components/settings/TeamCard";
@@ -23,11 +30,16 @@ import { WorkspaceNameCard } from "@/components/settings/WorkspaceNameCard";
 import { getPendingInvites, getTeamMembers } from "@/lib/data/team";
 import { getTemplates } from "@/lib/data/templates";
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function SettingsPage() {
   // Everything on this page — name, roster, invites, templates — renders
   // for the ACTIVE workspace (Step 16); the (app) layout guarantees a
   // membership exists.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const workspace = await getWorkspaceContext();
   const [templates, members, pendingInvites] = await Promise.all([
     workspace ? getTemplates(workspace.id) : Promise.resolve([]),
@@ -53,6 +65,7 @@ export default async function SettingsPage() {
           members={members}
           pendingInvites={pendingInvites}
           isOwner={isOwner}
+          currentUserId={user?.id ?? null}
         />
       )}
       <TemplatesList templates={templates} isOwner={isOwner} />

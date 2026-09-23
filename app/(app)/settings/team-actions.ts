@@ -117,3 +117,79 @@ export async function revokeTeamInviteAction(input: {
   revalidatePath("/settings");
   return { error: undefined };
 }
+
+/**
+ * Remove a member from the ACTIVE workspace (Step 21 — closes out the
+ * Step 15 team feature). The owner-only DELETE policy on
+ * workspace_members has existed since Step 2; this is the first app
+ * surface that uses it.
+ *
+ * Guards (defense in depth — the UI hides the same cases):
+ *   * owner-gated (role check here + is_workspace_owner in RLS);
+ *   * NO SELF-REMOVAL — "leaving a workspace" is a different action
+ *     (recorded cut, not built here);
+ *   * NO LAST-OWNER REMOVAL — a workspace must always keep at least
+ *     one owner (transferring ownership is role management, future).
+ */
+export async function removeMemberAction(input: {
+  userId: string;
+}): Promise<TeamActionResult> {
+  if (!isUuid(input.userId ?? "")) {
+    return { error: "Unknown member." };
+  }
+
+  const { supabase, user, membership } = await getMembership();
+  if (!user || !membership) {
+    return { error: "Your session has expired. Please log in again." };
+  }
+  if (membership.role !== "owner") {
+    return { error: "Only workspace owners can remove members." };
+  }
+  if (user.id === input.userId) {
+    return {
+      error:
+        "You can’t remove yourself — leaving a workspace is a different action (not available yet).",
+    };
+  }
+
+  // The target's membership (RLS-scoped to our workspaces; a non-member
+  // or foreign id resolves to no row).
+  const {
+    data: target,
+    error: targetError,
+  } = await supabase
+    .from("workspace_members")
+    .select("user_id, role")
+    .eq("workspace_id", membership.workspace_id)
+    .eq("user_id", input.userId)
+    .maybeSingle();
+
+  if (targetError) return { error: targetError.message };
+  if (!target) {
+    return { error: "That person is no longer a member of this workspace." };
+  }
+
+  // Last-owner guard: count the workspace's owners before deleting.
+  if (target.role === "owner") {
+    const { count, error: countError } = await supabase
+      .from("workspace_members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("workspace_id", membership.workspace_id)
+      .eq("role", "owner");
+    if (countError) return { error: countError.message };
+    if ((count ?? 0) <= 1) {
+      return { error: "You can’t remove the last owner of a workspace." };
+    }
+  }
+
+  const { error } = await supabase
+    .from("workspace_members")
+    .delete()
+    .eq("workspace_id", membership.workspace_id)
+    .eq("user_id", input.userId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/settings");
+  return { error: undefined };
+}
