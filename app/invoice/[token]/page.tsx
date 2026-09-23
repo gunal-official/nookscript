@@ -26,10 +26,9 @@
  */
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Printer } from "lucide-react";
 import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
+import { PrintButton } from "@/components/invoices/PrintButton";
 import { getSharedInvoiceByToken } from "@/lib/data/invoices";
 import {
   formatDate,
@@ -90,16 +89,7 @@ export default async function PublicInvoicePage({
         </span>
         <div className="flex items-center gap-2">
           <Badge variant="outline">Shared invoice — read only</Badge>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="print:hidden"
-            onClick={() => window.print()}
-          >
-            <Printer className="mr-2 h-3.5 w-3.5" />
-            Print
-          </Button>
+          <PrintButton />
         </div>
       </div>
 
