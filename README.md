@@ -266,6 +266,26 @@ select proname from pg_proc
    rows), `bad_source_type` guard, and the seeded thread-ordering
    assertion).
 
+## Verify Step 13 (marketing pages — /, /about, /pricing, /vs/notion)
+
+⚠ No new migration in this step — `npm run verify:db` is **unchanged at
+66 checks / 9 migrations**; there is zero database surface here (static
+content only).
+
+1. Open `/`: the dev route map is **gone for good** — replaced by the real
+   homepage (hero → 5-step pipeline cards → share links/templates →
+   closing CTA). From now on, navigate during local testing via the
+   sidebar (logged in) or the verify URLs listed in these README sections.
+2. `/about` and `/pricing` render real copy: pricing is **Free / Pro
+   (Early access)** with no invented prices — the Pro CTA is a plain
+   mailto, not a fake checkout.
+3. `/vs/notion` renders the data-driven comparison (content map in
+   `app/(marketing)/vs/[slug]/vs-pages.ts`); any other slug 404s.
+4. Shared chrome: sticky `SiteHeader` (logo, About/Pricing, Log in /
+   Sign up, theme toggle) and `SiteFooter` via the new
+   `app/(marketing)/layout.tsx`; all four pages stay public per the
+   existing middleware config, and each ships its own `metadata` title.
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through
