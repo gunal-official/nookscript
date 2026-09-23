@@ -378,3 +378,77 @@ insert into public.team_invites (
   now() + interval '14 days',
   now() - interval '1 day'
 ) on conflict do nothing;
+
+-- ── Invoices (Step 17): one draft + one sent on the demo workspace ──
+-- INV-0001 (draft) and INV-0002 (sent) prove the list's status tabs and
+-- the per-workspace number sequence. The two link rows prove the public
+-- view's rules with stable, demoable tokens:
+--   * …0070 (→ INV-0002, sent)  → the public page RENDERS:
+--       http://localhost:3000/invoice/00000000-0000-0000-0000-000000000070
+--   * …0069 (→ INV-0001, draft) → the SAME page shows the "unavailable"
+--     state even though the token is valid (drafts are never shared —
+--     indistinguishable from an invalid link, by design)
+
+insert into public.invoices (
+  id, workspace_id, invoice_number, client_name, title, status,
+  items, tax_percent, notes, due_date, sent_at, paid_at, created_at, updated_at
+) values (
+  '00000000-0000-0000-0000-000000000065',
+  '00000000-0000-0000-0000-000000000002',
+  1,
+  'Brightloop Co.',
+  'Brand refresh — phase one',
+  'draft',
+  '[{"id": "inv1-item-1", "description": "Brand discovery & audit", "quantity": 1, "unit_amount_cents": 75000},
+    {"id": "inv1-item-2", "description": "Visual identity concepts (initial round)", "quantity": 1, "unit_amount_cents": 120000}]'::jsonb,
+  0,
+  '',
+  now() + interval '7 days',
+  null,
+  null,
+  now() - interval '3 days',
+  now() - interval '3 days'
+) on conflict (id) do nothing;
+
+insert into public.invoices (
+  id, workspace_id, invoice_number, client_name, title, status,
+  items, tax_percent, notes, due_date, sent_at, paid_at, created_at, updated_at
+) values (
+  '00000000-0000-0000-0000-000000000066',
+  '00000000-0000-0000-0000-000000000002',
+  2,
+  'Brightloop Co.',
+  'Brand refresh — phase two: rollout & templates',
+  'sent',
+  '[{"id": "inv2-item-1", "description": "Brand rollout — web & social templates", "quantity": 1, "unit_amount_cents": 240000},
+    {"id": "inv2-item-2", "description": "Usage guide & asset handoff", "quantity": 1, "unit_amount_cents": 60000}]'::jsonb,
+  5.00,
+  'Net 14 — please pay within 14 days of the due date.',
+  now() + interval '10 days',
+  now() - interval '4 days',
+  null,
+  now() - interval '5 days',
+  now() - interval '4 days'
+) on conflict (id) do nothing;
+
+insert into public.invoice_links (
+  id, workspace_id, invoice_id, token, revoked_at, created_at
+) values (
+  '00000000-0000-0000-0000-000000000067',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000065',
+  '00000000-0000-0000-0000-000000000069',
+  null,
+  now() - interval '3 days'
+) on conflict (id) do nothing;
+
+insert into public.invoice_links (
+  id, workspace_id, invoice_id, token, revoked_at, created_at
+) values (
+  '00000000-0000-0000-0000-000000000068',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000066',
+  '00000000-0000-0000-0000-000000000070',
+  null,
+  now() - interval '4 days'
+) on conflict (id) do nothing;

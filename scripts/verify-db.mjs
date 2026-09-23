@@ -16,6 +16,9 @@
  *   - RLS (simulated JWT claims + a non-superuser role): members see only
  *     their workspace's briefs, strangers see nothing, brief_sources has no
  *     UPDATE policy (raw_content immutable at the DB level)
+ *   - invoices (Step 17): status CHECK, per-workspace unique numbers, one
+ *     link per invoice, and get_shared_invoice() returns zero rows for
+ *     invalid / revoked / draft-invoice tokens (all indistinguishable)
  *
  * Note: PGlite runs as a single superuser, so RLS is exercised via a
  * dedicated non-owner role (`nstester`) with a faked `auth.uid()`.
@@ -53,6 +56,17 @@ const TEAMMATE_UID = "00000000-0000-0000-0000-000000000071";
 const SEED_INVITE_TOKEN = "00000000-0000-0000-0000-000000000063";
 const EXPIRED_INVITE_TOKEN = "00000000-0000-0000-0000-000000000066";
 const SECOND_WS = "00000000-0000-0000-0000-000000000064";
+const SEED_INVOICE_DRAFT = "00000000-0000-0000-0000-000000000065";
+const SEED_INVOICE_SENT = "00000000-0000-0000-0000-000000000066";
+const SEED_INVOICE_LINK_DRAFT = "00000000-0000-0000-0000-000000000067";
+const DRAFT_INVOICE_TOKEN = "00000000-0000-0000-0000-000000000069";
+const SEED_INVOICE_LINK_SENT = "00000000-0000-0000-0000-000000000068";
+const SENT_INVOICE_TOKEN = "00000000-0000-0000-0000-000000000070";
+// Step 17 fixtures (verify-db only, like the share-link ones above):
+const REVOKED_INVOICE = "00000000-0000-0000-0000-000000000091";
+const REVOKED_INVOICE_TOKEN = "00000000-0000-0000-0000-000000000089";
+const REVOKED_INVOICE_LINK = "00000000-0000-0000-0000-000000000093";
+const FOREIGN_INVOICE = "00000000-0000-0000-0000-000000000092";
 
 console.log("Starting PGlite (WASM Postgres)…");
 const db = new PGlite();
@@ -127,11 +141,11 @@ const { rows: rlsRows } = await db.query(
   `select relname, relrowsecurity from pg_class
     where relnamespace = 'public'::regnamespace
       and relname = any($1) order by relname`,
-  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "proposals", "plans", "updates", "share_links", "templates", "workspaces", "workspace_members", "profiles", "team_invites"]]
+  [["briefs", "brief_sources", "brief_questions", "brief_edit_history", "proposals", "plans", "updates", "share_links", "templates", "workspaces", "workspace_members", "profiles", "team_invites", "invoices", "invoice_links"]]
 );
 check(
-  "all 13 tables exist with RLS enabled",
-  rlsRows.length === 13 && rlsRows.every((r) => r.relrowsecurity),
+  "all 15 tables exist with RLS enabled",
+  rlsRows.length === 15 && rlsRows.every((r) => r.relrowsecurity),
   rlsRows.map((r) => `${r.relname}=${r.relrowsecurity}`).join(" ")
 );
 
@@ -345,6 +359,79 @@ check(
   seedTemplates.map((t) => t.title).join(" | ")
 );
 
+// ── Seed invoices (Step 17) ──
+const { rows: seedInvoices } = await db.query(
+  "select id, invoice_number, status, client_name, items, tax_percent from public.invoices where id = any($1) order by invoice_number",
+  [[SEED_INVOICE_DRAFT, SEED_INVOICE_SENT]]
+);
+check(
+  "seed invoices present (sequential: draft INV-0001 + sent INV-0002)",
+  seedInvoices.length === 2 &&
+    seedInvoices[0]?.invoice_number === 1 &&
+    seedInvoices[1]?.invoice_number === 2 &&
+    seedInvoices[0]?.status === "draft" &&
+    seedInvoices[1]?.status === "sent" &&
+    seedInvoices.every((i) => i.client_name === "Brightloop Co.") &&
+    Array.isArray(seedInvoices[0]?.items) &&
+    seedInvoices.every((i) => i.items.length === 2),
+  seedInvoices.map((i) => `${i.invoice_number}:${i.status}`).join(" ")
+);
+
+const { rows: seedInvoiceLinks } = await db.query(
+  "select id, invoice_id, token, revoked_at from public.invoice_links where id = any($1) order by id",
+  [[SEED_INVOICE_LINK_DRAFT, SEED_INVOICE_LINK_SENT]]
+);
+check(
+  "seed invoice links present (draft + sent invoices, both active)",
+  seedInvoiceLinks.length === 2 &&
+    seedInvoiceLinks[0]?.token === DRAFT_INVOICE_TOKEN &&
+    seedInvoiceLinks[0]?.invoice_id === SEED_INVOICE_DRAFT &&
+    seedInvoiceLinks[1]?.token === SENT_INVOICE_TOKEN &&
+    seedInvoiceLinks[1]?.invoice_id === SEED_INVOICE_SENT &&
+    seedInvoiceLinks.every((l) => l.revoked_at === null),
+  seedInvoiceLinks.map((l) => l.token).join(" ")
+);
+
+// ── invoices constraints: status CHECK + per-workspace unique number ──
+let invoiceStatusRejected = false;
+try {
+  await db.query(
+    "insert into public.invoices (workspace_id, invoice_number, client_name, title, status) values ($1, 99, 'x', 'x', 'archived')",
+    [SEED_WS]
+  );
+} catch (e) {
+  invoiceStatusRejected = /violates check constraint/.test(e.message);
+}
+check("invoices.status CHECK rejects invalid value", invoiceStatusRejected);
+
+let dupInvoiceNumberRejected = false;
+try {
+  await db.query(
+    "insert into public.invoices (workspace_id, invoice_number, client_name, title) values ($1, 2, 'x', 'x')",
+    [SEED_WS]
+  );
+} catch (e) {
+  dupInvoiceNumberRejected = /duplicate key/.test(e.message);
+}
+check(
+  "invoices unique(workspace_id, invoice_number) — per-workspace sequence",
+  dupInvoiceNumberRejected
+);
+
+let dupInvoiceLinkRejected = false;
+try {
+  await db.query(
+    "insert into public.invoice_links (workspace_id, invoice_id) values ($1, $2)",
+    [SEED_WS, SEED_INVOICE_SENT]
+  );
+} catch (e) {
+  dupInvoiceLinkRejected = /duplicate key/.test(e.message);
+}
+check(
+  "invoice_links unique(invoice_id) — one link per invoice",
+  dupInvoiceLinkRejected
+);
+
 // ── create_workspace() RPC ──
 await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
 const { rows: [rpc] } = await db.query(
@@ -423,7 +510,7 @@ await db.exec(`
     public.workspaces, public.workspace_members, public.profiles,
     public.briefs, public.brief_sources, public.brief_questions, public.brief_edit_history,
     public.proposals, public.plans, public.updates, public.share_links, public.templates,
-    public.team_invites
+    public.team_invites, public.invoices, public.invoice_links
     to nstester;
 `);
 // fixtures the seed user does NOT belong to, plus one own-workspace REVOKED
@@ -436,6 +523,12 @@ await db.exec(`
   insert into public.updates (id, workspace_id, plan_id, title) values ('${FOREIGN_UPDATE}', '${FOREIGN_WS}', '${FOREIGN_PLAN}', 'Foreign update') on conflict do nothing;
   insert into public.share_links (id, workspace_id, update_id, token) values ('${FOREIGN_SHARE_LINK}', '${FOREIGN_WS}', '${FOREIGN_UPDATE}', '00000000-0000-0000-0000-000000000093') on conflict do nothing;
   insert into public.share_links (id, workspace_id, update_id, token, revoked_at) values ('${REVOKED_SHARE_LINK}', '${SEED_WS}', '00000000-0000-0000-0000-000000000041', '${REVOKED_SHARE_TOKEN}', now()) on conflict do nothing;
+  -- Step 17 fixtures: a FOREIGN invoice (for the cross-workspace RLS
+  -- checks) and an own-workspace invoice whose link is REVOKED (fixture
+  -- for get_shared_invoice's revoked-filter check)
+  insert into public.invoices (id, workspace_id, invoice_number, client_name, title, status) values ('${FOREIGN_INVOICE}', '${FOREIGN_WS}', 1, 'Foreign Co', 'Foreign invoice', 'sent') on conflict do nothing;
+  insert into public.invoices (id, workspace_id, invoice_number, client_name, title, status, sent_at) values ('${REVOKED_INVOICE}', '${SEED_WS}', 9, 'Foreign Co', 'Invoice with revoked link', 'sent', now()) on conflict do nothing;
+  insert into public.invoice_links (id, workspace_id, invoice_id, token, revoked_at) values ('${REVOKED_INVOICE_LINK}', '${SEED_WS}', '${REVOKED_INVOICE}', '${REVOKED_INVOICE_TOKEN}', now()) on conflict do nothing;
   -- a second user who is only a MEMBER of the demo workspace (Step 11:
   -- owner-vs-member split checks) — auth trigger creates their profile
   insert into auth.users (
@@ -690,6 +783,94 @@ const { rows: missingDoc } = await db.query(
 check(
   "get_shared_document returns nothing for a nonexistent token",
   missingDoc.length === 0
+);
+await db.query("reset role");
+
+// ── RLS on invoices + public RPC (Step 17) ──
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+await db.query("set role nstester");
+const { rows: visibleInvoices } = await db.query(
+  "select id from public.invoices order by invoice_number"
+);
+check(
+  "RLS: member sees own-workspace invoices only",
+  visibleInvoices.length === 3 &&
+    visibleInvoices.every((i) =>
+      [SEED_INVOICE_DRAFT, SEED_INVOICE_SENT, REVOKED_INVOICE].includes(i.id)
+    ),
+  `${visibleInvoices.length} visible`
+);
+
+let insertInvoiceBlocked = false;
+try {
+  await db.query(
+    "insert into public.invoices (workspace_id, invoice_number, client_name, title) values ($1, 1, 'x', 'x')",
+    [FOREIGN_WS]
+  );
+} catch (e) {
+  insertInvoiceBlocked = true;
+}
+check("RLS: cannot insert invoice into foreign workspace", insertInvoiceBlocked);
+
+let deleteInvoicePossible = false;
+try {
+  const { rowCount } = await db.query(
+    "delete from public.invoices where id = $1",
+    [SEED_INVOICE_DRAFT]
+  );
+  deleteInvoicePossible = rowCount === 1;
+} catch (e) {
+  deleteInvoicePossible = false;
+}
+check(
+  "RLS: invoices have NO delete policy — void is the only cancel",
+  !deleteInvoicePossible
+);
+await db.query("reset role");
+
+// get_shared_invoice — called as nstester (a non-member role), proving the
+// definer RPC is anon-callable and self-gated
+await db.query("set role nstester");
+const { rows: sharedInvoice } = await db.query(
+  "select invoice_number, client_name, status, items, workspace_name from public.get_shared_invoice($1)",
+  [SENT_INVOICE_TOKEN]
+);
+check(
+  "get_shared_invoice returns the invoice for a valid active token",
+  sharedInvoice.length === 1 &&
+    sharedInvoice[0].invoice_number === 2 &&
+    sharedInvoice[0].client_name === "Brightloop Co." &&
+    sharedInvoice[0].status === "sent" &&
+    Array.isArray(sharedInvoice[0].items) &&
+    sharedInvoice[0].items.length === 2 &&
+    sharedInvoice[0].workspace_name === "Atelier North",
+  sharedInvoice[0]?.title
+);
+
+const { rows: draftInvoice } = await db.query(
+  "select invoice_number from public.get_shared_invoice($1)",
+  [DRAFT_INVOICE_TOKEN]
+);
+check(
+  "get_shared_invoice returns nothing for a draft invoice's link",
+  draftInvoice.length === 0
+);
+
+const { rows: revokedInvoice } = await db.query(
+  "select invoice_number from public.get_shared_invoice($1)",
+  [REVOKED_INVOICE_TOKEN]
+);
+check(
+  "get_shared_invoice returns nothing for a revoked token",
+  revokedInvoice.length === 0
+);
+
+const { rows: missingInvoice } = await db.query(
+  "select invoice_number from public.get_shared_invoice('10000000-0000-0000-0000-000000000000')"
+);
+check(
+  "get_shared_invoice returns nothing for a nonexistent token",
+  missingInvoice.length === 0
 );
 await db.query("reset role");
 
