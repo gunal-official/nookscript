@@ -7,13 +7,19 @@ human-side checklist that must be confirmed in dashboards before real
 users touch this app.
 
 **Rate limiting**
-- ✅ In-code: `/share/*` and `/invite/*` (public routes that probe
-  Postgres per request) share a 30 req/min per-IP cap via an in-memory
-  sliding-window limiter (middleware). Documented limitation: in-memory
+- ✅ In-code: `/share/*`, `/invite/*` and `/invoice/` (public routes that
+  probe Postgres per request) share a 30 req/min per-IP cap via a
+  sliding-window limiter (middleware). Store (Step 24): with
+  `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` set, counters
+  live in Upstash Redis (shared across serverless instances, survive
+  redeploys — raw REST via `lib/upstash.ts`, no SDK dependency); either
+  var unset, or the store erroring, falls back to the Step 14 in-memory
+  window (a store outage neither takes the routes down nor opens them
+  wide). Fallback limitation: in-memory
   state does NOT survive redeploys and is NOT shared across serverless
   instances — in a multi-instance deploy the effective ceiling multiplies
-  by instance count. Treat as casual-abuse mitigation; the durable-store
-  upgrade (e.g. Upstash Redis) is future work.
+  by instance count. Treat the fallback as casual-abuse mitigation;
+  set the Upstash pair for production.
 - ⚠️ Login/signup abuse protection is **delegated entirely to Supabase**:
   those pages are client components whose auth calls go browser→Supabase
   Auth API directly, so this repo's middleware never sees them. Confirm

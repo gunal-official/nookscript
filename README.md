@@ -659,6 +659,45 @@ copy-link only, no warning).
   misconfigured-port path.
 - Live: create an invite for a real address and check the inbox.
 
+## Verify Step 24 (rate limiting — Upstash store — Step 14 follow-up)
+
+No DB changes. The Step 14 in-memory sliding-window limiter (30 req/min
+per IP on `/share/*`, `/invite/*`, `/invoice/`) now has an optional
+SHARED store so the caps survive redeploys and hold across serverless
+instances. Zero new dependencies: `lib/upstash.ts` speaks Upstash's
+Redis REST API with plain `fetch` (one HTTPS POST per check; an atomic
+EVAL keeps the check-and-record step race-free).
+
+**Setup** (your environment / host env — both required to engage):
+- `UPSTASH_REDIS_REST_URL` — the database's REST URL
+  (`https://<db>.upstash.io`), from the Upstash console.
+- `UPSTASH_REDIS_REST_TOKEN` — its REST token (read-write).
+
+Either var unset → the Step 14 in-memory window (silent — dev mode
+unchanged). Upstash configured but erroring/unreachable → falls back to
+the in-memory window (one console.warn per failure) — a store outage
+neither takes the routes down nor opens them wide. Limits, keys and
+semantics are identical in all modes (sliding window, rejected hits are
+not recorded).
+
+**Proof:**
+- `npm run verify:db` — 128 checks / 16 migrations, unchanged (no DB
+  layer).
+- Sandbox functional run against a LOCAL Upstash REST stub (11 checks,
+  no live calls): unconfigured = in-memory + zero HTTP; configured =
+  30 allowed / 31st blocked with exactly 30 recorded; CROSS-PROCESS
+  sharing (20 hits from one node process + 20 from another → exactly 10
+  more allowed); window aging frees the budget; store 500 / non-JSON /
+  timeout / wrong-token all degrade to the in-memory window.
+- End-to-end through `next dev` + middleware (9 checks): `/settings`
+  owner render intact through the async middleware refactor; a real
+  `/invite/<token>` renders through the gate; hammering the gate with
+  31 GETs passes exactly 30 then returns 429 with the exact plain-text
+  body, and the shared store recorded exactly 30 hits.
+- Live: set the pair, then `curl -H "x-forwarded-for: 1.2.3.4"` the same
+  `/invite/<token>` URL 31× — the 31st should 429, and the key should
+  show up in the Upstash console.
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

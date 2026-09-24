@@ -54,16 +54,16 @@ export async function updateSession(request: NextRequest) {
   // Postgres on every request (/share/* documents, /invite/* token
   // probes, /invoice/* token-gated invoice forms) — capped per-IP.
   // Runs BEFORE the session work so an abuser
-  // doesn't even cost an auth lookup. In-memory only: resets on redeploy
-  // and doesn't share state across serverless instances (see
-  // lib/rate-limit.ts — durable-store upgrade is noted there and in
-  // SECURITY.md as future work). Login/signup are NOT rate-limited here
+  // doesn't even cost an auth lookup. Store: Upstash Redis when the
+  // UPSTASH_* env vars are set (shared across instances — Step 24),
+  // else the Step 14 in-memory Map (see lib/rate-limit.ts). Login/signup
+  // are NOT rate-limited here
   // by design: their auth calls go browser→Supabase directly (never
   // touching this server), so protection belongs to Supabase's dashboard
   // auth limits.
   if (
     RATE_LIMITED_PREFIXES.some((p) => pathname.startsWith(p)) &&
-    rateLimitExceeded(clientKey(request))
+    (await rateLimitExceeded(clientKey(request)))
   ) {
     return new NextResponse(
       "Too many requests — these links are rate limited. Try again in about a minute.",
