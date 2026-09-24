@@ -6,11 +6,12 @@
  * themselves as defense in depth, and RLS (is_workspace_owner on
  * team_invites) is the final gate either way.
  *
- * Delivery (Step 23): when RESEND_API_KEY is set, the invite link is
- * emailed to the invitee via Resend (lib/invite-email). Copy-link stays
- * as the fallback — a missing key skips the email silently (dev mode),
- * and a failed send never blocks invite creation (the row is durable;
- * the UI gets a warning + the copy link).
+ * Delivery (Step 23, revised — plain SMTP via nodemailer): when the
+ * SMTP_* env vars are set, the invite link is emailed to the invitee
+ * through the project owner's own mail account (lib/invite-email).
+ * Copy-link stays as the fallback — no SMTP config skips the email
+ * silently (dev mode), and a failed send never blocks invite creation
+ * (the row is durable; the UI gets a warning + the copy link).
  */
 
 import { revalidatePath } from "next/cache";
@@ -98,7 +99,7 @@ export async function createTeamInviteAction(input: {
     return { error: error.message };
   }
 
-  // Best-effort email (Step 23) — a missing key skips it silently (dev
+  // Best-effort email (Step 23) — no SMTP config skips it silently (dev
   // mode); a failure never blocks the already-created invite.
   let warning: string | undefined;
   const h = headers();
@@ -120,7 +121,6 @@ export async function createTeamInviteAction(input: {
       .maybeSingle();
     const sent = await sendInviteEmail({
       to: email,
-      fromHost: host,
       workspaceName: membership.name,
       inviterName: me?.full_name || user.email,
       inviteUrl: `${proto}://${host}/invite/${invite.token}`,

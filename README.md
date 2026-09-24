@@ -614,40 +614,50 @@ nothing else (reassigning the membership to another user fails).
    promote ✓, demote-with-remaining-owner ✓, self-change ✗,
    reassignment ✗, plus the `is_last_owner()` unit check).
 
-## Verify Step 23 (invite email — Resend — Step 15 follow-up)
+## Verify Step 23 (invite email — plain SMTP — Step 15 follow-up)
 
-No DB changes — `team_invites` is untouched. This step adds the
-`resend` dependency (committed) and upgrades the Step-15 copy-link
-invites to emailed invites **when the project has a key**: the invite
-row is created first (durable), then the link is best-effort emailed
-via Resend. Delivery never blocks or undoes invite creation.
+No DB changes — `team_invites` is untouched. This step upgrades the
+Step-15 copy-link invites to emailed invites **when SMTP is
+configured**: the invite row is created first (durable), then the link
+is best-effort emailed through the project owner's own mail account via
+plain SMTP (`nodemailer`, the only dependency). Delivery never blocks
+or undoes invite creation.
 
-**Setup** (your environment / host env):
-- `RESEND_API_KEY` — a Resend API key (`re_…`). Without it the email
-  is skipped SILENTLY (dev mode — copy-link only, no warning).
-- `RESEND_FROM` — optional sender; must be a domain verified in your
-  Resend account (e.g. `NookScript <invites@yourdomain.com>`). Default
-  when unset: `NookScript <no-reply@<your site host>>`.
-- `RESEND_BASE_URL` — optional; only for pointing the SDK at a stub
-  (this is how the sandbox verified the send path).
+**Setup** (your environment / host env — all five must be set):
+- `SMTP_HOST` — SMTP server hostname (Gmail: `smtp.gmail.com`).
+- `SMTP_PORT` — `465` (implicit TLS) or `587` (STARTTLS); the TLS mode
+  is derived from the port.
+- `SMTP_USER` — auth username, the full address (`you@gmail.com`).
+- `SMTP_PASS` — auth password. **Gmail: an App Password, not your
+  regular one** — enable 2-Step Verification, then generate one at
+  myaccount.google.com → Security → App passwords. Google rejects
+  regular passwords for SMTP.
+- `SMTP_FROM` — sender shown to recipients
+  (`NookScript <invites@yourdomain.com>`). Gmail: the From domain must
+  match the account.
+
+Any of the five unset → the email is skipped SILENTLY (dev mode —
+copy-link only, no warning).
 
 **Behavior:**
-1. Key set → creating an invite emails the invite link to the invitee
-   (subject “You're invited to {workspace} on NookScript”; same link as
-   the copy button; 14-day expiry stated in the body).
-2. Key set but the send fails → the invite is still created and shows
-   in the pending list with its copy link; the card shows a warning
-   pointing at the copy link.
-3. No key → nothing sent, no warning (the copy-link flow is unchanged).
+1. SMTP configured → creating an invite emails the invite link to the
+   invitee (subject “You're invited to {workspace} on NookScript”; same
+   link as the copy button; 14-day expiry stated in the body).
+2. Configured but the send fails → the invite is still created and
+   shows in the pending list with its copy link; the card shows a
+   warning pointing at the copy link.
+3. Not configured → nothing sent, no warning (the copy-link flow is
+   unchanged).
 
 **Proof:**
 - `npm run verify:db` — 128 checks / 16 migrations, unchanged (this
   step has no DB layer).
-- Sandbox: the send path was exercised against a local Resend stub —
-  request shape (to/subject/From/invite link/inviter/expiry), the
-  `RESEND_FROM` override, and the failure path.
-- Live: create an invite for a real address and check the inbox (or
-  Resend's own email log).
+- Sandbox: the send path was exercised against a LOCAL SMTP server
+  (`smtp-server`, devDependency, never shipped) — no live sends:
+  auth + message shape (From/To/Subject/invite link/inviter/expiry),
+  the rejected-auth path, the server-unreachable path, and the
+  misconfigured-port path.
+- Live: create an invite for a real address and check the inbox.
 
 ## Notes
 

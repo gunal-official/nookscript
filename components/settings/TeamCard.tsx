@@ -3,10 +3,11 @@
 /**
  * Team card on /settings (Step 15): the workspace roster, plus — for
  * owners only — invite management, role management (Step 22), and
- * removal (Step 21). Invite delivery (Step 23): when the project has
- * RESEND_API_KEY set the invite link is emailed to the invitee, and
- * copy-link stays as the fallback (no key = silent skip; failed send =
- * warning + the copy link). Members see the roster read-only with ZERO
+ * removal (Step 21). Invite delivery (Step 23, revised — plain SMTP):
+ * when the SMTP_* env vars are set the invite link is emailed to the
+ * invitee through the owner's own mail account, and copy-link stays as
+ * the fallback (no config = silent skip; failed send = warning + the
+ * copy link). Members see the roster read-only with ZERO
  * management controls rendered (hide-don't-disable; the server actions
  * and RLS re-gate the same checks).
  *
@@ -426,7 +427,7 @@ export function TeamCard({
             <p className="text-sm font-medium">Invite a teammate</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               They’ll join as a member. The link is emailed to them when
-              email is configured — otherwise copy it below and send it
+              SMTP is configured — otherwise copy it below and send it
               yourself.
             </p>
             <form onSubmit={handleCreate} className="mt-3 flex gap-2">

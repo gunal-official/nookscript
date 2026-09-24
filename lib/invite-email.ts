@@ -1,31 +1,36 @@
 /**
- * Invite email delivery (Step 23 — Resend). The Team card's invites were
- * copy-link by design (no email anywhere); this step adds the email as
- * the PRIMARY delivery, keeping copy-link as the fallback:
+ * Invite email delivery (Step 23, revised — plain SMTP via nodemailer;
+ * the original Resend version was replaced at the user's direction: no
+ * third-party email API, just the project owner's own mail account).
  *
- *   - RESEND_API_KEY unset  → the send is skipped SILENTLY (dev mode —
- *     the copy-link flow is unchanged, nothing to warn about);
- *   - send fails            → the invite row still exists (it was
- *     created first); the caller surfaces a warning with a copy link.
+ * The Team card's invites are emailed when SMTP is configured; copy-link
+ * stays as the fallback:
+ *
+ *   - any of the SMTP_* env vars unset → the send is skipped SILENTLY
+ *     (dev mode — the copy-link flow is unchanged, nothing to warn
+ *     about);
+ *   - send fails → the invite row still exists (it was created first);
+ *     the caller surfaces a warning with a copy link.
  *
  * Delivery can never block or undo invite creation — email is a best
  * effort on top of a durable row.
  *
- * Env:
- *   RESEND_API_KEY   — required for any email to go out;
- *   RESEND_FROM      — sender (e.g. "NookScript <invites@yourdomain.com>");
- *                      defaults to NookScript <no-reply@<site host>> —
- *                      set it to a domain verified in your Resend
- *                      account or sends will be rejected;
- *   RESEND_BASE_URL  — only for sandbox/testing; points the SDK at a
- *                      stub instead of https://api.resend.com.
+ * Env (all five must be set for any email to go out):
+ *   SMTP_HOST  — SMTP server hostname (e.g. smtp.gmail.com);
+ *   SMTP_PORT  — 465 (implicit TLS) or 587 (STARTTLS); the TLS mode is
+ *                derived from the port, no separate flag;
+ *   SMTP_USER  — auth username (the full address, e.g. you@gmail.com);
+ *   SMTP_PASS  — auth password (Gmail: an APP PASSWORD — regular
+ *                passwords are rejected by Google for SMTP);
+ *   SMTP_FROM  — sender shown to recipients (e.g.
+ *                "NookScript <invites@yourdomain.com>").
  *
  * This module imports NO next/ stuff — the caller (server action)
  * resolves the site URL from request headers and passes it in, which is
- * also what keeps it unit-testable with plain node.
+ * also what keeps it testable against a local SMTP server.
  */
 
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
 export type InviteEmailResult =
   | { ok: true }
@@ -37,29 +42,43 @@ export type InviteEmailResult =
 
 const DEFAULT_FROM_NAME = "NookScript";
 
+function readConfig(): {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  from: string;
+} | null {
+  const host = process.env.SMTP_HOST;
+  const portRaw = process.env.SMTP_PORT;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM;
+  if (!host || !portRaw || !user || !pass || !from) return null;
+
+  const port = Number(portRaw);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
+
+  return { host, port, user, pass, from };
+}
+
 export async function sendInviteEmail(input: {
   to: string;
-  /** Site host (e.g. "app.nookscript.com") — used only to build the
-   *  default From address when RESEND_FROM is unset. */
-  fromHost: string;
   workspaceName: string;
   inviterName: string | null;
   inviteUrl: string;
   expiresAt: Date;
 }): Promise<InviteEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { ok: false, reason: "not-configured" };
+  const cfg = readConfig();
+  if (!cfg) return { ok: false, reason: "not-configured" };
 
-  const from =
-    process.env.RESEND_FROM ||
-    `${DEFAULT_FROM_NAME} <no-reply@${input.fromHost}>`;
-
-  const resend = new Resend(
-    apiKey,
-    process.env.RESEND_BASE_URL
-      ? { baseUrl: process.env.RESEND_BASE_URL }
-      : undefined
-  );
+  const transporter = nodemailer.createTransport({
+    host: cfg.host,
+    port: cfg.port,
+    // 465 = implicit TLS; 587 (and anything else) = STARTTLS.
+    secure: cfg.port === 465,
+    auth: { user: cfg.user, pass: cfg.pass },
+  });
 
   const who = input.inviterName ? `${input.inviterName} ` : "";
   const subject = `You're invited to ${input.workspaceName} on NookScript`;
@@ -77,7 +96,7 @@ export async function sendInviteEmail(input: {
     "",
     "Already have an account? Sign in first, then open the link.",
     "",
-    "— NookScript",
+    `— ${DEFAULT_FROM_NAME}`,
   ].join("\n");
 
   const html = `
@@ -94,20 +113,26 @@ export async function sendInviteEmail(input: {
         The link expires ${expires}. Already have an account? Sign in
         first, then open the link.
       </p>
-      <p style="font-size:12px;color:#a1a1aa;margin-top:24px;">NookScript</p>
+      <p style="font-size:12px;color:#a1a1aa;margin-top:24px;">${DEFAULT_FROM_NAME}</p>
     </div>
   `.trim();
 
-  const { error } = await resend.emails.send({
-    from,
-    to: input.to,
-    subject,
-    text,
-    html,
-  });
-
-  if (error) {
-    return { ok: false, reason: "send-failed", detail: error.message };
+  try {
+    await transporter.sendMail({
+      from: cfg.from,
+      to: input.to,
+      subject,
+      text,
+      html,
+    });
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: "send-failed",
+      detail: e instanceof Error ? e.message : String(e),
+    };
+  } finally {
+    await transporter.close();
   }
-  return { ok: true };
 }
