@@ -786,7 +786,8 @@ confirm. Members never see the card. After deletion the shell lands on
 your next workspace, or `/onboarding` when none remain.
 
 **Proof:**
-- `npm run verify:db` — **136 checks / 18 migrations** (the three new:
+- `npm run verify:db` — **136 checks / 18 migrations** at the time
+  (144 / 19 since Step 29) (the three new:
   foreign-workspace owner blocked, solo-workspace delete succeeds past
   the last-owner guard, children cascade + pointers clear). Every
   pre-existing check unchanged.
@@ -806,7 +807,7 @@ forgetting one passed every existence check while the app's writes
 silently no-oped. The new `npm run verify:live:policies`
 (`scripts/verify-live-policies.mjs`) closes that gap: it behaves like
 the app against the real project and asserts the allow/deny verdict of
-every policy surface (15 checks):
+every policy surface (15 checks at Step 28 — 18 since Step 29):
 
 - throwaway signups (owner + member persona) + a scratch workspace
   (`scripts/verify-auth.mjs` precedent) — every write is confined to
@@ -825,8 +826,8 @@ rename policy off, leave guard off, deletion cascade fix off) each
 produce exit 1 + the correct ✗ line + migration file; restore passes
 again. The policy SEMANTICS asserted are proven offline against real
 Postgres by `npm run verify:db` (136/18).
-**Live:** run `npm run verify:live:policies` against your project —
-15/15 expected (18/18 since Step 29 adds the viewer probes below).
+**Live:** superseded by Step 29 — the script now runs 18 checks; expect
+18/18 (see below).
 
 ## Verify Step 29 (viewer role — db + app)
 

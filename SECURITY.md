@@ -9,17 +9,15 @@ users touch this app.
 **Rate limiting**
 - ✅ In-code: `/share/*`, `/invite/*` and `/invoice/` (public routes that
   probe Postgres per request) share a 30 req/min per-IP cap via a
-  sliding-window limiter (middleware). Store (Step 24): with
-  `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` set, counters
-  live in Upstash Redis (shared across serverless instances, survive
-  redeploys — raw REST via `lib/upstash.ts`, no SDK dependency); either
-  var unset, or the store erroring, falls back to the Step 14 in-memory
-  window (a store outage neither takes the routes down nor opens them
-  wide). Fallback limitation: in-memory
-  state does NOT survive redeploys and is NOT shared across serverless
-  instances — in a multi-instance deploy the effective ceiling multiplies
-  by instance count. Treat the fallback as casual-abuse mitigation;
-  set the Upstash pair for production.
+  sliding-window limiter (middleware). Store: the Step 14 **in-memory
+  window, permanently** — the product decision is no third-party service
+  dependencies (the once-optional Upstash Redis store was rejected and
+  removed from the repo; `UPSTASH_*` is never set). Known limitation
+  (accepted): in-memory state does NOT survive redeploys and is NOT
+  shared across serverless instances — in a multi-instance deploy the
+  effective ceiling multiplies by instance count. Treat it as
+  casual-abuse mitigation; if a hard multi-instance ceiling is ever
+  needed, enforce it at the edge (CDN/WAF) rather than adding a service.
 - ⚠️ Login/signup abuse protection is **delegated entirely to Supabase**:
   those pages are client components whose auth calls go browser→Supabase
   Auth API directly, so this repo's middleware never sees them. Confirm
@@ -45,12 +43,12 @@ users touch this app.
 
 ## Known vulnerabilities (npm audit) — deferred by decision
 
-**Status as of 2026-09-23:** `npm audit` reports **5 vulnerabilities (4 high, 1 critical)**, all inside the Next.js dependency tree:
+**Status as of 2026-09-25:** `npm audit` reports **2 vulnerable packages (1 high, 1 critical)**, all inside the Next.js dependency tree:
 
-- **`next` (critical + high)** — 21 published advisories apply to the pinned line (14.2.x): HTTP request smuggling in rewrites; unbounded `next/image` disk-cache growth; Server Components DoS (×2); Middleware/Proxy redirect cache-poisoning; CSP-nonce XSS in App Router; RSC cache-busting cache poisoning; `beforeInteractive` XSS; Image Optimization DoS; WebSocket-upgrade SSRF; RSC response cache poisoning; Middleware/Proxy bypass in Pages-Router + i18n apps; Server Actions DoS; Server Actions SSRF on custom servers; response-body cache confusion (×2); unbounded Server Action payload in Edge runtime; rewrites SSRF via attacker-controlled hostname; unauthenticated disclosure of internal Server Function endpoints; **unauthenticated RCE on Windows-hosted servers**; unauthenticated RCE in Image Optimization with AVIF files.
+- **`next` (critical + high)** — 23 published advisories apply to the pinned line (14.2.x): HTTP request smuggling in rewrites; unbounded `next/image` disk-cache growth; Server Components DoS (×2); Middleware/Proxy redirect cache-poisoning; CSP-nonce XSS in App Router; RSC cache-busting cache poisoning; `beforeInteractive` XSS; Image Optimization DoS; WebSocket-upgrade SSRF; RSC response cache poisoning; Middleware/Proxy bypass in Pages-Router + i18n apps; Server Actions DoS; Server Actions SSRF on custom servers; response-body cache confusion (×2); unbounded Server Action payload in Edge runtime; rewrites SSRF via attacker-controlled hostname; unauthenticated disclosure of internal Server Function endpoints; **unauthenticated RCE on Windows-hosted servers**; unauthenticated RCE in Image Optimization with AVIF files; Image Optimizer `remotePatterns` DoS; insecure RSC request-deserialization DoS.
 - **`postcss <=8.5.22` (high)** — nested under `next`: XSS via unescaped `</style>` in stringify output, and attacker-controlled `sourceMappingURL` arbitrary-file-read/disclosure (3 advisories).
 
-`npm audit fix --force` resolves these by installing **next@16.3.6** — a breaking change.
+`npm audit fix --force` resolves these by installing **next@16.3.6** — a breaking change. (Upgrading past 14.2.x is blocked by the standing freeze: Next.js stays at 14.2.35 until the user lifts it.)
 
 ### Why this is deferred (not an oversight)
 
@@ -65,7 +63,10 @@ A 14→16 upgrade was attempted and deliberately **rolled back** when this casca
 ### What is already done
 
 - `lib/supabase/server.ts`'s `createClient()` was proactively converted to the **Next 15+ async `cookies()` pattern in commit `95bb87d`** (behavior-identical on Next 14), so that entire call-site migration (37 sites) is pre-done and out of the way.
-- The route surface is fully built and gated (`npm run verify:db` 66→69 checks, `npm run verify:live` for live-schema drift), so a future upgrade has a strong regression floor to run against.
+- The route surface is fully built and gated (`npm run verify:db` 144
+  checks / 19 migrations, `npm run verify:live` + `verify:live:policies`
+  for live drift), so a future upgrade has a strong regression floor to
+  run against.
 
 ### Recommendation
 

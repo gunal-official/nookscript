@@ -53,7 +53,7 @@ const TIERS: {
     features: [
       "Everything in Free",
       "Custom domains for share links — planned",
-      "Team roles beyond owner/member — planned",
+      "Custom role tiers (admin and beyond) — planned",
       "Priority support — planned",
       "Early builds of whatever ships next",
     ],

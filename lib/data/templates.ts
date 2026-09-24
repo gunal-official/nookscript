@@ -30,7 +30,8 @@ export async function getTemplates(workspaceId: string): Promise<Template[]> {
 
 /**
  * The current user's role in their ACTIVE workspace ("owner" | "member" |
- * null) — resolved via the shared workspace-context resolver (Step 16),
+ * "viewer" | null) — resolved via the shared workspace-context resolver
+ * (Step 16),
  * so someone who owns one workspace and is a member of another gets the
  * role of the workspace they're actually looking at. The (app) shell
  * resolves role for its own use but doesn't expose it to pages.

@@ -27,7 +27,8 @@ export default function IntakePage() {
       fallback={
         <div className="border border-border bg-card p-8">
           <p className="text-sm text-muted-foreground">
-            View only — you can’t make changes. Intake is owner/member ground.
+            View only — you can’t make changes. Intake is for owners and
+            members.
           </p>
         </div>
       }

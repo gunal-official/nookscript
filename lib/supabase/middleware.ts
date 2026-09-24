@@ -54,9 +54,9 @@ export async function updateSession(request: NextRequest) {
   // Postgres on every request (/share/* documents, /invite/* token
   // probes, /invoice/* token-gated invoice forms) — capped per-IP.
   // Runs BEFORE the session work so an abuser
-  // doesn't even cost an auth lookup. Store: Upstash Redis when the
-  // UPSTASH_* env vars are set (shared across instances — Step 24),
-  // else the Step 14 in-memory Map (see lib/rate-limit.ts). Login/signup
+  // doesn't even cost an auth lookup. Store: the Step 14 in-memory Map
+  // only (permanent decision — no third-party store; see
+  // lib/rate-limit.ts). Login/signup
   // are NOT rate-limited here
   // by design: their auth calls go browser→Supabase directly (never
   // touching this server), so protection belongs to Supabase's dashboard
