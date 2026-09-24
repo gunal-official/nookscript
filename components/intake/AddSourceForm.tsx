@@ -95,7 +95,7 @@ export function AddSourceForm({ briefId }: { briefId: string }) {
             onValueChange={(v) => setSourceType(v as SourceType)}
             disabled={submitting}
           >
-            <SelectTrigger className="h-8 w-[130px]">
+            <SelectTrigger className="h-8 w-[130px]" aria-label="Source type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -112,6 +112,7 @@ export function AddSourceForm({ briefId }: { briefId: string }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={submitting}
+          aria-label="Follow-up reply"
           placeholder={"Reply from the client?\n\nPaste it here to thread it onto this brief — e.g. a follow-up email clarifying scope or budget."}
           className="min-h-[88px] resize-y bg-muted/40 text-sm leading-relaxed"
         />

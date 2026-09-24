@@ -208,7 +208,7 @@ export function TimeLog({
               setConfirmDeleteId(null);
             }}
           >
-            <SelectTrigger className="h-9 w-52">
+            <SelectTrigger className="h-9 w-52" aria-label="Filter by brief">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -252,6 +252,7 @@ export function TimeLog({
                 setForm((f) => ({ ...f, description: e.target.value }))
               }
               placeholder="What did you work on?"
+              aria-label="Description"
               className="h-9 min-w-52 flex-1"
               autoFocus
             />
@@ -264,6 +265,7 @@ export function TimeLog({
                 setForm((f) => ({ ...f, minutes: e.target.value }))
               }
               placeholder="Minutes"
+              aria-label="Minutes"
               className="h-9 w-28"
             />
             <Input
@@ -272,6 +274,7 @@ export function TimeLog({
               onChange={(e) =>
                 setForm((f) => ({ ...f, worked_on: e.target.value }))
               }
+              aria-label="Worked on"
               className="h-9 w-40"
             />
             <Select
@@ -283,7 +286,7 @@ export function TimeLog({
                 }))
               }
             >
-              <SelectTrigger className="h-9 w-48">
+              <SelectTrigger className="h-9 w-48" aria-label="Brief">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

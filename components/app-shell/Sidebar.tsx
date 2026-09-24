@@ -7,23 +7,8 @@ import {
   WorkspaceSwitcher,
   type SwitcherWorkspace,
 } from "@/components/app-shell/WorkspaceSwitcher";
+import { MONEY_HREFS, NAV_ITEMS } from "@/components/app-shell/nav-items";
 import { cn } from "@/lib/utils";
-
-const NAV_ITEMS = [
-  { label: "Intake", href: "/intake" },
-  { label: "Inbox", href: "/intake/inbox" },
-  { label: "Briefs", href: "/briefs" },
-  { label: "Proposals", href: "/proposals" },
-  { label: "Plans", href: "/plans" },
-  { label: "Updates", href: "/updates" },
-  { label: "Invoices", href: "/invoices" },
-  { label: "Time", href: "/time" },
-  { label: "Contracts", href: "/contracts" },
-  { label: "Reports", href: "/reports" },
-  { label: "Settings", href: "/settings" },
-];
-
-const MONEY_HREFS = new Set(["/invoices", "/time"]);
 
 function NavItem({
   label,

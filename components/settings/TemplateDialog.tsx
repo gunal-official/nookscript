@@ -93,6 +93,7 @@ export function TemplateDialog({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Weekly update sign-off"
+              aria-label="Title"
             />
           </div>
           <div className="space-y-1.5">
@@ -101,6 +102,7 @@ export function TemplateDialog({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="The text you want to reuse…"
+              aria-label="Body"
               className="min-h-[180px] text-sm leading-relaxed"
             />
           </div>

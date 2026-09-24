@@ -177,6 +177,7 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
           value={stored?.label ?? ""}
           onChange={(e) => setLabel(e.target.value)}
           placeholder="What are you working on?"
+          aria-label="What are you working on?"
           className="w-48 bg-transparent text-sm text-text placeholder:text-muted-foreground focus:outline-none"
         />
         <Button size="sm" className="h-8 gap-1.5" onClick={openStopForm}>
@@ -187,6 +188,7 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
           type="button"
           onClick={discard}
           title="Discard this session"
+          aria-label="Discard this session"
           className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-text"
         >
           <X className="h-4 w-4" />
@@ -206,6 +208,7 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
         value={stored?.label ?? ""}
         onChange={(e) => setLabel(e.target.value)}
         placeholder="What did you work on?"
+        aria-label="What did you work on?"
         className="h-9"
         autoFocus
       />
@@ -223,6 +226,7 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
           type="date"
           value={workedOn}
           onChange={(e) => setWorkedOn(e.target.value)}
+          aria-label="Worked on"
           className="h-9 flex-1"
         />
       </div>
@@ -233,7 +237,7 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
             setBriefId(value === GENERAL ? "" : value)
           }
         >
-          <SelectTrigger className="h-9">
+          <SelectTrigger className="h-9" aria-label="Brief">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

@@ -867,6 +867,38 @@ control (Step-22 two-click confirm, now 3-way; badge reads "View only").
 **Live:** pull = **migration 19 only, no re-seed** (seeds use
 owner/member). Then `npm run verify:live:policies` — 18/18 expected.
 
+## Verify Step 31 (responsive + accessibility polish)
+
+No schema or behavior changes — markup/aria only, visual design
+untouched (shadcn NY preserved). Three defect classes from a repo-wide
+sweep:
+
+- **App shell was fixed-grid** (`220px` sidebar at every width — the
+  main column collapsed under ~500px). Now a `md:` grid with a
+  scrollable **MobileNav** strip under the Topbar below `md` (shared
+  `nav-items.ts` registry with the Sidebar, same viewer money-hide,
+  workspace switcher included). Public surfaces (marketing, share,
+  invoice links) were already responsive (`max-w` + `sm:`).
+- **Skip links + landmarks**: "Skip to content" → `#main` on the app
+  and marketing shells (`<html lang>` was already set; Topbar was
+  already `<header>`; focus rings were already per-component).
+- **Unnamed controls**: `aria-label`s added to every input/select/
+  textarea that relied on placeholder-only naming — AddSourceForm,
+  TemplateDialog, UpdateComposer, InvoiceComposer (5), ContractComposer
+  (Brief select; its text inputs already had real `htmlFor` labels),
+  TimeLog (4 + filter), TimeTimer (label input, discard button, date,
+  brief select). Label text = visible label text (label-in-name).
+
+**Proof (sandbox):** rendered smoke 6/6 against stub-PostgREST — skip
+link + `#main` in marketing AND app HTML, the `aria-label="Primary"`
+mobile strip + `md:` grid classes present, viewer money links absent in
+**both** navs, TimeLog filter + UpdateComposer controls named in live
+HTML (TimeTimer's run/stop controls are client-phase — source+type
+verified). tsc + `next build` clean; `verify:db` 144/144 regression.
+One smoke-harness bug caught en route (stub auth must accept the Bearer
+header — server-side supabase-js never forwards cookies) — the app's
+viewer gating was correct once the stub resolved personas properly.
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

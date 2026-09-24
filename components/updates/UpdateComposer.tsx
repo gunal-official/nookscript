@@ -85,6 +85,7 @@ export function UpdateComposer({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Update title"
+          aria-label="Title"
         />
       </div>
       <div className="space-y-1.5">
@@ -104,7 +105,7 @@ export function UpdateComposer({
                 );
               }}
             >
-              <SelectTrigger className="h-8 w-[190px]">
+              <SelectTrigger className="h-8 w-[190px]" aria-label="Insert template">
                 <SelectValue placeholder="Insert template…" />
               </SelectTrigger>
               <SelectContent>
@@ -131,6 +132,7 @@ export function UpdateComposer({
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Write the client update…"
+          aria-label="Body (markdown)"
           className="min-h-[320px] font-mono text-sm leading-relaxed"
         />
       </div>

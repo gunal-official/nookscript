@@ -228,6 +228,7 @@ export function InvoiceComposer({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Invoice title"
+            aria-label="Title"
           />
         </div>
         <div className="space-y-1.5">
@@ -236,6 +237,7 @@ export function InvoiceComposer({
             value={client}
             onChange={(e) => setClient(e.target.value)}
             placeholder="Client name"
+            aria-label="Client"
           />
         </div>
       </div>
@@ -315,6 +317,7 @@ export function InvoiceComposer({
             onChange={(e) => setTax(e.target.value)}
             inputMode="decimal"
             placeholder="0"
+            aria-label="Tax %"
             className="w-24"
           />
         </div>
@@ -324,6 +327,7 @@ export function InvoiceComposer({
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
+            aria-label="Due date"
             className="w-44"
           />
         </div>
@@ -336,6 +340,7 @@ export function InvoiceComposer({
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="e.g. Net 14 — please pay within 14 days of the due date."
+          aria-label="Notes (shown to the client)"
           rows={3}
         />
       </div>
