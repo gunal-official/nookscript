@@ -6,17 +6,22 @@
  * themselves as defense in depth, and RLS (is_workspace_owner on
  * team_invites) is the final gate either way.
  *
- * Delivery is copy-link by design: NO email is sent. The owner copies the
- * invite URL out of the pending list and sends it via their own channel.
+ * Delivery (Step 23): when RESEND_API_KEY is set, the invite link is
+ * emailed to the invitee via Resend (lib/invite-email). Copy-link stays
+ * as the fallback — a missing key skips the email silently (dev mode),
+ * and a failed send never blocks invite creation (the row is durable;
+ * the UI gets a warning + the copy link).
  */
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 
+import { sendInviteEmail } from "@/lib/invite-email";
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/utils";
 
-export type TeamActionResult = { error?: string } | undefined;
+export type TeamActionResult = { error?: string; warning?: string } | undefined;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000; // 14 days (spec)
@@ -36,7 +41,7 @@ async function getMembership() {
     supabase,
     user,
     membership: context
-      ? { workspace_id: context.id, role: context.role }
+      ? { workspace_id: context.id, name: context.name, role: context.role }
       : null,
   };
 }
@@ -70,12 +75,20 @@ export async function createTeamInviteAction(input: {
     };
   }
 
-  const { error } = await supabase.from("team_invites").insert({
-    workspace_id: membership.workspace_id,
-    email,
-    invited_by: user.id,
-    expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
-  });
+  const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
+  const {
+    data: invite,
+    error,
+  } = await supabase
+    .from("team_invites")
+    .insert({
+      workspace_id: membership.workspace_id,
+      email,
+      invited_by: user.id,
+      expires_at: expiresAt.toISOString(),
+    })
+    .select("token")
+    .single();
 
   if (error) {
     // Partial unique index: one pending invite per (workspace, email).
@@ -85,8 +98,43 @@ export async function createTeamInviteAction(input: {
     return { error: error.message };
   }
 
+  // Best-effort email (Step 23) — a missing key skips it silently (dev
+  // mode); a failure never blocks the already-created invite.
+  let warning: string | undefined;
+  const h = headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) {
+    warning =
+      "Invite created — but the email was skipped. Copy the link below and send it yourself.";
+  } else {
+    // x-forwarded-* under the platform; plain Host locally.
+    const proto =
+      h.get("x-forwarded-proto") ??
+      (host.startsWith("localhost") || host.startsWith("127.")
+        ? "http"
+        : "https");
+    const { data: me } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    const sent = await sendInviteEmail({
+      to: email,
+      fromHost: host,
+      workspaceName: membership.name,
+      inviterName: me?.full_name || user.email,
+      inviteUrl: `${proto}://${host}/invite/${invite.token}`,
+      expiresAt,
+    });
+    if (!sent.ok && sent.reason === "send-failed") {
+      console.error("invite email failed:", sent.detail);
+      warning =
+        "Invite created — but the email couldn't be sent. Copy the link below and send it yourself.";
+    }
+  }
+
   revalidatePath("/settings");
-  return { error: undefined };
+  return { error: undefined, warning };
 }
 
 /** Revoke a pending invite — keeps the row as an audit trail (the

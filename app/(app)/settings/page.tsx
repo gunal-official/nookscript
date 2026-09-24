@@ -25,6 +25,11 @@
  *      ✗, owner insert/update/delete ✓ — incl. the Step 21
  *      member-cannot-delete / owner-can-delete pair and the Step 22
  *      role-change quartet).
+ *   5. Invite email (Step 23): with RESEND_API_KEY (+ optional
+ *      RESEND_FROM) set in the environment, creating an invite emails
+ *      the link to the invitee; without a key the flow is copy-link
+ *      only with no warning; a failed send still creates the invite
+ *      and shows a warning beside the copy link.
  */
 
 import { TeamCard } from "@/components/settings/TeamCard";

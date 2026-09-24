@@ -3,11 +3,12 @@
 /**
  * Team card on /settings (Step 15): the workspace roster, plus — for
  * owners only — invite management, role management (Step 22), and
- * removal (Step 21). Invite delivery is copy-link (no email is sent
- * anywhere): the owner creates a targeted invite, copies its URL, and
- * sends it through their own mail/chat. Members see the roster
- * read-only with ZERO management controls rendered (hide-don't-disable;
- * the server actions and RLS re-gate the same checks).
+ * removal (Step 21). Invite delivery (Step 23): when the project has
+ * RESEND_API_KEY set the invite link is emailed to the invitee, and
+ * copy-link stays as the fallback (no key = silent skip; failed send =
+ * warning + the copy link). Members see the roster read-only with ZERO
+ * management controls rendered (hide-don't-disable; the server actions
+ * and RLS re-gate the same checks).
  *
  * Destructive / role controls use the same inline two-click confirm as
  * template delete and invite revoke. Absolute invite URLs resolve
@@ -351,6 +352,7 @@ export function TeamCard({
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -379,11 +381,17 @@ export function TeamCard({
     e.preventDefault();
     setPending(true);
     setError(null);
+    setWarning(null);
     const result = await createTeamInviteAction({ email });
     setPending(false);
     if (result?.error) {
       setError(result.error);
       return;
+    }
+    if (result?.warning) {
+      // The invite exists (and shows in the list with its copy link) —
+      // the email just didn't go out.
+      setWarning(result.warning);
     }
     setEmail(""); // the new invite appears in the list via revalidation
   }
@@ -417,8 +425,9 @@ export function TeamCard({
           <div className="mt-5 border-t border-border pt-5">
             <p className="text-sm font-medium">Invite a teammate</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              They’ll join as a member. No email is sent — copy the link and
-              send it yourself.
+              They’ll join as a member. The link is emailed to them when
+              email is configured — otherwise copy it below and send it
+              yourself.
             </p>
             <form onSubmit={handleCreate} className="mt-3 flex gap-2">
               <Input
@@ -439,6 +448,9 @@ export function TeamCard({
               </Button>
             </form>
             {error && <p className="mt-2 text-sm text-error">{error}</p>}
+            {warning && (
+              <p className="mt-2 text-sm text-muted-foreground">{warning}</p>
+            )}
 
             {pendingInvites.length > 0 && (
               <div className="mt-4">
