@@ -1910,5 +1910,77 @@ check(
   JSON.stringify(ptrCleared[0] ?? null)
 );
 
+// ── workspaces DELETE policy (Step 27: workspace deletion) ──
+// The escape hatch the Step-26 leave arc exposed: a sole owner can
+// neither leave nor (before this) destroy. Scratch fixture …0098 — a
+// SOLO workspace owned by Leo — with a template …0099 and Leo's active
+// pointer on it. Order matters: the foreign-workspace deny runs first,
+// then the delete proves the keep_last_owner cascade exception.
+await db.query(
+  "insert into public.workspaces (id, name) values ('00000000-0000-0000-0000-000000000098', 'Delete Probe')"
+);
+await db.query(
+  "insert into public.workspace_members (workspace_id, user_id, role) values ('00000000-0000-0000-0000-000000000098', $1, 'owner')",
+  [MEMBER_UID]
+);
+await db.query(
+  "insert into public.templates (id, workspace_id, title, body) values ('00000000-0000-0000-0000-000000000099', '00000000-0000-0000-0000-000000000098', 'doomed', 'x')"
+);
+await db.query(
+  "update public.profiles set active_workspace_id = '00000000-0000-0000-0000-000000000098' where id = $1",
+  [MEMBER_UID]
+);
+
+// 1 — owning ONE workspace grants no rights over ANOTHER
+await db.query("select set_config('app.jwt_sub', $1, false)", [MEMBER_UID]);
+await db.query("set role nstester");
+let foreignWorkspaceDeleteBlocked = true;
+try {
+  const { rowCount } = await db.query(
+    "delete from public.workspaces where id = $1",
+    [SEED_WS]
+  );
+  foreignWorkspaceDeleteBlocked = rowCount === 0;
+} catch (e) {
+  foreignWorkspaceDeleteBlocked = true;
+}
+check(
+  "RLS: a workspace's owner CANNOT delete a DIFFERENT workspace",
+  foreignWorkspaceDeleteBlocked
+);
+
+// 2 — the owner deletes their SOLO workspace: the Step-26
+// keep_last_owner trigger must let the cascade past its own owner row
+let workspaceDeletePossible = false;
+try {
+  const { rowCount } = await db.query(
+    "delete from public.workspaces where id = '00000000-0000-0000-0000-000000000098'"
+  );
+  workspaceDeletePossible = rowCount === 1;
+} catch (e) {
+  workspaceDeletePossible = false;
+}
+check(
+  "RLS: owner CAN delete a solo workspace (last-owner guard lets the cascade through)",
+  workspaceDeletePossible
+);
+await db.query("reset role");
+
+// 3 — everything cascaded: membership + template gone, pointer cleared
+const { rows: cascadeLeft } = await db.query(
+  `select
+     (select count(*)::int from public.workspace_members where workspace_id = '00000000-0000-0000-0000-000000000098') as members,
+     (select count(*)::int from public.templates where workspace_id = '00000000-0000-0000-0000-000000000098') as templates,
+     (select active_workspace_id from public.profiles where id = $1) as pointer`,
+  [MEMBER_UID]
+);
+check(
+  "workspace deletion cascades children + clears active pointers",
+  cascadeLeft[0].members === 0 &&
+    cascadeLeft[0].templates === 0 &&
+    cascadeLeft[0].pointer === null,
+  JSON.stringify(cascadeLeft[0])
+);
+
 console.log(failures === 0 ? "\nAll database checks passed ✔" : `\n${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

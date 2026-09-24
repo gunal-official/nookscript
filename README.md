@@ -764,6 +764,39 @@ depth).
 - Live: promote a second owner, leave as either, and watch the shell
   switch (or onboarding when it was your only workspace).
 
+## Verify Step 27 (workspace deletion — the Step-26 escape hatch)
+
+Migration 18 (`workspace_deletion.sql`). Owners can DESTROY a workspace
+— closing the trap the leave-workspace arc exposed: a sole owner could
+neither leave (last-owner guard — correct) nor delete (nothing offered
+it). The schema was deletion-ready from day one (every `workspace_id`
+FK cascades; `active_workspace_id` is ON DELETE SET NULL) — this
+migration adds the missing pieces:
+
+1. **DELETE policy** on workspaces — owner-gated (`is_workspace_owner`),
+   and owning one workspace grants nothing over another.
+2. **Cascade exception** — the Step-26 `keep_last_owner` trigger skips
+   its guard when the membership delete is a cascade of the workspace
+   row itself dying (nothing to orphan); direct membership deletes keep
+   the guard.
+
+UI: an owner-only **Danger zone** card at the bottom of /settings —
+loud copy (everything, for everyone, forever) + the house two-click
+confirm. Members never see the card. After deletion the shell lands on
+your next workspace, or `/onboarding` when none remain.
+
+**Proof:**
+- `npm run verify:db` — **136 checks / 18 migrations** (the three new:
+  foreign-workspace owner blocked, solo-workspace delete succeeds past
+  the last-owner guard, children cascade + pointers clear). Every
+  pre-existing check unchanged.
+- Rendered /settings regression through `next dev` + stub: owner sees
+  the Danger zone + the loud copy (with all Step-21/22/23/25/26
+  surfaces intact); a plain member gets none of it (and still gets
+  their Leave control).
+- Live: delete a scratch workspace and watch the shell fall through to
+  the next one (or onboarding).
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

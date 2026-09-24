@@ -38,10 +38,16 @@
  *      leaving, the shell lands on your next workspace (or /onboarding
  *      when none remain). DB-level proof: npm run verify:db (member
  *      self-delete ✓, last-owner delete ✗, pointer cleared on leave).
+ *   7. Delete workspace (Step 27): owners get a Danger zone card at the
+ *      bottom — two-click confirm, loud copy (everything is deleted for
+ *      everyone). Members never see the card. DB-level proof: npm run
+ *      verify:db (member cannot delete a workspace ✓, owner can —
+ *      children cascade, active pointers cleared).
  */
 
 import { TeamCard } from "@/components/settings/TeamCard";
 import { TemplatesList } from "@/components/settings/TemplatesList";
+import { WorkspaceDangerCard } from "@/components/settings/WorkspaceDangerCard";
 import { WorkspaceNameCard } from "@/components/settings/WorkspaceNameCard";
 import { getPendingInvites, getTeamMembers } from "@/lib/data/team";
 import { getTemplates } from "@/lib/data/templates";
@@ -85,6 +91,7 @@ export default async function SettingsPage() {
         />
       )}
       <TemplatesList templates={templates} isOwner={isOwner} />
+      {workspace && isOwner && <WorkspaceDangerCard name={workspace.name} />}
     </div>
   );
 }

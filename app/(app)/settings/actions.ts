@@ -36,6 +36,7 @@ async function getMembership() {
 
 const NOT_OWNER = "Only workspace owners can manage templates.";
 const RENAME_NOT_OWNER = "Only workspace owners can rename the workspace.";
+const DELETE_NOT_OWNER = "Only workspace owners can delete the workspace.";
 
 /**
  * Rename the caller's workspace (post-roadmap item). Owner-only — re-checked
@@ -65,6 +66,36 @@ export async function updateWorkspaceName(input: {
 
   revalidatePath("/settings");
   revalidatePath("/", "layout"); // sidebar shows the name on every app page
+  return { error: undefined };
+}
+
+/**
+ * Delete the ACTIVE workspace (Step 27 — the escape hatch the Step-26
+ * leave arc exposed: a sole owner can neither leave nor, until now,
+ * destroy). Owner-only — re-checked here as defense in depth, with the
+ * workspaces DELETE policy (is_workspace_owner) as the final gate.
+ * EVERYTHING cascades (all workspace_id FKs are on delete cascade; the
+ * active pointer is on delete set null) — briefs, proposals, invoices,
+ * templates, team access. Irreversible; the UI says so twice.
+ */
+export async function deleteWorkspaceAction(): Promise<ActionResult> {
+  const { supabase, membership } = await getMembership();
+  if (!membership) {
+    return { error: "Your session has expired. Please log in again." };
+  }
+  if (membership.role !== "owner") return { error: DELETE_NOT_OWNER };
+
+  const { error } = await supabase
+    .from("workspaces")
+    .delete()
+    .eq("id", membership.workspace_id);
+
+  if (error) return { error: error.message };
+
+  // The whole shell changes — next workspace (or /onboarding when none
+  // remain) resolves on the revalidated layout render.
+  revalidatePath("/settings");
+  revalidatePath("/", "layout");
   return { error: undefined };
 }
 

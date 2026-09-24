@@ -363,7 +363,7 @@ export async function leaveWorkspaceAction(): Promise<TeamActionResult> {
     if ((count ?? 0) <= 1) {
       return {
         error:
-          "You can’t leave — you’re the workspace’s last owner. Promote someone else first.",
+          "You can’t leave — you’re the workspace’s last owner. Promote someone else first (or delete the workspace from the Danger zone).",
       };
     }
   }
