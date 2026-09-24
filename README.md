@@ -76,11 +76,10 @@ missing object and its migration file (“did you forget to run
 safe to wire into CI or a pre-deploy check later.
 
 Known gap (future work, not wired now): the probe verifies tables and
-RPCs **exist** — it does not check POLICIES. Post-roadmap, the workspace
-rename UPDATE policy (`20260923060000_workspaces_rename_policy.sql`, the
-10th migration) is the first schema object in that category; a policy-aware
-version of `verify:live` could probe it by attempting an owner-scoped
-rename probe against a scratch workspace.
+RPCs **exist** — it does not check POLICIES. That gap is now closed by
+its behavioral sibling `npm run verify:live:policies` (Step 28 below) —
+policy-only migrations (workspace rename, roles, leave, deletion)
+create no table or RPC, so existence checks alone can't see them.
 
 ## Verify Step 2 (auth + workspaces)
 
@@ -796,6 +795,37 @@ your next workspace, or `/onboarding` when none remain.
   their Leave control).
 - Live: delete a scratch workspace and watch the shell fall through to
   the next one (or onboarding).
+
+## Verify Step 28 (live policy probes — tooling)
+
+No app changes. `npm run verify:live` proves tables + RPCs EXIST on the
+hosted project; **policy-only migrations** — 10 (workspace rename), 16
+(roles), 17 (leave), 18 (workspace deletion) — create neither, so
+forgetting one passed every existence check while the app's writes
+silently no-oped. The new `npm run verify:live:policies`
+(`scripts/verify-live-policies.mjs`) closes that gap: it behaves like
+the app against the real project and asserts the allow/deny verdict of
+every policy surface (15 checks):
+
+- throwaway signups (owner + member persona) + a scratch workspace
+  (`scripts/verify-auth.mjs` precedent) — every write is confined to
+  that scratch data, and the run self-cleans (the workspace is deleted
+  by the last checks; cleanup notes name the two test users);
+- rename: owner ✓ / member ✗ · roles: promote ✓ demote ✓ self ✗ ·
+  leave: member ✓ + pointer cleared ✗-guard on the last owner ·
+  deletion: member ✗ / owner ✓ (solo — past its own owner row);
+- failures name the exact `supabase/migrations/` file (verify:live
+  convention); needs email confirmation OFF (verify-auth prereq).
+
+**Proof (sandbox):** a 5-check contract run against a local
+policy-emulating Supabase stub (the script itself is the unit): baseline
+passes 15/15; three simulated drifts ("forgot a migration" worlds:
+rename policy off, leave guard off, deletion cascade fix off) each
+produce exit 1 + the correct ✗ line + migration file; restore passes
+again. The policy SEMANTICS asserted are proven offline against real
+Postgres by `npm run verify:db` (136/18).
+**Live:** run `npm run verify:live:policies` against your project —
+15/15 expected.
 
 ## Notes
 
