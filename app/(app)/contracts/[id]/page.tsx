@@ -29,6 +29,7 @@ import { getBriefs } from "@/lib/data/briefs";
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { formatDate, isUuid, timeAgo } from "@/lib/utils";
 import { ContractComposer } from "@/components/contracts/ContractComposer";
+import { CanEdit } from "@/components/app-shell/CanEdit";
 import {
   ContractStatusBadge,
   ExpiredBadge,
@@ -146,11 +147,13 @@ export default async function ContractDetailPage({
               </CardDescription>
             </CardHeader>
             <CardContent className="p-5">
-              <ContractComposer
-                contract={contract}
-                briefTitles={briefTitles}
-                clientSuggestions={clientSuggestions}
-              />
+              <CanEdit>
+                <ContractComposer
+                  contract={contract}
+                  briefTitles={briefTitles}
+                  clientSuggestions={clientSuggestions}
+                />
+              </CanEdit>
             </CardContent>
           </Card>
 
@@ -161,10 +164,14 @@ export default async function ContractDetailPage({
             </CardHeader>
             <CardContent className="space-y-3.5 p-5">
               <MetaRow label="Status">
-                <ContractStatusSelect
-                  contractId={contract.id}
-                  status={contract.status}
-                />
+                <CanEdit
+                  fallback={<ContractStatusBadge status={contract.status} />}
+                >
+                  <ContractStatusSelect
+                    contractId={contract.id}
+                    status={contract.status}
+                  />
+                </CanEdit>
               </MetaRow>
               <MetaRow label="Client">{contract.client_name}</MetaRow>
               <MetaRow label="Brief">{briefTitle ?? "Standalone"}</MetaRow>

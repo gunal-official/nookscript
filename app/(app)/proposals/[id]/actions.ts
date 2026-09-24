@@ -14,6 +14,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getProposalById } from "@/lib/data/proposals";
+import { requireEditor } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import type { ProposalStatus } from "@/lib/types/proposal";
 
@@ -40,6 +41,8 @@ export async function updateProposalStatus(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // Plain UPDATE; RLS scopes it to the user's workspaces.
   const { error } = await supabase
@@ -72,6 +75,8 @@ export async function createPlanFromProposal(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   const proposal = await getProposalById(input.proposalId);
   if (!proposal) return { error: "Proposal not found." };

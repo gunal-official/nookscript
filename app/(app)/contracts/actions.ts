@@ -14,7 +14,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getWorkspaceContext } from "@/lib/data/workspace-context";
+import { getWorkspaceContext, requireEditor } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/utils";
 
@@ -42,6 +42,8 @@ export async function createContract(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // Create on the ACTIVE workspace (Step 16 resolver).
   const context = await getWorkspaceContext();

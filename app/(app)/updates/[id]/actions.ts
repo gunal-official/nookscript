@@ -13,6 +13,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { requireEditor } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import type { UpdateStatus } from "@/lib/types/update";
 
@@ -34,6 +35,8 @@ export async function updateUpdateStatus(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // Plain UPDATE; RLS scopes it to the user's workspaces.
   const { error } = await supabase
@@ -61,6 +64,8 @@ export async function updateUpdateStatus(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   const { error } = await supabase
     .from("updates")
@@ -87,6 +92,8 @@ export async function createShareLink(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // The insert needs workspace_id; read it from the update (RLS-scoped,
   // so foreign updates simply look absent).
@@ -129,6 +136,8 @@ export async function revokeShareLink(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   const { error } = await supabase
     .from("share_links")
@@ -151,6 +160,8 @@ export async function regenerateShareLink(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // Same row, fresh unguessable token (uuid v4 — the JS-side equivalent of
   // gen_random_uuid(), since PostgREST updates can't invoke SQL defaults),

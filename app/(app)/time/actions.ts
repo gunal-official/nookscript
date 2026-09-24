@@ -13,7 +13,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getWorkspaceContext } from "@/lib/data/workspace-context";
+import { getWorkspaceContext, requireEditor } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/utils";
 import type { TimeEntryInput } from "@/lib/types/time";
@@ -63,6 +63,8 @@ export async function logTimeAction(
   const supabase = await requireSession();
   if (!supabase)
     return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   const context = await getWorkspaceContext();
   if (!context) {
@@ -96,6 +98,8 @@ export async function updateTimeAction(
   const supabase = await requireSession();
   if (!supabase)
     return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   const { error } = await supabase
     .from("time_entries")
@@ -122,6 +126,8 @@ export async function deleteTimeAction(input: {
   const supabase = await requireSession();
   if (!supabase)
     return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // RLS makes a foreign-workspace id a zero-row no-op; surface it so the
   // UI never pretends it deleted something it couldn't see.

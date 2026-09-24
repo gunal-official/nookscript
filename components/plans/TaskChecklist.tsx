@@ -23,9 +23,12 @@ import type { PlanTask } from "@/lib/types/plan";
 export function TaskChecklist({
   planId,
   tasks: initialTasks,
+  readOnly = false,
 }: {
   planId: string;
   tasks: PlanTask[];
+  /** Step 29: viewers see tasks read-only (no toggle affordance). */
+  readOnly?: boolean;
 }) {
   const [tasks, setTasks] = useState<PlanTask[]>(initialTasks);
   const [pending, setPending] = useState(false);
@@ -86,7 +89,7 @@ export function TaskChecklist({
               <button
                 type="button"
                 onClick={() => handleToggle(task)}
-                disabled={pending}
+                disabled={pending || readOnly}
                 aria-pressed={task.checked}
                 className="flex w-full items-start gap-2.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-muted disabled:cursor-wait disabled:opacity-70"
               >

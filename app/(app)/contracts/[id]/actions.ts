@@ -21,6 +21,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { requireEditor } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/utils";
 import type { ContractStatus } from "@/lib/types/contract";
@@ -61,6 +62,8 @@ export async function saveContract(input: {
   const supabase = await requireSession();
   if (!supabase)
     return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   const { error } = await supabase
     .from("contracts")
@@ -97,6 +100,8 @@ export async function setContractStatus(input: {
   const supabase = await requireSession();
   if (!supabase)
     return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // Read the current row (RLS-scoped; foreign contracts look absent) so
   // the stamps are computed from real state, not assumptions.

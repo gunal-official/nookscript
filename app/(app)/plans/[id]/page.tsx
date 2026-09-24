@@ -21,6 +21,7 @@ import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import { getPlanById } from "@/lib/data/plans";
 import { formatDate, isUuid, timeAgo } from "@/lib/utils";
 import { ComposeUpdateButton } from "@/components/plans/ComposeUpdateButton";
+import { CanEdit } from "@/components/app-shell/CanEdit";
 import { ExportMarkdownButton } from "@/components/plans/ExportMarkdownButton";
 import { PlanStatusBadge } from "@/components/plans/PlanStatusBadge";
 import { PlanStatusSelect } from "@/components/plans/PlanStatusSelect";
@@ -139,7 +140,11 @@ export default async function PlanDetailPage({
               )}
             </div>
 
-            <TaskChecklist planId={plan.id} tasks={plan.tasks} />
+            <CanEdit
+              fallback={<TaskChecklist planId={plan.id} tasks={plan.tasks} readOnly />}
+            >
+              <TaskChecklist planId={plan.id} tasks={plan.tasks} />
+            </CanEdit>
           </CardContent>
         </Card>
 
@@ -150,7 +155,9 @@ export default async function PlanDetailPage({
           </CardHeader>
           <CardContent className="space-y-3.5 p-5">
             <MetaRow label="Status">
-              <PlanStatusSelect planId={plan.id} status={plan.status} />
+              <CanEdit fallback={<PlanStatusBadge status={plan.status} />}>
+                <PlanStatusSelect planId={plan.id} status={plan.status} />
+              </CanEdit>
             </MetaRow>
             {plan.client_name && (
               <MetaRow label="Client">{plan.client_name}</MetaRow>
@@ -180,7 +187,9 @@ export default async function PlanDetailPage({
               />
             </div>
             <div className="border-t border-border pt-4">
-              <ComposeUpdateButton planId={plan.id} />
+              <CanEdit>
+                <ComposeUpdateButton planId={plan.id} />
+              </CanEdit>
             </div>
           </CardContent>
         </Card>

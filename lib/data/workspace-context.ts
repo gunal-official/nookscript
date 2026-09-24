@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { persistActiveWorkspacePointer } from "@/lib/active-pointer";
 import { createClient } from "@/lib/supabase/server";
 
@@ -33,9 +35,28 @@ export interface WorkspaceContext {
   /** Active workspace id — the one all list/creation scoping should use. */
   id: string;
   name: string;
-  role: "owner" | "member";
+  /** Step 29: three tiers — owner / member / viewer (docs/roles-spec.md). */
+  role: "owner" | "member" | "viewer";
+  /** false for viewers — they read operational content but write nothing. */
+  canEdit: boolean;
+  /** false for viewers — money (invoices, invoice links, time) is hidden. */
+  canSeeMoney: boolean;
   /** Every membership, oldest first — the switcher lists these. */
   workspaces: WorkspaceSummary[];
+}
+
+/** Shared copy for viewer-denied write attempts (actions + UI walls). */
+export const VIEW_ONLY_ERROR = "View only — you can't make changes.";
+
+/**
+ * Action guard (Step 29): returns VIEW_ONLY_ERROR for viewers, null to
+ * proceed. RLS (is_workspace_editor) stays the final gate — this is the
+ * friendly-error layer every content write action calls first.
+ */
+export async function requireEditor(): Promise<{ error: string } | null> {
+  const ctx = await getWorkspaceContext();
+  if (ctx && !ctx.canEdit) return { error: VIEW_ONLY_ERROR };
+  return null;
 }
 
 type MembershipRow = {
@@ -47,7 +68,7 @@ type MembershipRow = {
     | null;
 };
 
-export async function getWorkspaceContext(): Promise<WorkspaceContext | null> {
+async function getWorkspaceContextUncached(): Promise<WorkspaceContext | null> {
   const supabase = await createClient();
 
   const {
@@ -94,10 +115,16 @@ export async function getWorkspaceContext(): Promise<WorkspaceContext | null> {
     await persistActiveWorkspacePointer(supabase, user.id, active.workspace_id);
   }
 
+  const role = (active.role ?? "member") as "owner" | "member" | "viewer";
   return {
     id: active.workspace_id,
     name: activeSummary.name,
-    role: (active.role ?? "member") as "owner" | "member",
+    role,
+    canEdit: role !== "viewer",
+    canSeeMoney: role !== "viewer",
     workspaces,
   };
 }
+
+/** Request-deduped resolver (React cache) — pages + CanEdit gates share one fetch. */
+export const getWorkspaceContext = cache(getWorkspaceContextUncached);

@@ -59,10 +59,13 @@ export default async function AppLayout({
         <Sidebar
           workspaces={context.workspaces}
           activeWorkspaceId={context.id}
+          canSeeMoney={context.canSeeMoney}
         />
       </div>
       <main className="overflow-y-auto bg-bg px-8 pb-12 pt-6">{children}</main>
-      <TimeTimer briefs={briefs.map((b) => ({ id: b.id, title: b.title }))} />
+      {context.canSeeMoney && (
+        <TimeTimer briefs={briefs.map((b) => ({ id: b.id, title: b.title }))} />
+      )}
     </div>
   );
 }

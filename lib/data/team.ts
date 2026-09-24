@@ -13,7 +13,7 @@ export interface TeamMember {
   user_id: string;
   full_name: string | null;
   avatar_initials: string | null;
-  role: "owner" | "member";
+  role: "owner" | "member" | "viewer";
   joined_at: string;
 }
 

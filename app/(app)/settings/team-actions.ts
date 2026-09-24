@@ -183,12 +183,16 @@ export async function revokeTeamInviteAction(input: {
  */
 export async function changeMemberRoleAction(input: {
   userId: string;
-  role: "owner" | "member";
+  role: "owner" | "member" | "viewer";
 }): Promise<TeamActionResult> {
   if (!isUuid(input.userId ?? "")) {
     return { error: "Unknown member." };
   }
-  if (input.role !== "owner" && input.role !== "member") {
+  if (
+    input.role !== "owner" &&
+    input.role !== "member" &&
+    input.role !== "viewer"
+  ) {
     return { error: "Unknown role." };
   }
 
@@ -227,7 +231,7 @@ export async function changeMemberRoleAction(input: {
   if (target.role !== input.role) {
     // Last-owner guard: demoting the sole owner would leave the
     // workspace without one.
-    if (target.role === "owner" && input.role === "member") {
+    if (target.role === "owner" && input.role !== "owner") {
       const { count, error: countError } = await supabase
         .from("workspace_members")
         .select("user_id", { count: "exact", head: true })

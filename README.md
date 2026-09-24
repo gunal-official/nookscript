@@ -78,8 +78,9 @@ safe to wire into CI or a pre-deploy check later.
 Known gap (future work, not wired now): the probe verifies tables and
 RPCs **exist** — it does not check POLICIES. That gap is now closed by
 its behavioral sibling `npm run verify:live:policies` (Step 28 below) —
-policy-only migrations (workspace rename, roles, leave, deletion)
-create no table or RPC, so existence checks alone can't see them.
+policy-only migrations (workspace rename, roles, leave, deletion,
+viewer-role) create no table or RPC, so existence checks alone can't
+see them.
 
 ## Verify Step 2 (auth + workspaces)
 
@@ -825,7 +826,45 @@ produce exit 1 + the correct ✗ line + migration file; restore passes
 again. The policy SEMANTICS asserted are proven offline against real
 Postgres by `npm run verify:db` (136/18).
 **Live:** run `npm run verify:live:policies` against your project —
-15/15 expected.
+15/15 expected (18/18 since Step 29 adds the viewer probes below).
+
+## Verify Step 29 (viewer role — db + app)
+
+Roles spec (`docs/roles-spec.md`, approved with one amendment): three
+tiers **owner / member / viewer**. Viewers read the operational content
+(briefs, proposals, plans, updates, contracts, templates, roster) and
+**write nothing**; the amendment — **money is HIDDEN**: `invoices`,
+`invoice_links`, and `time_entries` are excluded at the RLS SELECT
+policy, not just write-gated (clients/stakeholders never see financials
+or tracked hours). Invites keep granting `member` (the recorded
+`team_invites` design); owners assign `viewer` from the roster's role
+control (Step-22 two-click confirm, now 3-way; badge reads "View only").
+
+- **DB** (`20260925220000_viewer_role.sql`): role CHECK grows to
+  `('owner','member','viewer')`; new `is_workspace_editor()` (member or
+  owner) switches every content **write** policy (briefs family,
+  proposals, plans, updates, share_links, contracts, invoices,
+  invoice_links, time_entries); the three money **select** policies move
+  to the same gate. Templates stay owner-write / member-read.
+- **App**: `requireEditor()` viewer guard in all 29 content write
+  actions (RLS stays authoritative); `CanEdit`/`CanSeeMoney` server
+  gates wrap every write surface (composers, generate/share buttons,
+  status selects → read badges, task checkboxes) and the money pages
+  (nav + `TimeTimer` + `/invoices`, `/invoices/[id]`, `/time` walls).
+- **verify:db** +9 (CHECK accept/reject, owner sets viewer, viewer
+  reads content but ZERO money, viewer writes denied, member/owner
+  regression).
+- **E2E** (scratch, stub-PostgREST): 7/7 — viewer /settings (money nav
+  hidden, "View only" badge, zero invite surface, Leave present),
+  both money walls, owner's role control offers "Viewer", update page
+  chrome hidden for viewer / intact for member (regression).
+- **verify:live:policies** → 18 checks (+set `viewer`, +viewer template
+  write denied, +money hidden with owner-visible fixture) with 3 new
+  drift modes contract-proven (roles policy / write gate / money hide
+  "forgotten" each trip the right ✗ + migration file).
+
+**Live:** pull = **migration 19 only, no re-seed** (seeds use
+owner/member). Then `npm run verify:live:policies` — 18/18 expected.
 
 ## Notes
 

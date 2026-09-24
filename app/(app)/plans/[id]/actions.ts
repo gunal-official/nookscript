@@ -15,6 +15,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getPlanById } from "@/lib/data/plans";
+import { requireEditor } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import type { PlanStatus, PlanTask } from "@/lib/types/plan";
@@ -37,6 +38,8 @@ export async function updatePlanStatus(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // Plain UPDATE; RLS scopes it to the user's workspaces.
   const { error } = await supabase
@@ -66,6 +69,8 @@ export async function toggleTask(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   const { data: plan, error: fetchError } = await supabase
     .from("plans")
@@ -110,6 +115,8 @@ export async function composeUpdateFromPlan(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   const plan = await getPlanById(input.planId);
   if (!plan) return { error: "Plan not found." };

@@ -24,6 +24,15 @@ import { getWorkspaceContext } from "@/lib/data/workspace-context";
 export default async function InvoicesPage() {
   // Scoped to the caller's ACTIVE workspace (Step 16), like every list.
   const context = await getWorkspaceContext();
+  if (!context?.canSeeMoney) {
+    return (
+      <div className="mx-auto max-w-3xl border border-border bg-card p-8">
+        <p className="text-sm text-muted-foreground">
+          View only — invoices and time entries aren’t visible to viewers.
+        </p>
+      </div>
+    );
+  }
   const [invoices, briefs] = await Promise.all([
     context ? getInvoices(context.id) : Promise.resolve([]),
     context ? getBriefs(context.id) : Promise.resolve([]),

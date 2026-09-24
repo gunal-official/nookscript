@@ -35,7 +35,9 @@ export async function getTemplates(workspaceId: string): Promise<Template[]> {
  * role of the workspace they're actually looking at. The (app) shell
  * resolves role for its own use but doesn't expose it to pages.
  */
-export async function getCurrentUserRole(): Promise<"owner" | "member" | null> {
+export async function getCurrentUserRole(): Promise<
+  "owner" | "member" | "viewer" | null
+> {
   const context = await getWorkspaceContext();
   return context?.role ?? null;
 }

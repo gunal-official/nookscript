@@ -19,6 +19,7 @@ import { ArrowLeft, ArrowUpRight, Check } from "lucide-react";
 import { getProposalById } from "@/lib/data/proposals";
 import { formatDate, isUuid, timeAgo } from "@/lib/utils";
 import { GeneratePlanButton } from "@/components/proposals/GeneratePlanButton";
+import { CanEdit } from "@/components/app-shell/CanEdit";
 import { ProposalStatusBadge } from "@/components/proposals/ProposalStatusBadge";
 import { ProposalStatusSelect } from "@/components/proposals/ProposalStatusSelect";
 import { Badge } from "@/components/ui/badge";
@@ -190,10 +191,14 @@ export default async function ProposalDetailPage({
           </CardHeader>
           <CardContent className="space-y-3.5 p-5">
             <MetaRow label="Status">
-              <ProposalStatusSelect
-                proposalId={proposal.id}
-                status={proposal.status}
-              />
+              <CanEdit
+                fallback={<ProposalStatusBadge status={proposal.status} />}
+              >
+                <ProposalStatusSelect
+                  proposalId={proposal.id}
+                  status={proposal.status}
+                />
+              </CanEdit>
             </MetaRow>
             {proposal.client_name && (
               <MetaRow label="Client">{proposal.client_name}</MetaRow>
@@ -215,7 +220,9 @@ export default async function ProposalDetailPage({
               </div>
             )}
             <div className="border-t border-border pt-4">
-              <GeneratePlanButton proposalId={proposal.id} />
+              <CanEdit>
+                <GeneratePlanButton proposalId={proposal.id} />
+              </CanEdit>
             </div>
           </CardContent>
         </Card>

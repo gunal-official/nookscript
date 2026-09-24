@@ -19,7 +19,20 @@
  */
 
 import { IntakeClient } from "@/components/intake/IntakeClient";
+import { CanEdit } from "@/components/app-shell/CanEdit";
 
 export default function IntakePage() {
-  return <IntakeClient aiConfigured={Boolean(process.env.OPENAI_API_KEY)} />;
+  return (
+    <CanEdit
+      fallback={
+        <div className="border border-border bg-card p-8">
+          <p className="text-sm text-muted-foreground">
+            View only — you can’t make changes. Intake is owner/member ground.
+          </p>
+        </div>
+      }
+    >
+      <IntakeClient aiConfigured={Boolean(process.env.OPENAI_API_KEY)} />
+    </CanEdit>
+  );
 }

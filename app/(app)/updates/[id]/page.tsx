@@ -25,6 +25,7 @@ import { getUpdateById } from "@/lib/data/updates";
 import { getShareLinkForUpdate } from "@/lib/data/shares";
 import { getTemplates } from "@/lib/data/templates";
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
+import { CanEdit } from "@/components/app-shell/CanEdit";
 import { formatDate, isUuid, timeAgo } from "@/lib/utils";
 import { ExportUpdateMarkdownButton } from "@/components/updates/ExportUpdateMarkdownButton";
 import { ShareLinkPanel } from "@/components/updates/ShareLinkPanel";
@@ -124,6 +125,7 @@ export default async function UpdateDetailPage({
 
       <div className="grid items-start gap-6 lg:grid-cols-[2fr_1fr]">
         {/* ── Left: composer ── */}
+        <CanEdit>
         <Card>
           <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
             <CardTitle className="text-base">Composer</CardTitle>
@@ -141,6 +143,7 @@ export default async function UpdateDetailPage({
             />
           </CardContent>
         </Card>
+        </CanEdit>
 
         {/* ── Right: metadata / actions ── */}
         <Card>
@@ -149,7 +152,9 @@ export default async function UpdateDetailPage({
           </CardHeader>
           <CardContent className="space-y-3.5 p-5">
             <MetaRow label="Status">
-              <UpdateStatusSelect updateId={update.id} status={update.status} />
+              <CanEdit fallback={<UpdateStatusBadge status={update.status} />}>
+                <UpdateStatusSelect updateId={update.id} status={update.status} />
+              </CanEdit>
             </MetaRow>
             {update.client_name && (
               <MetaRow label="Client">{update.client_name}</MetaRow>
@@ -179,6 +184,7 @@ export default async function UpdateDetailPage({
           </CardContent>
         </Card>
 
+        <CanEdit>
         <Card>
           <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
             <CardTitle className="text-base">Share</CardTitle>
@@ -190,6 +196,7 @@ export default async function UpdateDetailPage({
             <ShareLinkPanel updateId={update.id} shareLink={shareLink} />
           </CardContent>
         </Card>
+        </CanEdit>
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getBriefById, resolveQuestion } from "@/lib/data/briefs";
+import { requireEditor } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import type { BriefStatus } from "@/lib/types/brief";
 
@@ -35,6 +36,8 @@ export async function resolveBriefQuestion(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   try {
     // Marks the question resolved and appends 'question_resolved' history.
@@ -70,6 +73,8 @@ export async function updateBriefStatus(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // Plain UPDATE: the BEFORE UPDATE trigger logs 'status_changed'
   // (old → new) into brief_edit_history with auth.uid() as the actor.
@@ -101,6 +106,8 @@ export async function createProposalFromBrief(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   const brief = await getBriefById(input.briefId);
   if (!brief) return { error: "Brief not found." };

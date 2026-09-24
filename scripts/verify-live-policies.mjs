@@ -6,11 +6,14 @@
  *
  * Why this exists: verify:live checks that tables + RPCs EXIST via the
  * anon key. Policy-only migrations create neither — forget to run
- * migration 10 (workspace rename), 16 (roles), 17 (leave), or 18
- * (workspace deletion) and every existence check still passes while
+ * migration 10 (workspace rename), 16 (roles), 17 (leave), 18
+ * (workspace deletion), or 19 (viewer role + money hide) and every
+ * existence check still passes while
  * the app's writes silently no-op or die at runtime. This probe closes
  * that gap: it BEHAVES like the app against the real project and
- * asserts the allow/deny verdict of each policy surface.
+ * asserts the allow/deny verdict of each policy surface (18 checks:
+ * rename, roles incl. viewer, leave + guard, deletion, write gates,
+ * and the money-hide select).
  *
  * Mechanism (scripts/verify-auth.mjs precedent): throwaway signups +
  * a scratch workspace — every write is confined to that scratch data,
@@ -22,7 +25,7 @@
  * name the exact supabase/migrations file; exit 0 pass / 1 fail).
  *
  * The policy SEMANTICS asserted here are proven offline against real
- * Postgres by `npm run verify:db` (136 checks); this script's job is
+ * Postgres by `npm run verify:db` (~144 checks); this script's job is
  * detecting drift on the HOSTED project.
  */
 
@@ -64,6 +67,7 @@ const M = {
   roles: "20260925120000_role_management.sql",
   leave: "20260925180000_workspace_members_leave.sql",
   deletion: "20260925200000_workspace_deletion.sql",
+  viewer: "20260925220000_viewer_role.sql",
 };
 
 let failures = 0;
@@ -177,6 +181,61 @@ check(
   demoted.error?.message ?? "",
   M.roles
 );
+// ── viewer tier (migration 19 — CHECK + policy switches) ──
+const setViewer = await clientA
+  .from("workspace_members")
+  .update({ role: "viewer" })
+  .eq("workspace_id", wsId)
+  .eq("user_id", uidB)
+  .select("user_id");
+check(
+  "policy: owner CAN set role 'viewer'",
+  !setViewer.error && setViewer.data?.length === 1,
+  setViewer.error?.message ?? "",
+  M.viewer
+);
+// scratch template (owner insert — silent setup), then the write probe
+const { data: tplRow, error: tplErr } = await clientA
+  .from("templates")
+  .insert({ workspace_id: wsId, title: "policy probe", body: "x" })
+  .select("id")
+  .single();
+const viewerWrite = await clientB
+  .from("templates")
+  .update({ title: "viewer edit" })
+  .eq("id", tplRow?.id ?? "00000000-0000-0000-0000-000000000000")
+  .select("id");
+check(
+  "policy: viewer CANNOT edit templates (write gate)",
+  !tplErr && !viewerWrite.error && viewerWrite.data?.length === 0,
+  tplErr?.message || viewerWrite.error?.message || "",
+  M.viewer
+);
+// scratch invoice (owner insert — silent setup) so the hide has data to
+// hide: the owner must SEE it while the viewer sees nothing.
+const { error: invErr } = await clientA
+  .from("invoices")
+  .insert({ workspace_id: wsId, invoice_number: 1, client_name: "Probe Co", title: "policy probe" })
+  .select("id");
+const ownerMoney = await clientA.from("invoices").select("id").eq("workspace_id", wsId);
+const viewerMoney = await clientB.from("invoices").select("id").eq("workspace_id", wsId);
+check(
+  "policy: money is HIDDEN from viewers (invoices select)",
+  !invErr &&
+    (ownerMoney.data?.length ?? -1) === 1 &&
+    !viewerMoney.error &&
+    (viewerMoney.data?.length ?? -1) === 0,
+  `owner ${ownerMoney.data?.length ?? "err"}, viewer ${viewerMoney.data?.length ?? "err"}`,
+  M.viewer
+);
+// silent restore — B is a plain member again for the remaining checks
+await clientA
+  .from("workspace_members")
+  .update({ role: "member" })
+  .eq("workspace_id", wsId)
+  .eq("user_id", uidB)
+  .select("user_id");
+
 const selfChange = await clientA
   .from("workspace_members")
   .update({ role: "member" })

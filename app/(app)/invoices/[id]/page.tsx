@@ -24,6 +24,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { getInvoiceById } from "@/lib/data/invoices";
 import { getInvoiceLinkForInvoice } from "@/lib/data/invoices";
+import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { formatDate, isUuid, invoiceNumberLabel, timeAgo } from "@/lib/utils";
 import { InvoiceComposer } from "@/components/invoices/InvoiceComposer";
 import { InvoiceLinkPanel } from "@/components/invoices/InvoiceLinkPanel";
@@ -81,6 +82,17 @@ export default async function InvoiceDetailPage({
 }) {
   if (!isUuid(params.id)) {
     return <NotFoundState />;
+  }
+
+  const context = await getWorkspaceContext();
+  if (!context?.canSeeMoney) {
+    return (
+      <div className="mx-auto max-w-3xl border border-border bg-card p-8">
+        <p className="text-sm text-muted-foreground">
+          View only — invoices and time entries aren’t visible to viewers.
+        </p>
+      </div>
+    );
   }
 
   const invoice = await getInvoiceById(params.id);

@@ -63,6 +63,7 @@ const REVOKED_SHARE_TOKEN = "00000000-0000-0000-0000-000000000052";
 const REVOKED_SHARE_LINK = "00000000-0000-0000-0000-000000000053";
 const FOREIGN_SHARE_LINK = "00000000-0000-0000-0000-000000000094";
 const MEMBER_UID = "00000000-0000-0000-0000-000000000070";
+const TESS_UID = "00000000-0000-0000-0000-000000000071";
 const TEAMMATE_UID = "00000000-0000-0000-0000-000000000071";
 const SEED_INVITE_TOKEN = "00000000-0000-0000-0000-000000000063";
 const EXPIRED_INVITE_TOKEN = "00000000-0000-0000-0000-000000000066";
@@ -1981,6 +1982,144 @@ check(
     cascadeLeft[0].pointer === null,
   JSON.stringify(cascadeLeft[0])
 );
+
+// ── viewer role (Step 29: viewer tier + money hide) ──
+// Scratch …0088: Maya …0001 owner, Leo …0070 VIEWER (proves the CHECK
+// accepts the third value), Tess …0071 member. Content: template …0097,
+// brief …0086, proposal …0085, invoice …0084 + time entry …0083 (money).
+// Scratch …0087: Leo as a plain MEMBER + brief …0082 (write regression).
+await db.query(
+  "insert into public.workspaces (id, name) values ('00000000-0000-0000-0000-000000000088', 'Viewer Probe'), ('00000000-0000-0000-0000-000000000087', 'Member Regression')"
+);
+await db.query(
+  "insert into public.workspace_members (workspace_id, user_id, role) values ('00000000-0000-0000-0000-000000000088', $1, 'owner'), ('00000000-0000-0000-0000-000000000088', $2, 'viewer'), ('00000000-0000-0000-0000-000000000088', $3, 'member'), ('00000000-0000-0000-0000-000000000087', $2, 'member')",
+  [SEED_UID, MEMBER_UID, TESS_UID]
+);
+await db.query(
+  "insert into public.templates (id, workspace_id, title, body) values ('00000000-0000-0000-0000-000000000097', '00000000-0000-0000-0000-000000000088', 'viewer-readable', 'x')"
+);
+await db.query(
+  "insert into public.briefs (id, workspace_id, title) values ('00000000-0000-0000-0000-000000000086', '00000000-0000-0000-0000-000000000088', 'viewer brief'), ('00000000-0000-0000-0000-000000000082', '00000000-0000-0000-0000-000000000087', 'member brief')"
+);
+await db.query(
+  "insert into public.proposals (id, workspace_id, brief_id, title) values ('00000000-0000-0000-0000-000000000085', '00000000-0000-0000-0000-000000000088', '00000000-0000-0000-0000-000000000086', 'viewer proposal')"
+);
+await db.query(
+  "insert into public.invoices (id, workspace_id, invoice_number, title, client_name) values ('00000000-0000-0000-0000-000000000084', '00000000-0000-0000-0000-000000000088', 1, 'secret money', 'Acme')"
+);
+await db.query(
+  "insert into public.time_entries (id, workspace_id, brief_id, description, duration_minutes) values ('00000000-0000-0000-0000-000000000083', '00000000-0000-0000-0000-000000000088', '00000000-0000-0000-0000-000000000086', 'secret hours', 90)"
+);
+const { rows: viewerRoleRow } = await db.query(
+  "select role from public.workspace_members where workspace_id = '00000000-0000-0000-0000-000000000088' and user_id = $1",
+  [MEMBER_UID]
+);
+check(
+  "CHECK constraint accepts the viewer role",
+  viewerRoleRow[0]?.role === "viewer",
+  JSON.stringify(viewerRoleRow[0] ?? null)
+);
+
+let adminRoleRejected = false;
+try {
+  await db.query(
+    "insert into public.workspace_members (workspace_id, user_id, role) values ('00000000-0000-0000-0000-000000000088', $1, 'admin')",
+    [TESS_UID]
+  );
+  adminRoleRejected = false;
+} catch (e) {
+  adminRoleRejected = true;
+}
+check("CHECK constraint rejects any fourth role (admin)", adminRoleRejected);
+
+// owner CAN assign the viewer role (role-change policy + new CHECK)
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+await db.query("set role nstester");
+const { rowCount: setViewerRows } = await db.query(
+  "update public.workspace_members set role = 'viewer' where workspace_id = '00000000-0000-0000-0000-000000000088' and user_id = $1",
+  [TESS_UID]
+);
+check(
+  "RLS: an owner CAN set a teammate's role to viewer",
+  setViewerRows === 1,
+  `rowCount ${setViewerRows}`
+);
+
+// viewer reads operational content …
+await db.query("select set_config('app.jwt_sub', $1, false)", [MEMBER_UID]);
+await db.query("set role nstester");
+const { rows: viewerReadRows } = await db.query(
+  `select
+     (select count(*)::int from public.templates where workspace_id = '00000000-0000-0000-0000-000000000088') as templates,
+     (select count(*)::int from public.proposals where workspace_id = '00000000-0000-0000-0000-000000000088') as proposals,
+     (select count(*)::int from public.invoices where workspace_id = '00000000-0000-0000-0000-000000000088') as invoices,
+     (select count(*)::int from public.time_entries where workspace_id = '00000000-0000-0000-0000-000000000088') as time_entries`
+);
+check(
+  "RLS: a viewer reads operational content but ZERO money (invoices + time hidden)",
+  viewerReadRows[0].templates === 1 &&
+    viewerReadRows[0].proposals === 1 &&
+    viewerReadRows[0].invoices === 0 &&
+    viewerReadRows[0].time_entries === 0,
+  JSON.stringify(viewerReadRows[0])
+);
+
+// …and writes nothing: insert → WITH CHECK error; update/delete → 0 rows
+let viewerInsertBlocked = true;
+try {
+  const { rowCount } = await db.query(
+    "insert into public.briefs (workspace_id, title) values ('00000000-0000-0000-0000-000000000088', 'viewer write')"
+  );
+  viewerInsertBlocked = rowCount === 0;
+} catch (e) {
+  viewerInsertBlocked = true;
+}
+check(
+  "RLS: a viewer CANNOT insert content (briefs)",
+  viewerInsertBlocked
+);
+const { rowCount: viewerUpdateRows } = await db.query(
+  "update public.briefs set title = 'x' where id = '00000000-0000-0000-0000-000000000086'"
+);
+const { rowCount: viewerDeleteRows } = await db.query(
+  "delete from public.templates where id = '00000000-0000-0000-0000-000000000097'"
+);
+const { rowCount: viewerMoneyWriteRows } = await db.query(
+  "update public.invoices set title = 'x' where id = '00000000-0000-0000-0000-000000000084'"
+);
+check(
+  "RLS: a viewer's updates/deletes affect 0 rows (content + money)",
+  viewerUpdateRows === 0 &&
+    viewerDeleteRows === 0 &&
+    viewerMoneyWriteRows === 0,
+  `upd ${viewerUpdateRows}, del ${viewerDeleteRows}, money ${viewerMoneyWriteRows}`
+);
+await db.query("reset role");
+
+// member write regression: the editor gate must not have broken members
+await db.query("select set_config('app.jwt_sub', $1, false)", [MEMBER_UID]);
+await db.query("set role nstester");
+const { rowCount: memberUpdateRows } = await db.query(
+  "update public.briefs set title = 'member still edits' where id = '00000000-0000-0000-0000-000000000082'"
+);
+const { rows: ownerMoneyRows } = await db.query(
+  "select count(*)::int as n from public.invoices where workspace_id = '00000000-0000-0000-0000-000000000088'"
+);
+check(
+  "RLS: members still edit content (is_workspace_editor regression)",
+  memberUpdateRows === 1,
+  `rowCount ${memberUpdateRows}`
+);
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+const { rows: ownerSeesMoney } = await db.query(
+  "select count(*)::int as n from public.invoices where workspace_id = '00000000-0000-0000-0000-000000000088'"
+);
+check(
+  "RLS: owners still see money (invoices visible to editors)",
+  ownerSeesMoney[0]?.n === 1,
+  JSON.stringify(ownerSeesMoney[0] ?? null)
+);
+await db.query("reset role");
 
 console.log(failures === 0 ? "\nAll database checks passed ✔" : `\n${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

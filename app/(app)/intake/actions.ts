@@ -15,7 +15,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getWorkspaceContext } from "@/lib/data/workspace-context";
+import { getWorkspaceContext, requireEditor } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import { generateBriefContent, type GeneratorEngine } from "@/lib/ai/brief-generator";
 import type {
@@ -63,6 +63,8 @@ export async function generateBriefFromSource(input: {
   if (!user) {
     return { error: "Your session has expired. Please log in again." };
   }
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // Briefs are created in the ACTIVE workspace (Step 16 resolver) — the
   // one the sidebar is showing — never a background first-joined one.
@@ -168,6 +170,8 @@ export async function addSourceToBrief(input: {
   if (!user) {
     return { error: "Your session has expired. Please log in again." };
   }
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   const { error } = await supabase.rpc("add_brief_source", {
     p_brief_id: input.briefId,
@@ -208,6 +212,8 @@ export async function saveBriefEdits(input: {
   if (!user) {
     return { error: "Your session has expired. Please log in again." };
   }
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // Each changed field: one RPC call (atomic field update + history entry).
   // The whitelist + membership check live inside update_brief_field().

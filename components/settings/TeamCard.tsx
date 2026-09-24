@@ -24,11 +24,9 @@ import {
   Ban,
   Check,
   Copy,
-  Crown,
   Loader2,
   LogOut,
   Trash2,
-  UserMinus,
   UserPlus,
 } from "lucide-react";
 
@@ -56,17 +54,17 @@ import { formatDate, getInitials } from "@/lib/utils";
 function MemberRow({
   member,
   removable,
-  roleChange,
+  roleOptions,
   leavable,
 }: {
   member: TeamMember;
   /** True when the viewer (an owner) may remove this member: not their
    *  own row, and not the workspace's last owner. */
   removable: boolean;
-  /** The role the viewer (an owner) may change this member TO: never
-   *  their own row, and never the last owner (they can't be demoted).
-   *  null = no role control. */
-  roleChange: "owner" | "member" | null;
+  /** Roles the viewer (an owner) may switch this member TO (Step 22/29):
+   *  never their own row, never the last owner, never the member's
+   *  current role. Empty = no role control. */
+  roleOptions: Array<"owner" | "member" | "viewer">;
   /** True when this is the VIEWER'S OWN row and they may leave (anyone
    *  but the workspace's last owner — Step 26). */
   leavable: boolean;
@@ -77,6 +75,9 @@ function MemberRow({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingRole, setConfirmingRole] = useState(false);
+  const [pendingRole, setPendingRole] = useState<
+    "owner" | "member" | "viewer" | null
+  >(null);
   const [rolePending, setRolePending] = useState(false);
   const [roleError, setRoleError] = useState<string | null>(null);
   const [confirmingLeave, setConfirmingLeave] = useState(false);
@@ -96,12 +97,12 @@ function MemberRow({
   }
 
   async function handleRoleChange() {
-    if (!roleChange) return;
+    if (!pendingRole) return;
     setRolePending(true);
     setRoleError(null);
     const result = await changeMemberRoleAction({
       userId: member.user_id,
-      role: roleChange,
+      role: pendingRole,
     });
     setRolePending(false);
     if (result?.error) {
@@ -124,7 +125,7 @@ function MemberRow({
     // /onboarding when none remain) — this card unmounts with it.
   }
 
-  const isPromotion = roleChange === "owner";
+  const roleLabel = member.role === "viewer" ? "View only" : member.role;
 
   return (
     <li className="py-3 first:pt-0 last:pb-0">
@@ -143,32 +144,29 @@ function MemberRow({
           </p>
         </div>
         <Badge variant={member.role === "owner" ? "default" : "secondary"}>
-          {member.role}
+          {roleLabel}
         </Badge>
 
-        {roleChange && !confirmingRole && !confirming && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className={
-              isPromotion
-                ? "shrink-0 text-muted-foreground hover:text-foreground"
-                : "shrink-0 text-muted-foreground hover:text-error"
-            }
-            onClick={() => setConfirmingRole(true)}
-            aria-label={
-              isPromotion
-                ? `Make ${member.full_name ?? "member"} an owner`
-                : `Make ${member.full_name ?? "member"} a member`
-            }
+        {roleOptions.length > 0 && !confirmingRole && !confirming && (
+          <select
+            className="shrink-0 rounded-md border border-border bg-card px-2 py-1 text-xs text-muted-foreground"
+            value=""
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === "owner" || value === "member" || value === "viewer") {
+                setPendingRole(value);
+                setConfirmingRole(true);
+              }
+            }}
+            aria-label={`Change role for ${member.full_name ?? "member"}`}
           >
-            {isPromotion ? (
-              <Crown className="h-3.5 w-3.5" />
-            ) : (
-              <UserMinus className="h-3.5 w-3.5" />
-            )}
-          </Button>
+            <option value="">Change role…</option>
+            {roleOptions.map((r) => (
+              <option key={r} value={r}>
+                {r === "viewer" ? "Viewer" : r === "owner" ? "Owner" : "Member"}
+              </option>
+            ))}
+          </select>
         )}
 
         {removable && !confirming && !confirmingRole && (
@@ -184,23 +182,26 @@ function MemberRow({
           </Button>
         )}
 
-        {roleChange && confirmingRole && (
+        {pendingRole && confirmingRole && (
           <div className="flex shrink-0 items-center gap-1.5">
             <span className="text-xs text-muted-foreground">
-              {isPromotion ? "Make owner?" : "Make member?"}
+              Make {pendingRole === "viewer" ? "viewer" : pendingRole}?
             </span>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => setConfirmingRole(false)}
+              onClick={() => {
+                setConfirmingRole(false);
+                setPendingRole(null);
+              }}
               disabled={rolePending}
             >
               Cancel
             </Button>
             <Button
               type="button"
-              variant={isPromotion ? "default" : "destructive"}
+              variant={pendingRole === "owner" ? "default" : "destructive"}
               size="sm"
               onClick={handleRoleChange}
               disabled={rolePending}
@@ -208,7 +209,7 @@ function MemberRow({
               {rolePending && (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               )}
-              {isPromotion ? "Make owner" : "Make member"}
+              Make {pendingRole === "viewer" ? "viewer" : pendingRole}
             </Button>
           </div>
         )}
@@ -431,15 +432,17 @@ export function TeamCard({
     member.user_id !== currentUserId &&
     !(member.role === "owner" && ownerCount === 1);
 
-  // Role changes (Step 22): owners can flip anyone else's role —
-  // members up to owner, owners down to member — except the workspace's
-  // last owner (demoting them would leave it ownerless).
-  const roleChangeFor = (
+  // Role changes (Step 22/29): owners can set anyone else's role among
+  // owner / member / viewer — except their own row (self-guard) and the
+  // workspace's last owner (every option would demote them).
+  const roleOptionsFor = (
     member: TeamMember
-  ): "owner" | "member" | null => {
-    if (!isOwner || member.user_id === currentUserId) return null;
-    if (member.role === "member") return "owner";
-    return ownerCount > 1 ? "member" : null;
+  ): Array<"owner" | "member" | "viewer"> => {
+    if (!isOwner || member.user_id === currentUserId) return [];
+    if (member.role === "owner" && ownerCount === 1) return [];
+    return (["owner", "member", "viewer"] as const).filter(
+      (r) => r !== member.role
+    );
   };
 
   // Leaving (Step 26): the viewer's own row, anyone but the last owner.
@@ -486,7 +489,7 @@ export function TeamCard({
               key={member.user_id}
               member={member}
               removable={isRemovable(member)}
-              roleChange={roleChangeFor(member)}
+              roleOptions={roleOptionsFor(member)}
               leavable={isLeavable(member)}
             />
           ))}

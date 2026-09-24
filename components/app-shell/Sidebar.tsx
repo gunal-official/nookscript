@@ -23,6 +23,8 @@ const NAV_ITEMS = [
   { label: "Settings", href: "/settings" },
 ];
 
+const MONEY_HREFS = new Set(["/invoices", "/time"]);
+
 function NavItem({
   label,
   href,
@@ -54,22 +56,28 @@ function NavItem({
 export function Sidebar({
   workspaces,
   activeWorkspaceId,
+  canSeeMoney,
 }: {
   workspaces: SwitcherWorkspace[];
   activeWorkspaceId: string;
+  /** Step 29: viewers never see Invoices / Time (money is hidden). */
+  canSeeMoney: boolean;
 }) {
   const pathname = usePathname();
 
   // Only ONE item highlights: pick the longest matching prefix, so
   // /intake/inbox lights "Inbox" and not also its parent-prefix "Intake".
-  const activeHref = NAV_ITEMS.map((item) => item.href)
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => canSeeMoney || !MONEY_HREFS.has(item.href)
+  );
+  const activeHref = visibleItems.map((item) => item.href)
     .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
     .sort((a, b) => b.length - a.length)[0];
 
   return (
     <aside className="flex h-full flex-col border-r border-border bg-muted p-3">
       <nav className="flex flex-col gap-1">
-        {NAV_ITEMS.map((item) => (
+        {visibleItems.map((item) => (
           <NavItem
             key={item.label}
             label={item.label}

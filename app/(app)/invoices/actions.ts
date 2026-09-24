@@ -19,7 +19,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getWorkspaceContext } from "@/lib/data/workspace-context";
+import { getWorkspaceContext, requireEditor } from "@/lib/data/workspace-context";
 import { getNextInvoiceNumber } from "@/lib/data/invoices";
 import { createClient } from "@/lib/supabase/server";
 
@@ -41,6 +41,8 @@ export async function createInvoice(input: {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // Create on the ACTIVE workspace (Step 16 resolver).
   const context = await getWorkspaceContext();

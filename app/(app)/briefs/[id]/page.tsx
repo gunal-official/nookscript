@@ -24,6 +24,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getBriefById } from "@/lib/data/briefs";
 import { formatDate, getInitials, isUuid, timeAgo } from "@/lib/utils";
 import { GenerateProposalButton } from "@/components/briefs/GenerateProposalButton";
+import { CanEdit } from "@/components/app-shell/CanEdit";
 import { ResolveQuestionDialog } from "@/components/briefs/ResolveQuestionDialog";
 import { StatusBadge } from "@/components/briefs/StatusBadge";
 import { StatusSelect } from "@/components/briefs/StatusSelect";
@@ -262,14 +263,16 @@ export default async function BriefDetailPage({
                               </p>
                             )}
                           </div>
-                          <ResolveQuestionDialog
-                            briefId={brief.id}
-                            questionId={q.id}
-                            questionText={q.question_text}
-                            defaultAnsweredBy={
-                              userName ? `${userName} (you)` : ""
-                            }
-                          />
+                          <CanEdit>
+                            <ResolveQuestionDialog
+                              briefId={brief.id}
+                              questionId={q.id}
+                              questionText={q.question_text}
+                              defaultAnsweredBy={
+                                userName ? `${userName} (you)` : ""
+                              }
+                            />
+                          </CanEdit>
                         </div>
                       </li>
                     ))}
@@ -319,7 +322,9 @@ export default async function BriefDetailPage({
             </CardHeader>
             <CardContent className="space-y-3.5 p-5">
               <MetaRow label="Status">
-                <StatusSelect briefId={brief.id} status={brief.status} />
+                <CanEdit fallback={<StatusBadge status={brief.status} />}>
+                  <StatusSelect briefId={brief.id} status={brief.status} />
+                </CanEdit>
               </MetaRow>
               {brief.client_name && (
                 <MetaRow label="Client">{brief.client_name}</MetaRow>
@@ -332,7 +337,9 @@ export default async function BriefDetailPage({
                   : "Team"}
               </MetaRow>
               <div className="border-t border-border pt-4">
-                <GenerateProposalButton briefId={brief.id} />
+                <CanEdit>
+                  <GenerateProposalButton briefId={brief.id} />
+                </CanEdit>
               </div>
             </CardContent>
           </Card>
@@ -374,7 +381,9 @@ export default async function BriefDetailPage({
               {/* Step 12: thread a follow-up source onto this brief — the
                   same composer as /intake/inbox; the reply lands here AND
                   in the inbox thread for this brief. */}
-              <AddSourceForm briefId={brief.id} />
+              <CanEdit>
+                <AddSourceForm briefId={brief.id} />
+              </CanEdit>
             </CardContent>
           </Card>
 

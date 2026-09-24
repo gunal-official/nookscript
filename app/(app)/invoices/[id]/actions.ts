@@ -21,6 +21,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { requireEditor } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import type { InvoiceItem, InvoiceStatus } from "@/lib/types/invoice";
 
@@ -73,6 +74,8 @@ export async function saveInvoiceContent(input: {
   const supabase = await requireSession();
   if (!supabase)
     return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   const { error } = await supabase
     .from("invoices")
@@ -108,6 +111,8 @@ export async function setInvoiceStatus(input: {
   const supabase = await requireSession();
   if (!supabase)
     return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // Read the current row (RLS-scoped; foreign invoices look absent) so
   // the stamps are computed from real state, not assumptions.
@@ -160,6 +165,8 @@ export async function createInvoiceLink(input: {
   const supabase = await requireSession();
   if (!supabase)
     return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // The insert needs workspace_id; read it from the invoice (RLS-scoped,
   // so foreign invoices simply look absent).
@@ -199,6 +206,8 @@ export async function revokeInvoiceLink(input: {
   const supabase = await requireSession();
   if (!supabase)
     return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   const { error } = await supabase
     .from("invoice_links")
@@ -218,6 +227,8 @@ export async function regenerateInvoiceLink(input: {
   const supabase = await requireSession();
   if (!supabase)
     return { error: "Your session has expired. Please log in again." };
+  const viewerGuard = await requireEditor();
+  if (viewerGuard) return viewerGuard;
 
   // Same row, fresh unguessable token (uuid v4 — the JS-side equivalent
   // of gen_random_uuid(), since PostgREST updates can't invoke SQL

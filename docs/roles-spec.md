@@ -1,91 +1,100 @@
-# Roles beyond owner/member — SPEC DRAFT (awaiting sign-off)
+# Roles beyond owner/member — SPEC (approved with amendment, 2026-09-25)
 
-**Status:** DRAFT — no implementation starts until this is signed off
-("next" locks the RECOMMENDED package; any amendment is welcome).
-Candidate **Step 29 (db+app): viewer role**.
+**Status:** APPROVED — "viewer only, no admin" + **money surface = HIDE**.
+Implemented as **Step 29 (db+app): viewer role**. One correction to the
+draft's matrix is recorded below (templates were misstated) — flagged to
+the approver, not silently changed.
 
-## Ground truth (current model — verified in-repo)
+## Locked decisions
 
-- `workspace_members.role text not null default 'owner' check (role in
-  ('owner', 'member'))` — `20260922000000_workspace_auth_init.sql:20`.
-- **owner** (multi-owner allowed; the last owner cannot leave, be
-  removed, or demoted): workspace rename + delete, invite/create/revoke
-  (`team_invites` has **no role column "on purpose: invites can only
-  ever grant 'member'"** — `20260923070000` line 28), remove members,
-  change any OTHER member's role (incl. promoting owners), all content
-  writes.
-- **member**: full content writes (templates, briefs, proposals, plans,
-  updates, share links, invoices, time entries, contracts, template
-  positions) + leave self; no admin surface (E2E-proven "View only").
-- 55 policies across 15 migration files; write policies gate on a
-  membership `EXISTS (SELECT 1 FROM workspace_members …)` subquery,
-  owner-only policies add `wm.role = 'owner'`.
+1. **Role set:** three tiers — `owner` / `member` / `viewer`. No admin
+   tier (deferred).
+2. **Money surface — HIDE:** viewers get **zero visibility** into
+   `invoices`, `invoice_links`, and `time_entries` — enforced in RLS at
+   the SELECT policy (not just write gating). Operational content —
+   briefs, proposals, plans, updates, contracts, templates, roster —
+   stays visible read-only. Matches viewer use cases (clients /
+   stakeholders who must not see financials or tracked hours).
+3. **Invite picker:** none. Invites keep granting `member` (the recorded
+   `team_invites` "no role column on purpose" design). `viewer` is
+   assigned/revoked by an owner via the roster role control.
+4. **Naming:** value `viewer`; display "Viewer" (role menu) /
+   "View only" (badge + existing card copy).
 
-## RECOMMENDED package: add one tier — `viewer`
-
-Three roles total: **owner / member / viewer**. No rename of `member`
-(no migration churn; UI already says "View only"). Invites stay
-member-only (locked by the no-role-column design); **viewer is assigned
-and revoked by an owner via the roster role menu** (the Step-22 menu
-gains one option — and the Step-26 last-owner demotion guard already
-extends naturally).
+## Power matrix (CORRECTED — see the templates row)
 
 | Capability | owner | member | viewer |
 |---|---|---|---|
-| Read workspace, templates, briefs, proposals, plans, updates, invoices, time entries, contracts, roster | ✓ | ✓ | ✓ |
-| Create/edit/delete templates, briefs, proposals, plans, updates, invoices, time entries, contracts; reorder | ✓ | ✓ | **✗** |
-| Generate/revoke share links | ✓ | ✓ | **✗** |
-| Leave workspace (self) | ✓ (not last) | ✓ | ✓ |
+| Read briefs, proposals, plans, updates, contracts, templates, roster | ✓ | ✓ | ✓ |
+| Read invoices, invoice_links, time entries (money) | ✓ | ✓ | **✗ hidden** |
+| Create/edit/delete briefs (sources/questions/history), proposals, plans, updates, contracts | ✓ | ✓ | **✗** |
+| Create/revoke share links | ✓ | ✓ | **✗** |
+| Create/edit invoices + invoice links; log/edit/delete time | ✓ | ✓ | **✗** |
+| **Templates: create/edit/delete** | ✓ | **✗** | **✗** |
+| Templates: read | ✓ | ✓ | ✓ |
+| Leave workspace (self) | ✓ (not last owner) | ✓ | ✓ |
 | Invite / revoke invites / remove members | ✓ | ✗ | ✗ |
 | Change others' roles (incl. to viewer) | ✓ (not self) | ✗ | ✗ |
-| Rename workspace | ✓ | ✗ | ✗ |
-| Delete workspace | ✓ | ✗ | ✗ |
+| Rename / delete workspace | ✓ | ✗ | ✗ |
 
-## DB deltas (one migration, `…_viewer_role.sql`)
+> **Draft correction (flagged):** the sign-off draft said members create
+> /edit/delete templates. Ground truth: templates are **owner-managed** —
+> RLS `templates: owners can insert/update/delete`
+> (`20260923040000_templates_schema.sql`) + the action guard "Only
+> workspace owners can manage templates." Members (and now viewers) READ
+> templates (e.g. UpdateComposer's template insert). The corrected row
+> matches the product's recorded copy ("View only — owners manage
+> these."). Viewer template visibility per the approval is unchanged
+> (read ✓).
 
-1. CHECK becomes `('owner','member','viewer')` (drop + re-add).
-2. Every content table's INSERT/UPDATE/DELETE policies gain `and role in
-   ('owner','member')` in the membership subquery (same EXISTS shape;
-   SELECT policies stay membership-only so viewers read).
-3. The template-position RPC's guard rejects viewers.
-4. `accept_team_invite` unchanged (grants `member` — by design).
-5. No new tables → no GRANT growth beyond the altered policies'
-   re-grants if any.
+## DB deltas — `supabase/migrations/20260925220000_viewer_role.sql`
+
+1. `workspace_members_role_check` → `('owner','member','viewer')`.
+2. New `public.is_workspace_editor(ws_id uuid)` (SECURITY DEFINER,
+   `search_path = ''`, sibling of `is_workspace_member/owner`): membership
+   with `role in ('owner','member')`.
+3. Every **content write** policy switches to `is_workspace_editor`:
+   briefs (ins/upd/del), brief_sources (ins/del), brief_questions
+   (ins/upd/del), brief_edit_history (ins), proposals (ins/upd), plans
+   (ins/upd), updates (ins/upd), share_links (ins/upd), contracts
+   (ins/upd), invoices (ins/upd), invoice_links (ins/upd), time_entries
+   (ins/upd/del).
+4. **Money hide:** `invoices`/`invoice_links`/`time_entries` **select**
+   policies switch to `is_workspace_editor` too.
+5. Templates policies unchanged (already owner-write / member-read).
+   No RPC changes (template ordering is a plain `templates` UPDATE —
+   covered by its owner policy; the draft's "position RPC" never existed).
 
 ## App deltas
 
-- `getWorkspaceContext` already returns `role`; add `canEdit = role !==
-  'viewer'`.
-- Gate every write surface (composer save/create, share generator,
-  invoice composer, roster/danger/invite — the latter already
-  owner-only) + a `requireEditor` guard in each server action
-  (RLS stays authoritative; this is the friendly-error layer).
-- Roster role menu: add "Viewer"; keep Step-22/26 copy conventions.
+- `WorkspaceContext.role` gains `| "viewer"` plus derived
+  `canEdit` / `canSeeMoney` (`role !== "viewer"`) and a shared
+  `VIEW_ONLY_ERROR` copy.
+- Every content write action (briefs ×3, contracts ×3, intake ×3,
+  invoices ×6, plans ×3, proposals ×2, time ×3, updates ×1) short-circuits
+  with `VIEW_ONLY_ERROR` for viewers (RLS stays the final gate). Template
+  + admin actions already owner-gate (viewer blocked).
+- Sidebar hides **Invoices** + **Time** for viewers; the layout's
+  `TimeTimer` (time tracking = money) hides too; the three money pages
+  (invoices, invoice detail, time) render a "View only" wall before any
+  data fetch.
+- Roster role control (owner-only) becomes 3-way with the Step-22
+  two-click confirm; viewer badge shows "View only". The Step-26
+  last-owner demotion guard covers demotes **to any non-owner role**.
+- Write chrome (composers, generate/share buttons, status selects →
+  read badges) hides for viewers on operational pages.
 
-## Verification plan (standard trio)
+## Verification (standard trio)
 
-- `verify:db` +~10: CHECK accepts viewer/rejects 'admin'; viewer reads
-  ✓; viewer INSERT/UPDATE/DELETE templates + share_pages + invoices →
-  denied (0 rows or 42501 per verb); viewer cannot reorder; owner sets
-  viewer role ✓; viewer leaves ✓; Step-21/22/26/27 probes regression.
-- E2E persona C (viewer): content visible, zero composer/save/share
-  surface, "View only"; A's menu shows the viewer option; A/B regression.
-- `verify:live:policies` +2 (owner CAN set 'viewer'; viewer template
-  write denied) → 17 checks.
-
-## Decision points (each has a recommended default)
-
-1. **Role set** — RECOMMENDED: viewer only (3 tiers). Alternative: add
-   `admin` (membership admin without delete-workspace) → 4 tiers, a real
-   role-change/delete matrix; defer.
-2. **Viewer money surface** — RECOMMENDED: invoices/time entries visible
-   read-only ("read everything, write nothing"). Alternative: hide
-   invoices + time entries + contracts from viewers (money-sensitive
-   studio data).
-3. **Invite role picker** — RECOMMENDED: none (viewer = roster
-   assignment only; invites keep granting member — the recorded
-   "no role column on purpose" design). Alternative: add a role select
-   to the invite flow + a role column on `team_invites` (reverses that
-   recorded decision).
-4. **Naming** — RECOMMENDED: value `viewer`, display "Viewer" (menu) /
-   "View only" (badge, existing copy).
+- `verify:db` +12 probes: CHECK accepts `viewer` / rejects `admin`;
+  viewer reads operational content ✓ (briefs, proposals, contracts,
+  templates); viewer content writes denied (insert → 42501, update /
+  delete → 0 rows); **viewer money SELECTs return 0 rows (invoices +
+  time entries)**; member writes + member/owner money reads regression.
+- E2E (scratch, stub-PostgREST): persona C viewer — sidebar money links
+  absent, `/invoices` + `/time` walls, roster badge "View only", zero
+  composer/share surface on an update page, leave visible; A's roster
+  role control offers "Viewer"; A/B regression.
+- `verify:live:policies` → **18 checks** (+owner CAN set `viewer`,
+  +viewer template write denied, +viewer money SELECT hidden). Contract
+  re-proof: baseline + drift negatives.
