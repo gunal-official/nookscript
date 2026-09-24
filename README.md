@@ -698,6 +698,38 @@ not recorded).
   `/invite/<token>` URL 31× — the 31st should 429, and the key should
   show up in the Upstash console.
 
+## Verify Step 25 (stale-pointer cleanup — Step 16/21 follow-up)
+
+No DB changes. `profiles.active_workspace_id` (the Step-16 active
+workspace pointer) can go stale exactly one way: the owner removes the
+user (Step 21) from the workspace the pointer names. Reads were never
+broken — the resolver self-heals to the first-joined membership — but
+the row stayed wrong. Now it can't linger:
+
+1. **At the source** — removing a member also clears their pointer when
+   it names that workspace (0 rows touched otherwise — a healthy
+   pointer elsewhere is never disturbed).
+2. **At the read** — when the resolver heals a stale pointer (SET-BUT-
+   WRONG only), it persists the healed id, so the stored row converges
+   on the user's next visit. NULL is the documented "unset" state (pre-
+   switcher accounts) and is deliberately left NULL.
+
+Both writes are best-effort (lib/active-pointer) — the removal still
+succeeds and the render still resolves if they fail.
+
+**Proof:**
+- `npm run verify:db` — 128 checks / 16 migrations, unchanged (no DB
+  layer).
+- Sandbox functional run (4 checks, lib level vs a local PostgREST
+  stub): persist writes the healed id with the row pinned; clear-if-
+  pointing-at nulls on a hit and touches nothing on a miss; a dead
+  store never throws.
+- End-to-end through `next dev` (9 checks, four render phases against a
+  stateful stub): healthy pointer → render + ZERO hygiene writes
+  (incl. the standard /settings regression); stale pointer → renders
+  via the fallback AND the write-back converges the row; second render
+  → ZERO writes (idempotent); NULL pointer → left alone + ZERO writes.
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

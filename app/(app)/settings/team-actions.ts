@@ -17,6 +17,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
+import { clearActiveWorkspaceIfPointingAt } from "@/lib/active-pointer";
 import { sendInviteEmail } from "@/lib/invite-email";
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
@@ -324,6 +325,16 @@ export async function removeMemberAction(input: {
     .eq("user_id", input.userId);
 
   if (error) return { error: error.message };
+
+  // Stale-pointer cleanup (Step 25): the removed person's
+  // active_workspace_id may name THIS workspace — clear it now so the
+  // row matches reality immediately (the resolver would self-heal their
+  // next visit regardless). Best-effort; never blocks the removal.
+  await clearActiveWorkspaceIfPointingAt(
+    supabase,
+    input.userId,
+    membership.workspace_id
+  );
 
   revalidatePath("/settings");
   return { error: undefined };

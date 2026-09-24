@@ -1,5 +1,6 @@
 import "server-only";
 
+import { persistActiveWorkspacePointer } from "@/lib/active-pointer";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -16,6 +17,11 @@ import { createClient } from "@/lib/supabase/server";
  * RLS stays the security gate (membership-scoped). The active id exists
  * so list reads can pin an explicit .eq("workspace_id", …) filter and a
  * multi-workspace user never sees two workspaces' rows merged.
+ *
+ * Stale-pointer cleanup (Step 25): a set-but-wrong pointer is healed
+ * here AND persisted (lib/active-pointer), so the stored row converges
+ * on the user's next visit. NULL pointers are the documented "unset"
+ * state and are deliberately left NULL.
  */
 
 export interface WorkspaceSummary {
@@ -80,6 +86,13 @@ export async function getWorkspaceContext(): Promise<WorkspaceContext | null> {
     memberships.find((m) => m.workspace_id === pointer) ?? memberships[0];
   const activeSummary = toSummary(active);
   if (!activeSummary) return null;
+
+  // Stale-pointer cleanup (Step 25): pointer set but pointing OUTSIDE
+  // the membership list → persist the healed id so the row converges.
+  // Best-effort (the helper never throws); NULL stays NULL by design.
+  if (pointer && active.workspace_id !== pointer) {
+    await persistActiveWorkspacePointer(supabase, user.id, active.workspace_id);
+  }
 
   return {
     id: active.workspace_id,
