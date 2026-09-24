@@ -202,7 +202,7 @@ export async function changeMemberRoleAction(input: {
   if (user.id === input.userId) {
     return {
       error:
-        "You can’t change your own role — leaving a workspace is a different action (not available yet).",
+        "You can’t change your own role — use Leave on your own row instead.",
     };
   }
 
@@ -284,7 +284,7 @@ export async function removeMemberAction(input: {
   if (user.id === input.userId) {
     return {
       error:
-        "You can’t remove yourself — leaving a workspace is a different action (not available yet).",
+        "You can’t remove yourself — use Leave on your own row instead.",
     };
   }
 
@@ -337,5 +337,54 @@ export async function removeMemberAction(input: {
   );
 
   revalidatePath("/settings");
+  return { error: undefined };
+}
+
+/** Leave the ACTIVE workspace (Step 26 — the self-removal half of the
+ *  Step-21 feature). Anyone may leave except the workspace's last owner
+ *  (the same invariant as removal/demotion: a workspace keeps one
+ *  owner). The DB enforces all of it again (self-delete policy +
+ *  BEFORE DELETE last-owner guard + the pointer-hygiene trigger), so
+ *  this action's guards are defense in depth. */
+export async function leaveWorkspaceAction(): Promise<TeamActionResult> {
+  const { supabase, user, membership } = await getMembership();
+  if (!user || !membership) {
+    return { error: "Your session has expired. Please log in again." };
+  }
+
+  // Last-owner guard mirrors the DB trigger (Step 22 precedent).
+  if (membership.role === "owner") {
+    const { count, error: countError } = await supabase
+      .from("workspace_members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("workspace_id", membership.workspace_id)
+      .eq("role", "owner");
+    if (countError) return { error: countError.message };
+    if ((count ?? 0) <= 1) {
+      return {
+        error:
+          "You can’t leave — you’re the workspace’s last owner. Promote someone else first.",
+      };
+    }
+  }
+
+  const { error } = await supabase
+    .from("workspace_members")
+    .delete()
+    .eq("workspace_id", membership.workspace_id)
+    .eq("user_id", user.id);
+
+  if (error) return { error: error.message };
+
+  // Best-effort pointer hygiene (the DB trigger is authoritative).
+  await clearActiveWorkspaceIfPointingAt(
+    supabase,
+    user.id,
+    membership.workspace_id
+  );
+
+  // The whole shell changes (switcher, every page's scoping) — and with
+  // no membership left the (app) layout redirects to /onboarding.
+  revalidatePath("/", "layout");
   return { error: undefined };
 }

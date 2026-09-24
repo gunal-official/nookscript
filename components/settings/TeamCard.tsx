@@ -3,7 +3,8 @@
 /**
  * Team card on /settings (Step 15): the workspace roster, plus — for
  * owners only — invite management, role management (Step 22), and
- * removal (Step 21). Invite delivery (Step 23, revised — plain SMTP):
+ * removal (Step 21), and — for everyone on their own row — Leave
+ * (Step 26). Invite delivery (Step 23, revised — plain SMTP):
  * when the SMTP_* env vars are set the invite link is emailed to the
  * invitee through the owner's own mail account, and copy-link stays as
  * the fallback (no config = silent skip; failed send = warning + the
@@ -25,6 +26,7 @@ import {
   Copy,
   Crown,
   Loader2,
+  LogOut,
   Trash2,
   UserMinus,
   UserPlus,
@@ -33,6 +35,7 @@ import {
 import {
   changeMemberRoleAction,
   createTeamInviteAction,
+  leaveWorkspaceAction,
   removeMemberAction,
   revokeTeamInviteAction,
 } from "@/app/(app)/settings/team-actions";
@@ -54,6 +57,7 @@ function MemberRow({
   member,
   removable,
   roleChange,
+  leavable,
 }: {
   member: TeamMember;
   /** True when the viewer (an owner) may remove this member: not their
@@ -63,6 +67,9 @@ function MemberRow({
    *  their own row, and never the last owner (they can't be demoted).
    *  null = no role control. */
   roleChange: "owner" | "member" | null;
+  /** True when this is the VIEWER'S OWN row and they may leave (anyone
+   *  but the workspace's last owner — Step 26). */
+  leavable: boolean;
 }) {
   const initials =
     member.avatar_initials || getInitials(member.full_name ?? "?");
@@ -72,6 +79,9 @@ function MemberRow({
   const [confirmingRole, setConfirmingRole] = useState(false);
   const [rolePending, setRolePending] = useState(false);
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
+  const [leavePending, setLeavePending] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
 
   async function handleRemove() {
     setPending(true);
@@ -99,6 +109,19 @@ function MemberRow({
       setConfirmingRole(false);
     }
     // On success the badge updates via revalidated server props.
+  }
+
+  async function handleLeave() {
+    setLeavePending(true);
+    setLeaveError(null);
+    const result = await leaveWorkspaceAction();
+    setLeavePending(false);
+    if (result?.error) {
+      setLeaveError(result.error);
+      setConfirmingLeave(false);
+    }
+    // On success the shell revalidates into the next workspace (or
+    // /onboarding when none remain) — this card unmounts with it.
   }
 
   const isPromotion = roleChange === "owner";
@@ -216,9 +239,50 @@ function MemberRow({
             </Button>
           </div>
         )}
+
+        {leavable && !confirmingLeave && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => setConfirmingLeave(true)}
+            aria-label="Leave workspace"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </Button>
+        )}
+
+        {leavable && confirmingLeave && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Leave?</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmingLeave(false)}
+              disabled={leavePending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleLeave}
+              disabled={leavePending}
+            >
+              {leavePending && (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              )}
+              Leave workspace
+            </Button>
+          </div>
+        )}
       </div>
       {error && <p className="mt-1 text-xs text-error">{error}</p>}
       {roleError && <p className="mt-1 text-xs text-error">{roleError}</p>}
+      {leaveError && <p className="mt-1 text-xs text-error">{leaveError}</p>}
     </li>
   );
 }
@@ -345,8 +409,8 @@ export function TeamCard({
   members: TeamMember[];
   pendingInvites: PendingInvite[];
   isOwner: boolean;
-  /** The signed-in user's id — their own row never gets a remove
-   *  control (self-removal is "leaving", a different, unbuilt action). */
+  /** The signed-in user's id — their own row gets Leave (Step 26)
+   *  instead of a remove control. */
   currentUserId: string | null;
 }) {
   const [origin, setOrigin] = useState<string | null>(null);
@@ -377,6 +441,11 @@ export function TeamCard({
     if (member.role === "member") return "owner";
     return ownerCount > 1 ? "member" : null;
   };
+
+  // Leaving (Step 26): the viewer's own row, anyone but the last owner.
+  const isLeavable = (member: TeamMember) =>
+    member.user_id === currentUserId &&
+    !(member.role === "owner" && ownerCount === 1);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -418,6 +487,7 @@ export function TeamCard({
               member={member}
               removable={isRemovable(member)}
               roleChange={roleChangeFor(member)}
+              leavable={isLeavable(member)}
             />
           ))}
         </ul>

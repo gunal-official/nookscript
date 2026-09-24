@@ -730,6 +730,40 @@ succeeds and the render still resolves if they fail.
   via the fallback AND the write-back converges the row; second render
   → ZERO writes (idempotent); NULL pointer → left alone + ZERO writes.
 
+## Verify Step 26 (leave-workspace — Step 21 follow-up)
+
+Migration 17 (`workspace_members_leave.sql`). Anyone can take
+themselves OUT of a workspace — the self-removal half of the Step-21
+feature, the action the old copy called "not available yet":
+
+1. **Self-delete policy** — the owner-only DELETE policy gains a self
+   clause: delete your OWN membership row, never anyone else's.
+2. **Last-owner guard (DB)** — a BEFORE DELETE trigger refuses to
+   delete a workspace's only owner (both paths: leaving AND owner
+   removal — until now this guard lived only in the Step-21 action).
+3. **Pointer hygiene (DB-grade Step 25)** — an AFTER DELETE trigger
+   clears the departed user's `active_workspace_id` when it names the
+   workspace they left (SECURITY DEFINER — the remover is often someone
+   else, who can't update the victim's profile row).
+
+UI: your own row gets a Leave control (two-click confirm) — hidden for
+the last owner; the shell lands on your next workspace, or `/onboarding`
+when none remain. The action enforces the same guards (defense in
+depth).
+
+**Proof:**
+- `npm run verify:db` — **133 checks / 17 migrations** (the five new:
+  last-owner leave ✗, non-last-owner leave ✓, member leave ✓, matching
+  pointer cleared, mismatched pointer preserved). The pre-existing
+  removal/role/pointer checks all still pass unchanged.
+- Rendered /settings regression through `next dev` + stub in three
+  shapes: sole owner (no Leave on their row + all Step-21/22/23/25
+  surfaces intact), plain member (Leave on their own row, zero
+  management controls, "View only"), two owners (Leave visible + demote
+  control on the other owner).
+- Live: promote a second owner, leave as either, and watch the shell
+  switch (or onboarding when it was your only workspace).
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

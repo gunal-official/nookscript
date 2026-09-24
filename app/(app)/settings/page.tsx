@@ -32,6 +32,12 @@
  *      Password); without SMTP config the flow is copy-link only with
  *      no warning; a failed send still creates the invite and shows a
  *      warning beside the copy link.
+ *   6. Leave (Step 26): your own row gets a Leave control (two-click
+ *      confirm) — unless you're the workspace's last owner, where it's
+ *      hidden and the action + DB trigger both refuse anyway. After
+ *      leaving, the shell lands on your next workspace (or /onboarding
+ *      when none remain). DB-level proof: npm run verify:db (member
+ *      self-delete ✓, last-owner delete ✗, pointer cleared on leave).
  */
 
 import { TeamCard } from "@/components/settings/TeamCard";

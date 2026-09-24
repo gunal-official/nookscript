@@ -1807,5 +1807,108 @@ check(
 );
 await db.query("reset role");
 
+// ── workspace_members leave + pointer hygiene (Step 26) ──
+// The self-removal half of the Step-21 feature: the DELETE policy gains
+// a self clause, a BEFORE DELETE trigger keeps the last owner, and an
+// AFTER DELETE trigger clears the departed user's active pointer. Runs
+// LAST (after the removal probe) — the probes here delete and re-seat
+// Leo's row.
+// 1 — Maya is the sole owner again (Step-22 probes netted out Leo's
+// promote; the removal probe deleted Tess) — her own delete must die on
+// the trigger (RLS USING passes via the self clause).
+await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+await db.query("set role nstester");
+let lastOwnerLeaveBlocked = true;
+try {
+  const { rowCount } = await db.query(
+    "delete from public.workspace_members where workspace_id = $1 and user_id = $2",
+    [SEED_WS, SEED_UID]
+  );
+  lastOwnerLeaveBlocked = rowCount === 0;
+} catch (e) {
+  lastOwnerLeaveBlocked = true;
+}
+check(
+  "RLS: the last owner CANNOT leave (delete their own row)",
+  lastOwnerLeaveBlocked
+);
+
+// setup: promote Leo so two owners exist (the Step-22 promote path)
+await db.query(
+  "update public.workspace_members set role = 'owner' where workspace_id = $1 and user_id = $2",
+  [SEED_WS, MEMBER_UID]
+);
+await db.query("reset role");
+// Leo's pointer will name ANOTHER workspace (mismatch shape)
+await db.query(
+  "update public.profiles set active_workspace_id = '00000000-0000-0000-0000-000000000064' where id = $1",
+  [MEMBER_UID]
+);
+
+// 2 — a non-last owner CAN leave (self-delete policy)
+await db.query("select set_config('app.jwt_sub', $1, false)", [MEMBER_UID]);
+await db.query("set role nstester");
+let ownerLeavePossible = false;
+try {
+  const { rowCount } = await db.query(
+    "delete from public.workspace_members where workspace_id = $1 and user_id = $2",
+    [SEED_WS, MEMBER_UID]
+  );
+  ownerLeavePossible = rowCount === 1;
+} catch (e) {
+  ownerLeavePossible = false;
+}
+check("RLS: a non-last owner CAN leave (self-delete)", ownerLeavePossible);
+
+// 3 — the mismatched pointer is NOT touched
+await db.query("reset role");
+const { rows: ptrAfterLeave } = await db.query(
+  "select active_workspace_id from public.profiles where id = $1",
+  [MEMBER_UID]
+);
+check(
+  "leaving PRESERVES a pointer that names another workspace",
+  ptrAfterLeave[0]?.active_workspace_id ===
+    "00000000-0000-0000-0000-000000000064",
+  JSON.stringify(ptrAfterLeave[0] ?? null)
+);
+
+// re-seat Leo as a plain member with a MATCHING pointer
+await db.query(
+  "insert into public.workspace_members (workspace_id, user_id, role) values ($1, $2, 'member')",
+  [SEED_WS, MEMBER_UID]
+);
+await db.query(
+  "update public.profiles set active_workspace_id = $2 where id = $1",
+  [MEMBER_UID, SEED_WS]
+);
+
+// 4 — a plain member CAN leave (self-delete policy)
+await db.query("select set_config('app.jwt_sub', $1, false)", [MEMBER_UID]);
+await db.query("set role nstester");
+let memberLeavePossible = false;
+try {
+  const { rowCount } = await db.query(
+    "delete from public.workspace_members where workspace_id = $1 and user_id = $2",
+    [SEED_WS, MEMBER_UID]
+  );
+  memberLeavePossible = rowCount === 1;
+} catch (e) {
+  memberLeavePossible = false;
+}
+check("RLS: a plain member CAN leave (self-delete policy)", memberLeavePossible);
+
+// 5 — the matching pointer is cleared (DB-grade Step 25 hygiene)
+await db.query("reset role");
+const { rows: ptrCleared } = await db.query(
+  "select active_workspace_id from public.profiles where id = $1",
+  [MEMBER_UID]
+);
+check(
+  "leaving CLEARS a matching active pointer (DB-grade hygiene)",
+  ptrCleared[0]?.active_workspace_id === null,
+  JSON.stringify(ptrCleared[0] ?? null)
+);
+
 console.log(failures === 0 ? "\nAll database checks passed ✔" : `\n${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
