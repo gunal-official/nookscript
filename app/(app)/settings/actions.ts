@@ -14,9 +14,12 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
+import { createCheckoutSession } from "@/lib/stripe";
 
 export type ActionResult = { error?: string } | undefined;
 
@@ -165,4 +168,51 @@ export async function deleteTemplate(input: {
 
   revalidatePath("/settings");
   return { error: undefined };
+}
+
+/**
+ * Start a hosted Stripe Checkout session for the Free → Pro upgrade
+ * (Phase: events/webhooks foundation). Owner-only; TEST-mode keys only
+ * (STRIPE_SECRET_KEY = sk_test_…, STRIPE_PRICE_ID = a test price). On
+ * success this NEVER returns — the browser lands on Stripe's hosted page;
+ * state changes arrive via /api/stripe/webhook, not from this action.
+ */
+export async function startCheckout(): Promise<ActionResult> {
+  const { supabase, membership } = await getMembership();
+  if (!membership) {
+    return { error: "Your session has expired. Please log in again." };
+  }
+  if (membership.role !== "owner") {
+    return { error: "Only workspace owners can manage billing." };
+  }
+
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const priceId = process.env.STRIPE_PRICE_ID;
+  if (!secretKey || !priceId) {
+    return {
+      error:
+        "Billing is not configured yet — set STRIPE_SECRET_KEY and STRIPE_PRICE_ID (test mode).",
+    };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", (await supabase.auth.getUser()).data.user?.id ?? "")
+    .maybeSingle();
+
+  const h = await headers();
+  const host = h.get("origin") ?? (h.get("x-forwarded-host") ? `https://${h.get("x-forwarded-host")}` : "http://localhost:3000");
+
+  const session = await createCheckoutSession({
+    secretKey,
+    workspaceId: membership.workspace_id,
+    priceId,
+    successUrl: `${host}/settings?checkout=success`,
+    cancelUrl: `${host}/settings?checkout=canceled`,
+    customerEmail: profile?.email ?? null,
+  });
+  if (!session.ok) return { error: session.error };
+
+  redirect(session.url);
 }

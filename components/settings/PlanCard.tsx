@@ -1,15 +1,17 @@
 /**
- * Plan & billing (Step 34(b)) — the subscription surface, honest per the
- * pricing doctrine (app/(marketing)/pricing/page.tsx): there is NO billing
- * system, so no prices are shown and no checkout is implied. Free = the
- * full product today; Pro = early-access roadmap with the same mailto CTA
- * the pricing page uses. Upgrade = request access; downgrade = nothing to
- * cancel on Free — plan changes are by request until billing lands.
+ * Plan & billing (Step 34(b), billing live in the events/webhooks
+ * foundation phase) — the subscription surface reflects REAL state from
+ * billing_subscriptions (row absent = Free, 'active' = Pro; the Stripe
+ * webhooks own those transitions). Upgrade = hosted Stripe Checkout
+ * (test-mode keys) when configured; when billing env is absent the early
+ * access mailto remains as the honest fallback. No prices are shown or
+ * implied (pricing doctrine) — the price lives in your Stripe account.
  */
 
 import Link from "next/link";
 import { ArrowRight, Check, CreditCard, Sparkles } from "lucide-react";
 
+import { PlanCheckoutButton } from "@/components/settings/PlanCheckoutButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,10 +42,15 @@ const PRO_MAILTO =
 export function PlanCard({
   memberCount,
   templateCount,
+  plan,
+  billingConfigured,
 }: {
   memberCount: number;
   templateCount: number;
+  plan: "free" | "pro";
+  billingConfigured: boolean;
 }) {
+  const isPro = plan === "pro";
   return (
     <Card className="animate-rise-in" data-proof="plan">
       <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
@@ -54,17 +61,26 @@ export function PlanCard({
           <CardTitle className="text-base">Plan</CardTitle>
         </div>
         <CardDescription>
-          Subscription and billing — free during early access. No prices and
-          no checkout exist yet, and none are implied.
+          Subscription and billing for NookScript itself — real plan state,
+          checkout via Stripe when configured. No prices are shown or
+          implied.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5 p-5">
         {/* Current plan + usage */}
         <div className="flex flex-wrap items-center gap-3">
-          <p className="font-display text-2xl font-bold tracking-tight">Free</p>
-          <Badge className="border-accent bg-accent-soft text-accent">
-            Early access
-          </Badge>
+          <p className="font-display text-2xl font-bold tracking-tight">
+            {isPro ? "Pro" : "Free"}
+          </p>
+          {isPro ? (
+            <Badge className="border-accent bg-accent-soft text-accent">
+              Active
+            </Badge>
+          ) : (
+            <Badge className="border-accent bg-accent-soft text-accent">
+              Early access
+            </Badge>
+          )}
           <p className="w-full text-sm text-muted-foreground sm:w-auto">
             {memberCount} member{memberCount === 1 ? "" : "s"} ·{" "}
             {templateCount} template{templateCount === 1 ? "" : "s"} · 1
@@ -98,11 +114,20 @@ export function PlanCard({
             ))}
           </ul>
           <div className="flex flex-wrap items-center gap-3 pt-1">
-            <Button asChild variant="outline">
-              <a href={PRO_MAILTO} className="inline-flex min-h-11 min-w-11 items-center">
-                Request access
-              </a>
-            </Button>
+            {isPro ? (
+              <p className="text-sm text-muted-foreground">
+                Your workspace is on Pro — billing is managed through your
+                Stripe receipt.
+              </p>
+            ) : billingConfigured ? (
+              <PlanCheckoutButton />
+            ) : (
+              <Button asChild variant="outline">
+                <a href={PRO_MAILTO} className="inline-flex min-h-11 min-w-11 items-center">
+                  Request access
+                </a>
+              </Button>
+            )}
             <Link
               href="/pricing"
               className="inline-flex min-h-11 min-w-11 items-center gap-1.5 text-sm text-accent underline-offset-2 hover:underline"
@@ -112,8 +137,11 @@ export function PlanCard({
             </Link>
           </div>
           <p className="text-xs text-muted-foreground">
-            Changing plans is by request until billing lands — early users
-            keep Free exactly as it is today. Nothing to cancel, ever.
+            {isPro
+              ? "Cancel anytime from the Stripe billing portal link in your receipt — the plan flips back to Free when the subscription ends."
+              : billingConfigured
+                ? "Upgrade opens Stripe Checkout (test mode). The plan updates here once Stripe confirms payment."
+                : "Changing plans is by request until billing is configured — early users keep Free exactly as it is today. Nothing to cancel, ever."}
           </p>
         </div>
       </CardContent>

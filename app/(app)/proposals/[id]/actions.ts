@@ -11,6 +11,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { recordEvent } from "@/lib/events";
 import { redirect } from "next/navigation";
 
 import { getProposalById } from "@/lib/data/proposals";
@@ -44,6 +45,19 @@ export async function updateProposalStatus(input: {
   const viewerGuard = await requireEditor();
   if (viewerGuard) return viewerGuard;
 
+  // Read the current row (RLS-scoped; foreign proposals look absent) so
+  // events record real transitions, not re-assertions (invoice precedent).
+  const { data: proposal, error: fetchError } = await supabase
+    .from("proposals")
+    .select("status, workspace_id, title")
+    .eq("id", input.proposalId)
+    .maybeSingle();
+
+  if (fetchError) return { error: fetchError.message };
+  if (!proposal) return { error: "Proposal not found." };
+
+  const previous = proposal.status as ProposalStatus;
+
   // Plain UPDATE; RLS scopes it to the user's workspaces.
   const { error } = await supabase
     .from("proposals")
@@ -51,6 +65,18 @@ export async function updateProposalStatus(input: {
     .eq("id", input.proposalId);
 
   if (error) return { error: error.message };
+
+  if (
+    previous !== input.status &&
+    (input.status === "accepted" || input.status === "declined")
+  ) {
+    await recordEvent(supabase, {
+      workspace_id: proposal.workspace_id,
+      event_type:
+        input.status === "accepted" ? "proposal.accepted" : "proposal.declined",
+      payload: { proposal_id: input.proposalId, title: proposal.title },
+    });
+  }
 
   revalidatePath("/proposals");
   revalidatePath(`/proposals/${input.proposalId}`);

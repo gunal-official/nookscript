@@ -22,6 +22,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireEditor } from "@/lib/data/workspace-context";
+import { recordEvent } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
 import type { InvoiceItem, InvoiceStatus } from "@/lib/types/invoice";
 
@@ -118,7 +119,7 @@ export async function setInvoiceStatus(input: {
   // the stamps are computed from real state, not assumptions.
   const { data: invoice, error: fetchError } = await supabase
     .from("invoices")
-    .select("status, sent_at, paid_at")
+    .select("status, sent_at, paid_at, workspace_id, invoice_number, total_cents")
     .eq("id", input.invoiceId)
     .maybeSingle();
 
@@ -149,6 +150,18 @@ export async function setInvoiceStatus(input: {
     .eq("id", input.invoiceId);
 
   if (error) return { error: error.message };
+
+  if (input.status === "paid" && invoice.status !== "paid") {
+    await recordEvent(supabase, {
+      workspace_id: invoice.workspace_id,
+      event_type: "invoice.paid",
+      payload: {
+        invoice_id: input.invoiceId,
+        invoice_number: invoice.invoice_number,
+        total_cents: invoice.total_cents,
+      },
+    });
+  }
 
   revalidatePath(`/invoices/${input.invoiceId}`);
   revalidatePath("/invoices");

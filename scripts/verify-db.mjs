@@ -577,8 +577,11 @@ await db.exec(`
     public.briefs, public.brief_sources, public.brief_questions, public.brief_edit_history,
     public.proposals, public.plans, public.updates, public.share_links, public.templates,
     public.team_invites, public.invoices, public.invoice_links,
-    public.time_entries, public.contracts
+    public.time_entries, public.contracts, public.events,
+    public.webhook_endpoints, public.webhook_deliveries,
+    public.billing_subscriptions
     to nstester;
+  grant execute on function public.get_workspace_webhook_endpoints(uuid) to nstester;
 `);
 // fixtures the seed user does NOT belong to, plus one own-workspace REVOKED
 // share link (fixture for the RPC's revoked-filter check)
@@ -2120,6 +2123,158 @@ check(
   JSON.stringify(ownerSeesMoney[0] ?? null)
 );
 await db.query("reset role");
+
+// ── events (Phase: events/webhooks foundation) ──
+{
+  await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+  await db.query("set role nstester");
+  const ins = await db
+    .query(
+      "insert into public.events (workspace_id, event_type, payload) values ($1, 'brief.created', $2::jsonb) returning id",
+      [SEED_WS, JSON.stringify({ brief_id: SEED_BRIEF, title: "t" })]
+    )
+    .catch((e) => ({ rows: [], err: String(e) }));
+  check("events: member can insert an event row", ins.rows?.length === 1);
+  const sel = await db.query(
+    "select event_type, payload from public.events where workspace_id = $1",
+    [SEED_WS]
+  );
+  check(
+    "events: member can read workspace events",
+    sel.rows.length === 1 && sel.rows[0].event_type === "brief.created"
+  );
+  const foreignIns = await db
+    .query(
+      "insert into public.events (workspace_id, event_type) values ($1, 'invoice.paid')",
+      [FOREIGN_WS]
+    )
+    .then(() => ({ ok: true }))
+    .catch(() => ({ ok: false }));
+  check("RLS: cannot insert event into foreign workspace", foreignIns.ok === false);
+  const foreignSel = await db.query(
+    "select count(*)::int as n from public.events where workspace_id = $1",
+    [FOREIGN_WS]
+  );
+  check("RLS: foreign events are invisible", foreignSel.rows[0]?.n === 0);
+  const badType = await db
+    .query(
+      "insert into public.events (workspace_id, event_type) values ($1, 'invoice.deleted')",
+      [SEED_WS]
+    )
+    .then(() => ({ ok: true }))
+    .catch(() => ({ ok: false }));
+  check("events.event_type CHECK rejects unknown types", badType.ok === false);
+  const { rows: evMut } = await db.query(
+    "select count(*)::int as n from pg_policies where tablename = 'events' and cmd in ('UPDATE', 'DELETE')"
+  );
+  check("events has zero UPDATE/DELETE policies (append-only)", evMut[0]?.n === 0);
+  await db.query("reset role");
+}
+
+// ── webhooks (Phase: events/webhooks foundation) ──
+{
+  await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+  await db.query("set role nstester");
+  const epIns = await db
+    .query(
+      "insert into public.webhook_endpoints (workspace_id, url, signing_secret) values ($1, 'https://example.com/h', 'whsec_x') returning id",
+      [SEED_WS]
+    )
+    .catch((e) => ({ rows: [], err: String(e) }));
+  check("webhooks: owner can register an endpoint", epIns.rows?.length === 1);
+  const foreignEp = await db
+    .query(
+      "insert into public.webhook_endpoints (workspace_id, url, signing_secret) values ($1, 'https://example.com/h2', 'whsec_y')",
+      [FOREIGN_WS]
+    )
+    .then(() => ({ ok: true }))
+    .catch(() => ({ ok: false }));
+  check("RLS: cannot register an endpoint in a foreign workspace", foreignEp.ok === false);
+  const rpcOwn = await db.query(
+    "select url, signing_secret from public.get_workspace_webhook_endpoints($1)",
+    [SEED_WS]
+  );
+  check(
+    "webhooks: dispatch RPC returns own endpoints (with secrets)",
+    rpcOwn.rows.length === 1 && rpcOwn.rows[0].signing_secret === "whsec_x"
+  );
+  await db.query("select set_config('app.jwt_sub', $1, false)", [
+    "00000000-0000-0000-0000-0000000000aa",
+  ]);
+  const rpcStranger = await db.query(
+    "select * from public.get_workspace_webhook_endpoints($1)",
+    [SEED_WS]
+  );
+  check(
+    "webhooks: dispatch RPC leaks nothing to non-members",
+    rpcStranger.rows.length === 0
+  );
+  await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+  const delIns = await db
+    .query(
+      "insert into public.webhook_deliveries (workspace_id, endpoint_id, event_id) select $1, e.id, ev.id from public.webhook_endpoints e, public.events ev where e.workspace_id = $1 and ev.workspace_id = $1 limit 1 returning id",
+      [SEED_WS]
+    )
+    .catch((e) => ({ rows: [], err: String(e) }));
+  check("webhooks: dispatch can record a delivery row", delIns.rows?.length === 1);
+  const updRes = await db
+    .query(
+      "update public.webhook_deliveries set status = 'delivered', attempts = 1 where workspace_id = $1",
+      [SEED_WS]
+    )
+    .catch((e) => ({ rows: [], err: String(e) }));
+  check("webhooks: dispatch can settle a delivery row", updRes.rows?.length !== undefined);
+  const { rows: epMut } = await db.query(
+    "select count(*)::int as n from pg_policies where tablename = 'webhook_endpoints' and cmd = 'UPDATE'"
+  );
+  check("webhook_endpoints has zero UPDATE policies (rotate = re-register)", epMut[0]?.n === 0);
+  const { rows: dlDel } = await db.query(
+    "select count(*)::int as n from pg_policies where tablename = 'webhook_deliveries' and cmd = 'DELETE'"
+  );
+  check("webhook_deliveries has zero DELETE policies (audit trail)", dlDel[0]?.n === 0);
+  await db.query("reset role");
+}
+
+// ── billing (Phase: events/webhooks foundation) ──
+{
+  await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+  await db.query("set role nstester");
+  const freeRow = await db.query(
+    "select count(*)::int as n from public.billing_subscriptions where workspace_id = $1",
+    [SEED_WS]
+  );
+  check("billing: absent row reads as Free (0 rows)", freeRow.rows[0]?.n === 0);
+  const userWrite = await db
+    .query(
+      "insert into public.billing_subscriptions (workspace_id, status) values ($1, 'active')",
+      [SEED_WS]
+    )
+    .then(() => ({ ok: true }))
+    .catch(() => ({ ok: false }));
+  check("RLS: users cannot write billing state (service role only)", userWrite.ok === false);
+  await db.query("reset role");
+  // service-role stand-in (superuser — the Stripe webhook route's client)
+  await db.query(
+    "insert into public.billing_subscriptions (workspace_id, stripe_customer_id, stripe_subscription_id, status) values ($1, 'cus_test', 'sub_test', 'active')",
+    [SEED_WS]
+  );
+  const badStatus = await db
+    .query(
+      "update public.billing_subscriptions set status = 'invented' where workspace_id = $1",
+      [SEED_WS]
+    )
+    .then(() => ({ ok: true }))
+    .catch(() => ({ ok: false }));
+  check("billing.status CHECK rejects invented values", badStatus.ok === false);
+  await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+  await db.query("set role nstester");
+  const proRow = await db.query(
+    "select status from public.billing_subscriptions where workspace_id = $1",
+    [SEED_WS]
+  );
+  check("billing: owner sees the active subscription (Pro)", proRow.rows[0]?.status === "active");
+  await db.query("reset role");
+}
 
 console.log(failures === 0 ? "\nAll database checks passed ✔" : `\n${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

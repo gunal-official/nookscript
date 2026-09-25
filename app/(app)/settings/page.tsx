@@ -46,6 +46,7 @@
  */
 
 import { PlanCard } from "@/components/settings/PlanCard";
+import { WebhooksCard } from "@/components/settings/WebhooksCard";
 import { TeamCard } from "@/components/settings/TeamCard";
 import { TemplatesList } from "@/components/settings/TemplatesList";
 import { WorkspaceDangerCard } from "@/components/settings/WorkspaceDangerCard";
@@ -66,11 +67,32 @@ export default async function SettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   const workspace = await getWorkspaceContext();
-  const [templates, members, pendingInvites] = await Promise.all([
-    workspace ? getTemplates(workspace.id) : Promise.resolve([]),
-    getTeamMembers(),
-    getPendingInvites(),
-  ]);
+  const [templates, members, pendingInvites, webhookEndpoints, billing] =
+    await Promise.all([
+      workspace ? getTemplates(workspace.id) : Promise.resolve([]),
+      getTeamMembers(),
+      getPendingInvites(),
+      workspace
+        ? supabase
+            .from("webhook_endpoints")
+            .select("id, url, signing_secret, created_at")
+            .eq("workspace_id", workspace.id)
+            .order("created_at", { ascending: true })
+            .then(({ data }) => data ?? [])
+        : Promise.resolve([]),
+      workspace
+        ? supabase
+            .from("billing_subscriptions")
+            .select("status")
+            .eq("workspace_id", workspace.id)
+            .maybeSingle()
+            .then(({ data }) => data)
+        : Promise.resolve(null),
+    ]);
+  const plan = billing?.status === "active" ? "pro" : "free";
+  const billingConfigured = Boolean(
+    process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID
+  );
   const isOwner = workspace?.role === "owner";
 
   return (
@@ -91,7 +113,13 @@ export default async function SettingsPage() {
         />
       )}
       <TemplatesList templates={templates} isOwner={isOwner} />
-      <PlanCard memberCount={members.length} templateCount={templates.length} />
+      <PlanCard
+        memberCount={members.length}
+        templateCount={templates.length}
+        plan={plan}
+        billingConfigured={billingConfigured}
+      />
+      <WebhooksCard endpoints={webhookEndpoints} isOwner={isOwner} />
       {workspace && isOwner && <WorkspaceDangerCard name={workspace.name} />}
     </div>
   );

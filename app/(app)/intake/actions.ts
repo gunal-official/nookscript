@@ -16,6 +16,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getWorkspaceContext, requireEditor } from "@/lib/data/workspace-context";
+import { recordEvent } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
 import { generateBriefContent, type GeneratorEngine } from "@/lib/ai/brief-generator";
 import type {
@@ -99,6 +100,16 @@ export async function generateBriefFromSource(input: {
   if (error || !briefId) {
     return { error: error?.message ?? "Could not save the generated brief." };
   }
+
+  await recordEvent(supabase, {
+    workspace_id: context.id,
+    event_type: "brief.created",
+    payload: {
+      brief_id: briefId,
+      title: content.title,
+      client_name: content.client_name,
+    },
+  });
 
   // 3. Fetch the persisted rows back so the form edits real DB state.
   const [{ data: brief }, { data: source }, { data: questions }] =

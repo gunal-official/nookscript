@@ -16,6 +16,7 @@ import { redirect } from "next/navigation";
 
 import { getPlanById } from "@/lib/data/plans";
 import { requireEditor } from "@/lib/data/workspace-context";
+import { recordEvent } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import type { PlanStatus, PlanTask } from "@/lib/types/plan";
@@ -74,14 +75,16 @@ export async function toggleTask(input: {
 
   const { data: plan, error: fetchError } = await supabase
     .from("plans")
-    .select("tasks")
+    .select("tasks, workspace_id")
     .eq("id", input.planId)
     .maybeSingle();
 
   if (fetchError) return { error: fetchError.message };
   if (!plan) return { error: "Plan not found." };
 
-  const tasks = ((plan.tasks ?? []) as PlanTask[]).map((task) =>
+  const before = (plan.tasks ?? []) as PlanTask[];
+  const target = before.find((task) => task.id === input.taskId);
+  const tasks = before.map((task) =>
     task.id === input.taskId ? { ...task, checked: !task.checked } : task
   );
 
@@ -91,6 +94,20 @@ export async function toggleTask(input: {
     .eq("id", input.planId);
 
   if (error) return { error: error.message };
+
+  // "plan task completed" fires when a task BECOMES checked — unchecking
+  // is not a completion transition.
+  if (target && !target.checked) {
+    await recordEvent(supabase, {
+      workspace_id: plan.workspace_id,
+      event_type: "plan.task_completed",
+      payload: {
+        plan_id: input.planId,
+        task_id: input.taskId,
+        task_text: target.text,
+      },
+    });
+  }
 
   revalidatePath(`/plans/${input.planId}`);
   revalidatePath("/plans");

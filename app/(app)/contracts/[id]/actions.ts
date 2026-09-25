@@ -22,6 +22,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireEditor } from "@/lib/data/workspace-context";
+import { recordEvent } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/utils";
 import type { ContractStatus } from "@/lib/types/contract";
@@ -107,7 +108,7 @@ export async function setContractStatus(input: {
   // the stamps are computed from real state, not assumptions.
   const { data: contract, error: fetchError } = await supabase
     .from("contracts")
-    .select("status, sent_at, signed_at")
+    .select("status, sent_at, signed_at, workspace_id, title, client_name")
     .eq("id", input.contractId)
     .maybeSingle();
 
@@ -134,6 +135,18 @@ export async function setContractStatus(input: {
     .eq("id", input.contractId);
 
   if (error) return { error: error.message };
+
+  if (previous !== "signed" && input.status === "signed") {
+    await recordEvent(supabase, {
+      workspace_id: contract.workspace_id,
+      event_type: "contract.signed",
+      payload: {
+        contract_id: input.contractId,
+        title: contract.title,
+        client_name: contract.client_name,
+      },
+    });
+  }
 
   revalidatePath(`/contracts/${input.contractId}`);
   revalidatePath("/contracts");
