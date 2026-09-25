@@ -45,6 +45,7 @@
  *      children cascade, active pointers cleared).
  */
 
+import { PlanCard } from "@/components/settings/PlanCard";
 import { TeamCard } from "@/components/settings/TeamCard";
 import { TemplatesList } from "@/components/settings/TemplatesList";
 import { WorkspaceDangerCard } from "@/components/settings/WorkspaceDangerCard";
@@ -53,6 +54,8 @@ import { getPendingInvites, getTeamMembers } from "@/lib/data/team";
 import { getTemplates } from "@/lib/data/templates";
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
+import { DocHeader } from "@/components/ui/doc-detail";
+import { Settings as SettingsIcon } from "lucide-react";
 
 export default async function SettingsPage() {
   // Everything on this page — name, roster, invites, templates — renders
@@ -72,14 +75,11 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight">
-          Settings
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Workspace configuration — name, team, and reusable text snippets.
-        </p>
-      </div>
+      <DocHeader
+        icon={SettingsIcon}
+        title="Settings"
+        subtitle="Workspace configuration — name, team, reusable text snippets, and your plan."
+      />
 
       {workspace && <WorkspaceNameCard name={workspace.name} isOwner={isOwner} />}
       {workspace && (
@@ -91,6 +91,7 @@ export default async function SettingsPage() {
         />
       )}
       <TemplatesList templates={templates} isOwner={isOwner} />
+      <PlanCard memberCount={members.length} templateCount={templates.length} />
       {workspace && isOwner && <WorkspaceDangerCard name={workspace.name} />}
     </div>
   );

@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import { useMotionItems } from "@/components/ui/motion-rows";
 import {
+  Users,
   Ban,
   Check,
   Copy,
@@ -498,7 +499,12 @@ export function TeamCard({
   return (
     <Card>
       <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
-        <CardTitle className="text-base">Team</CardTitle>
+        <div className="flex items-center gap-2.5">
+          <span className="icon-chip icon-chip-muted h-8 w-8">
+            <Users className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <CardTitle className="text-base">Team</CardTitle>
+        </div>
         <CardDescription>
           Everyone who can see this workspace.{" "}
           {!isOwner && (

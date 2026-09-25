@@ -14,7 +14,7 @@
  */
 
 import { useState } from "react";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, TriangleAlert } from "lucide-react";
 
 import { deleteWorkspaceAction } from "@/app/(app)/settings/actions";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,12 @@ export function WorkspaceDangerCard({ name }: { name: string }) {
   return (
     <Card>
       <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
-        <CardTitle className="text-base">Danger zone</CardTitle>
+        <div className="flex items-center gap-2.5">
+          <span className="icon-chip icon-chip-muted h-8 w-8">
+            <TriangleAlert className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <CardTitle className="text-base">Danger zone</CardTitle>
+        </div>
         <CardDescription>Irreversible workspace operations.</CardDescription>
       </CardHeader>
       <CardContent className="p-5">

@@ -8,7 +8,7 @@
  */
 
 import { useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Building2 } from "lucide-react";
 
 import { updateWorkspaceName } from "@/app/(app)/settings/actions";
 import { Button } from "@/components/ui/button";
@@ -56,7 +56,12 @@ export function WorkspaceNameCard({
   return (
     <Card>
       <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
-        <CardTitle className="text-base">Workspace</CardTitle>
+        <div className="flex items-center gap-2.5">
+          <span className="icon-chip icon-chip-muted h-8 w-8">
+            <Building2 className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <CardTitle className="text-base">Workspace</CardTitle>
+        </div>
         <CardDescription>
           The workspace name appears in the sidebar and across the app.
           {!isOwner && (

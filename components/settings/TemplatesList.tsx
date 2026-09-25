@@ -12,7 +12,7 @@
  */
 
 import { useState } from "react";
-import { FileText, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { FileText, Loader2, Pencil, Plus, Trash2, LayoutTemplate } from "lucide-react";
 
 import { deleteTemplate } from "@/app/(app)/settings/actions";
 import { TemplateDialog } from "@/components/settings/TemplateDialog";
@@ -166,7 +166,12 @@ export function TemplatesList({
         <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-1">
-              <CardTitle className="text-base">Templates</CardTitle>
+              <div className="flex items-center gap-2.5">
+          <span className="icon-chip icon-chip-muted h-8 w-8">
+            <LayoutTemplate className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <CardTitle className="text-base">Templates</CardTitle>
+        </div>
               <CardDescription>
                 Reusable text snippets for the workspace.{" "}
                 {!isOwner && (
