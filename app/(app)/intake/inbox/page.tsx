@@ -16,26 +16,28 @@
  *      here immediately.
  */
 
-import { MessageSquare } from "lucide-react";
+import { Inbox as InboxIcon, MessageSquare } from "lucide-react";
 
 import { getInboxThreads } from "@/lib/data/inbox";
 import { InboxThreadList } from "@/components/intake/InboxThreadList";
+import { DocHeader } from "@/components/ui/doc-detail";
 
 export default async function IntakeInboxPage() {
   const threads = await getInboxThreads();
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-6">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Inbox</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Every client message across every brief, as a running thread.
-        </p>
-      </div>
+      <DocHeader
+        icon={InboxIcon}
+        title="Inbox"
+        subtitle="Every client message across every brief, as a running thread."
+      />
 
       {threads === null ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-16 text-center">
-          <MessageSquare className="h-6 w-6 text-muted-foreground"  aria-hidden="true" />
+          <span className="icon-chip icon-chip-muted h-10 w-10">
+            <MessageSquare className="h-5 w-5" aria-hidden="true" />
+          </span>
           <p className="text-sm font-medium">Couldn&apos;t load the inbox</p>
           <p className="max-w-sm text-sm text-muted-foreground">
             Refresh to retry. If this persists, check your Supabase

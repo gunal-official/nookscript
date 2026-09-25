@@ -1,13 +1,17 @@
 /**
- * /share/:token — PUBLIC, read-only view of a shared update. No auth, no
- * app shell: the page lives outside the route groups by design and
- * inherits only the root layout (font/theme).
+ * /share/:token — PUBLIC, read-only view of a shared update (Step 34(b)
+ * client-document treatment). No auth, no app shell: the page lives
+ * outside the route groups by design and inherits only the root layout
+ * (font/theme). Renders the update as a paper client-update document —
+ * the same PaperCard vocabulary as the member app, so the client's view
+ * matches the product.
  *
  * HOW TO TEST (locally — ⚠ share_links migration + seed applied first):
  *   1. Seed plants a link for the "Week 1" update with token
  *      00000000-0000-0000-0000-000000000051 → open
  *      http://localhost:3000/share/00000000-0000-0000-0000-000000000051
- *      in an INCOGNITO window (no session) — the update renders read-only.
+ *      in an INCOGNITO window (no session) — the update renders read-only
+ *      as a letterhead document with the body as the letter body.
  *   2. Revoke the link from the update's Share panel → the same URL now
  *      shows the generic "invalid or revoked" state (no distinction).
  *   3. /share/demo-token (route map) isn't a UUID → same state, and the
@@ -18,22 +22,32 @@
  * revoked is indistinguishable; no ids or internals are returned.
  */
 
+import { Link2Off } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-} from "@/components/ui/card";
 import { UpdateStatusBadge } from "@/components/updates/UpdateStatusBadge";
+import { PaperCard } from "@/components/ui/doc-detail";
 import { getSharedDocumentByToken } from "@/lib/data/shares";
 import { formatDate, isUuid } from "@/lib/utils";
 
+function Brand() {
+  return (
+    <div className="mb-6 flex items-center justify-between">
+      <span className="font-display text-lg font-bold tracking-tight">
+        nook<span className="text-accent">script</span>
+      </span>
+      <Badge variant="outline">Shared update — read only</Badge>
+    </div>
+  );
+}
+
 function InvalidState() {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col items-start justify-center px-6">
-      <Badge variant="secondary" className="mb-4">
-        Link unavailable
-      </Badge>
+    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center px-6">
+      <Brand />
+      <span className="icon-chip icon-chip-muted mb-4 h-10 w-10">
+        <Link2Off className="h-5 w-5" aria-hidden="true" />
+      </span>
       <h1 className="font-display text-3xl font-bold tracking-tight">
         This link is invalid or has been revoked
       </h1>
@@ -71,42 +85,34 @@ export default async function SharePage({
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center px-6 py-16">
-      {/* minimal public chrome */}
-      <div className="mb-6 flex items-center justify-between">
-        <span className="font-display text-lg font-bold tracking-tight">
-          nook<span className="text-accent">script</span>
-        </span>
-        <Badge variant="outline">Shared update — read only</Badge>
-      </div>
+      <Brand />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-3xl font-bold tracking-tight">
-          {document.title}
-        </h1>
-        <UpdateStatusBadge status={document.status} />
-      </div>
-      {document.client_name && (
-        <p className="mb-6 text-sm text-muted-foreground">
-          {document.client_name}
-        </p>
-      )}
-
-      <Card>
-        <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
-          <p className="text-xs text-muted-foreground">
-            Updated {formatDate(document.updated_at)}
+      <PaperCard
+        letterLabel="Client update"
+        letterhead={document.client_name ?? "nookscript"}
+        meta={formatDate(document.updated_at)}
+        footer={
+          <p className="text-center text-xs text-muted-foreground">
+            Shared via nookscript — the sender can revoke this link at any
+            time.
           </p>
-        </CardHeader>
-        <CardContent className="p-5">
-          <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-            {document.body}
-          </pre>
-        </CardContent>
-      </Card>
-
-      <p className="mt-6 text-center text-xs text-muted-foreground">
-        Shared via nookscript
-      </p>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="font-display text-2xl font-bold tracking-tight">
+            {document.title}
+          </h1>
+          <UpdateStatusBadge status={document.status} />
+        </div>
+        {document.client_name && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {document.client_name}
+          </p>
+        )}
+        <pre className="mt-5 whitespace-pre-wrap font-sans text-[15px] leading-relaxed">
+          {document.body}
+        </pre>
+      </PaperCard>
     </main>
   );
 }

@@ -15,6 +15,8 @@ import {
 } from "@/app/(app)/intake/actions";
 import { BriefForm, type BriefDraftFields } from "@/components/intake/BriefForm";
 import { SourcePanel } from "@/components/intake/SourcePanel";
+import { DocHeader } from "@/components/ui/doc-detail";
+import { PenLine } from "lucide-react";
 import type { BriefQuestion, BriefSource } from "@/lib/types/brief";
 import type { GeneratedBriefBundle } from "@/app/(app)/intake/actions";
 import type { EditableBriefField } from "@/lib/types/brief";
@@ -127,12 +129,11 @@ export function IntakeClient({ aiConfigured }: { aiConfigured: boolean }) {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-6">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Intake</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Paste what the client sent you. Get a structured, gap-flagged brief back.
-        </p>
-      </div>
+      <DocHeader
+        icon={PenLine}
+        title="Intake"
+        subtitle="Paste what the client sent you. Get a structured, gap-flagged brief back."
+      />
 
       {engine === "heuristic" && phase === "preview" && (
         <div className="mb-4 rounded-md border border-border bg-muted px-3 py-2.5 text-sm text-muted-foreground">
