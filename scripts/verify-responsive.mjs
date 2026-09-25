@@ -103,6 +103,7 @@ const U = {
 
 const PAGES = [
   { slug: "marketing-home", url: "/", auth: false },
+  { slug: "pipeline", url: "/", auth: true },
   { slug: "marketing-about", url: "/about", auth: false },
   { slug: "marketing-pricing", url: "/pricing", auth: false },
   { slug: "marketing-vs-notion", url: "/vs/notion", auth: false },

@@ -25,6 +25,7 @@ const APP_PREFIXES = [
   "/reports",
   "/settings",
   "/onboarding",
+  "/dashboard", // the Pipeline dashboard (served at / via the rewrite below)
 ];
 
 /** Auth pages an already-signed-in user should be bounced away from. */
@@ -117,6 +118,19 @@ export async function updateSession(request: NextRequest) {
   // Logged in → keep out of the auth pages.
   if (user && isAuthPage(pathname)) {
     return redirect(request, "/intake");
+  }
+
+  // Authed "/" is the Pipeline dashboard: rewrite (URL stays /) to the
+  // (app) route so members land in the shell; guests keep the marketing
+  // home on the same URL (Step 34).
+  if (user && pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    const rewriteResponse = NextResponse.rewrite(url);
+    supabaseResponse.cookies
+      .getAll()
+      .forEach((cookie) => rewriteResponse.cookies.set(cookie));
+    return rewriteResponse;
   }
 
   // Marketing (/, /about, /pricing, /vs/*), /share/*, /invite/*,
