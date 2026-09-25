@@ -163,6 +163,7 @@ const INV_ITEMS = [
 const INVOICE = { id: U.invoice, workspace_id: WS.id, invoice_number: 7, title: "Harbor Lane — phase 1", client_name: "Harbor Lane Studio", status: "sent", items: INV_ITEMS, tax_percent: 20, notes: "Net 14 — please pay within 14 days of the due date. Bank transfer preferred.", due_date: "2026-10-15", sent_at: NOW, paid_at: null, created_at: NOW, updated_at: NOW };
 const INVOICE_LINK = { id: "il-1", workspace_id: WS.id, invoice_id: U.invoice, token: "tok-bill-1", created_at: NOW, revoked_at: null };
 const CONTRACT = { id: U.contract, workspace_id: WS.id, brief_id: U.brief, client_name: "Harbor Lane Studio", title: "Harbor Lane — engagement letter", status: "sent", terms: "Scope: brand identity refresh as per the attached proposal. Fee: £12,000 excl. VAT, invoiced 50% up front and 50% on delivery. Payment: net 14. Cancellation: 30 days notice in writing. Exclusivity: 90 days post-delivery within the hospitality sector.", expires_on: "2026-12-01", signed_by: "Dana Whitfield (Brightloop)", sent_at: NOW, signed_at: null, created_at: NOW, updated_at: NOW };
+let TE_SEQ = 0;
 const TIME_ENTRIES = [
   { id: "te-1", workspace_id: WS.id, brief_id: U.brief, description: "Discovery workshop and stakeholder interviews", worked_on: "2026-09-24", duration_minutes: 150, created_at: NOW, updated_at: NOW },
   { id: "te-2", workspace_id: WS.id, brief_id: null, description: "Studio admin and long description that wraps on narrow screens to test layout", worked_on: "2026-09-23", duration_minutes: 45, created_at: NOW, updated_at: NOW },
@@ -186,7 +187,7 @@ function subFrom(req) {
 
 function startStub() {
   return new Promise((resolveServer, reject) => {
-    const server = http.createServer((req, res) => {
+    const server = http.createServer(async (req, res) => {
       const url = new URL(req.url, `http://127.0.0.1:${STUB_PORT}`);
       const p = url.pathname;
       const sub = subFrom(req);
@@ -247,7 +248,29 @@ function startStub() {
       if (p.startsWith("/rest/v1/invoice_links")) return send(eq("id") || eq("invoice_id") ? one(INVOICE_LINK) : [INVOICE_LINK]);
       if (p.startsWith("/rest/v1/invoices")) return send(eq("id") ? one(INVOICE) : [{ id: INVOICE.id, invoice_number: 7, title: INVOICE.title, client_name: INVOICE.client_name, status: INVOICE.status, items: INVOICE.items, tax_percent: 20, due_date: INVOICE.due_date, updated_at: NOW }]);
       if (p.startsWith("/rest/v1/contracts")) return send(eq("id") ? one(CONTRACT) : [{ id: CONTRACT.id, title: CONTRACT.title, client_name: CONTRACT.client_name, status: CONTRACT.status, brief_id: CONTRACT.brief_id, expires_on: CONTRACT.expires_on, updated_at: NOW }]);
-      if (p.startsWith("/rest/v1/time_entries")) return send(TIME_ENTRIES);
+      if (p.startsWith("/rest/v1/time_entries")) {
+        // POST = real insert (time-entry-added motion round-trips): accept the
+        // row, stamp defaults, and serve it back so the list grows on refresh.
+        if (req.method === "POST") {
+          let raw = "";
+          for await (const chunk of req) raw += chunk;
+          let row = {};
+          try { row = JSON.parse(raw || "{}"); } catch {}
+          const created = {
+            id: `te-${(TE_SEQ += 1)}`,
+            workspace_id: WS.id,
+            brief_id: null,
+            description: "",
+            duration_minutes: 0,
+            worked_on: NOW.slice(0, 10),
+            created_at: NOW,
+            ...row,
+          };
+          TIME_ENTRIES.unshift(created);
+          return send(req.headers["accept"]?.includes("vnd.pgrst.object") ? created : [created]);
+        }
+        return send(TIME_ENTRIES);
+      }
       if (p.startsWith("/rest/v1/share_links")) return send([]);
       if (p.startsWith("/rest/v1/workspaces")) return send([WS]);
       send([]);
@@ -564,18 +587,18 @@ async function main() {
       say(`${faded ? "✓" : "✗"}  320 motion-dialog-exit     t0:${first.opacity}/anims:${first.anims} mid:${mid?.opacity} gone@${goneAt}`);
       results.push({ page: "motion-dialog-exit-samples", width: 320, samples: samples.filter((_, i) => i % 4 === 0), smallTaps: [], overflowX: 0 });
       // Slowed capture (800ms exit) so screenshots can show the fade shape.
+      await page.addStyleTag({ content: "[data-state=closed] { animation-duration: 1500ms !important; }" });
       await page.click('button:has-text("template")', { timeout: 8000 });
       await page.waitForTimeout(400);
-      await page.addStyleTag({ content: "[data-state=closed] { animation-duration: 800ms !important; }" });
       await page.screenshot({ path: join(dir, "dialog-exit-00.png") });
       await page.keyboard.press("Escape");
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(120);
       await page.screenshot({ path: join(dir, "dialog-exit-01.png") });
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(300);
       await page.screenshot({ path: join(dir, "dialog-exit-02.png") });
-      await page.waitForTimeout(350);
+      await page.waitForTimeout(450);
       await page.screenshot({ path: join(dir, "dialog-exit-03.png") });
-      say("     320 motion-dialog-frames  4 frames (capture-slowed 800ms)");
+      say("     320 motion-dialog-frames  4 frames (capture-slowed 1500ms)");
 
       // E) page transition: slowed route-in (800ms) so screenshots catch the fade
       await page.addStyleTag({ content: ".animate-route-in { animation-duration: 800ms !important; }" });
@@ -631,6 +654,34 @@ async function main() {
       await page.waitForTimeout(200);
       await page.screenshot({ path: join(dir, "member-leave-01.png") });
       say("     320 motion-member-frames  2 frames");
+
+      // G) time entry added: start -> stop -> save lands a new row on /time
+      // and it rises in (capture-slowed 900ms so the frames show the motion).
+      await page.goto(`${BASE}/time`, { waitUntil: "load", timeout: 20000 });
+      await page.waitForTimeout(300);
+      await page.addStyleTag({ content: ".animate-rise-in { animation-duration: 900ms !important; }" });
+      const beforeRows = await page.$$eval("li", (n) => n.length);
+      await page.click('button:has-text("Start timer")', { timeout: 8000 });
+      await page.waitForTimeout(250);
+      await page.click('button:has-text("Stop")', { timeout: 8000 });
+      await page.waitForTimeout(250);
+      await page.fill('input[aria-label="What did you work on?"]', "Motion probe entry");
+      await page.fill('input[aria-label="Minutes"]', "30");
+      await page.click('button:has-text("Save")', { timeout: 8000 });
+      let rose = false;
+      for (let i = 0; i < 40 && !rose; i++) {
+        rose = await page.$$eval("li", (ns) => ns.some((n) => n.getAnimations().length > 0)).catch(() => false);
+        if (!rose) await page.waitForTimeout(100);
+      }
+      await page.screenshot({ path: join(dir, "time-entry-00.png") });
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: join(dir, "time-entry-01.png") });
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: join(dir, "time-entry-02.png") });
+      const afterRows = await page.$$eval("li", (n) => n.length);
+      const teOk = rose && afterRows > beforeRows;
+      if (!teOk) failures++;
+      say(`${teOk ? "✓" : "✗"}  320 motion-time-entry       rose:${rose} rows:${beforeRows}->${afterRows} 3 frames`);
 
       // B) line row enter
       await page.goto(`${BASE}/invoices/${U.invoice}`, { waitUntil: "load", timeout: 20000 });

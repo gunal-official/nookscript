@@ -337,7 +337,7 @@ export function TimeLog({
                 {group.items.map((entry) => (
                   <li
                     key={entry.id}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm"
+                    className="flex animate-rise-in items-center gap-3 px-3 py-2.5 text-sm"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-text">{entry.description}</p>
