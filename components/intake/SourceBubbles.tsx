@@ -7,6 +7,8 @@
  * plus the brief detail Sources card — render sources identically.
  * Presentational only; safe to use from server or client components.
  */
+import { MessageSquare } from "lucide-react";
+
 function toMessages(raw: string): string[] {
   return raw
     .split(/\n{2,}/)
@@ -19,8 +21,8 @@ export function SourceBubbles({ text }: { text: string }) {
     <div className="space-y-3">
       {toMessages(text).map((msg, i) => (
         <div key={i} className="flex gap-2.5">
-          <span className="mt-1 h-6 w-6 shrink-0 rounded-full bg-accent text-center text-[11px] font-semibold leading-6 text-white">
-            {i === 0 ? "S" : "·"}
+          <span className="icon-chip icon-chip-accent mt-1 h-6 w-6 shrink-0 rounded-full">
+            <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1 rounded-lg border border-border bg-card px-4 py-3">
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">

@@ -1,15 +1,16 @@
 /**
- * /invoice/:token — PUBLIC, read-only invoice form. No auth, no app
- * shell: the page lives outside the route groups by design (share page
- * precedent) and inherits only the root layout (font/theme).
+ * /invoice/:token — PUBLIC, read-only invoice document (Step 34(b) client
+ * treatment, mirrors the member invoice paper). No auth, no app shell:
+ * the page lives outside the route groups (share page precedent) and
+ * inherits only the root layout (font/theme).
  *
  * HOW TO TEST (locally — ⚠ invoices migration + seed applied first):
  *   1. Seed plants a link for the sent INV-0002 with token
  *      00000000-0000-0000-0000-000000000070 → open
  *      http://localhost:3000/invoice/00000000-0000-0000-0000-000000000070
  *      in an INCOGNITO window (no session) — the invoice renders as a
- *      clean form: number, billed to, line items, subtotal → tax →
- *      total, due date, notes, from-line, Print button.
+ *      paper invoice: letterhead, billed-to, wrap-safe line items,
+ *      subtotal → tax → total, notes footer, Print button in the chrome.
  *   2. The DRAFT invoice's seeded link (token …0069) opens the SAME
  *      generic "unavailable" state as a revoked or garbage token —
  *      drafts are never shared, and the visitor cannot tell which kind
@@ -17,7 +18,8 @@
  *   3. /invoice/not-a-uuid never reaches the database (shape check
  *      first).
  *   4. "Print" → the browser print dialog (the v1 export story — no
- *      markdown/PDF endpoint recorded-cut).
+ *      markdown/PDF endpoint recorded-cut). Print output = the paper
+ *      only (chrome + footer are print:hidden).
  *
  * Security notes: data comes ONLY from the get_shared_invoice SECURITY
  * DEFINER RPC (invoice_links itself is fully member-gated); invalid vs
@@ -25,10 +27,12 @@
  * are returned (workspace_name is the intended seller identity).
  */
 
+import { Link2Off } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
 import { PrintButton } from "@/components/invoices/PrintButton";
+import { PaperCard } from "@/components/ui/doc-detail";
 import { getSharedInvoiceByToken } from "@/lib/data/invoices";
 import {
   formatDate,
@@ -38,12 +42,27 @@ import {
 } from "@/lib/utils";
 import { invoiceTotals } from "@/lib/invoice-totals";
 
+function Brand() {
+  return (
+    <div className="mb-6 flex items-center justify-between print:hidden">
+      <span className="font-display text-lg font-bold tracking-tight">
+        nook<span className="text-accent">script</span>
+      </span>
+      <div className="flex items-center gap-2">
+        <Badge variant="outline">Shared invoice — read only</Badge>
+        <PrintButton />
+      </div>
+    </div>
+  );
+}
+
 function InvalidState() {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col items-start justify-center px-6">
-      <Badge variant="secondary" className="mb-4">
-        Link unavailable
-      </Badge>
+    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col [justify-content:safe_center] px-6">
+      <Brand />
+      <span className="icon-chip icon-chip-muted mb-4 h-10 w-10">
+        <Link2Off className="h-5 w-5" aria-hidden="true" />
+      </span>
       <h1 className="font-display text-3xl font-bold tracking-tight">
         This link is invalid or has been revoked
       </h1>
@@ -52,6 +71,14 @@ function InvalidState() {
         in full.
       </p>
     </main>
+  );
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      {children}
+    </p>
   );
 }
 
@@ -82,127 +109,108 @@ export default async function PublicInvoicePage({
   const totals = invoiceTotals(invoice.items, invoice.tax_percent);
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center px-6 py-16">
-      {/* minimal public chrome */}
-      <div className="mb-6 flex items-center justify-between">
-        <span className="font-display text-lg font-bold tracking-tight">
-          nook<span className="text-accent">script</span>
-        </span>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline">Shared invoice — read only</Badge>
-          <PrintButton />
-        </div>
-      </div>
+    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col [justify-content:safe_center] px-6 py-16">
+      <Brand />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-3xl font-bold tracking-tight">
-          {invoiceNumberLabel(invoice.invoice_number)}
-        </h1>
-        <InvoiceStatusBadge status={invoice.status} />
-      </div>
-      <p className="mb-6 text-sm text-muted-foreground">{invoice.title}</p>
-
-      <Card>
-        <CardHeader className="space-y-4 border-b border-border px-5 py-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                Billed to
-              </p>
-              <p className="mt-1 text-sm font-medium">{invoice.client_name}</p>
-            </div>
-            <div className="sm:text-right">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                From
-              </p>
-              <p className="mt-1 text-sm font-medium">{invoice.workspace_name}</p>
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                Issued
-              </p>
-              <p className="mt-1 text-sm">
-                {formatDate(invoice.sent_at)}
+      <PaperCard
+        letterLabel="Invoice"
+        letterhead={invoice.workspace_name}
+        meta={invoiceNumberLabel(invoice.invoice_number)}
+        footer={
+          invoice.notes.trim() !== "" ? (
+            <div className="space-y-1.5">
+              <FieldLabel>Notes</FieldLabel>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                {invoice.notes}
               </p>
             </div>
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                Due
-              </p>
-              <p className="mt-1 text-sm">{formatDate(invoice.due_date)}</p>
+          ) : undefined
+        }
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="font-display text-2xl font-bold tracking-tight">
+                {invoice.title}
+              </h1>
+              <InvoiceStatusBadge status={invoice.status} />
             </div>
-            {invoice.paid_at && (
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Paid
-                </p>
-                <p className="mt-1 text-sm">{formatDate(invoice.paid_at)}</p>
-              </div>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 p-5">
-          {/* line items */}
-          <div className="space-y-2">
-            <div className="grid grid-cols-[1fr_3.5rem_6rem_6.5rem] gap-2 border-b border-border pb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              <span>Description</span>
-              <span className="text-right">Qty</span>
-              <span className="text-right">Unit</span>
-              <span className="text-right">Amount</span>
-            </div>
-            {invoice.items.length === 0 ? (
-              <p className="text-sm italic text-muted-foreground">
-                No line items.
-              </p>
-            ) : (
-              invoice.items.map((item) => (
-                <div
-                  key={item.id}
-                  className="grid grid-cols-[1fr_3.5rem_6rem_6.5rem] gap-2 text-sm"
-                >
-                  <span>{item.description}</span>
-                  <span className="text-right text-muted-foreground">
-                    {item.quantity}
-                  </span>
-                  <span className="text-right text-muted-foreground">
-                    {formatMoney(item.unit_amount_cents)}
-                  </span>
-                  <span className="text-right">
-                    {formatMoney(item.quantity * item.unit_amount_cents)}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* totals — computed, never stored */}
-          <div className="space-y-1 border-t border-border pt-3 text-sm">
-            <div className="flex justify-between text-muted-foreground">
-              <span>Subtotal</span>
-              <span>{formatMoney(totals.subtotal_cents)}</span>
-            </div>
-            <div className="flex justify-between text-muted-foreground">
-              <span>Tax ({invoice.tax_percent}%)</span>
-              <span>{formatMoney(totals.tax_cents)}</span>
-            </div>
-            <div className="flex justify-between border-t border-border pt-2 font-display text-base font-bold tracking-tight">
-              <span>Total</span>
-              <span>{formatMoney(totals.total_cents)}</span>
-            </div>
-          </div>
-
-          {invoice.notes.trim() !== "" && (
-            <p className="border-t border-border pt-3 text-sm leading-relaxed text-muted-foreground">
-              {invoice.notes}
+            <p className="mt-1 text-sm text-muted-foreground">
+              {invoiceNumberLabel(invoice.invoice_number)} ·{" "}
+              {invoice.workspace_name}
             </p>
+          </div>
+          <div className="text-right text-sm text-muted-foreground">
+            <p>Issued {formatDate(invoice.sent_at)}</p>
+            <p>Due {formatDate(invoice.due_date)}</p>
+            {invoice.paid_at && <p>Paid {formatDate(invoice.paid_at)}</p>}
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <FieldLabel>Billed to</FieldLabel>
+          <p className="mt-1 font-display text-lg font-bold">
+            {invoice.client_name}
+          </p>
+        </div>
+
+        {/* Line items — wrapping rows (no clipped cells at any width). */}
+        <div className="mt-6 border-t border-border">
+          {invoice.items.length === 0 ? (
+            <p className="py-3 text-sm italic text-muted-foreground">
+              No line items.
+            </p>
+          ) : (
+            invoice.items.map((item) => (
+              <div
+                key={item.id}
+                className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-border py-3"
+              >
+                <p className="min-w-0 flex-1 basis-full text-sm sm:basis-auto">
+                  {item.description}
+                </p>
+                <p className="w-12 shrink-0 text-right text-sm text-muted-foreground">
+                  ×{item.quantity}
+                </p>
+                <p className="w-20 shrink-0 text-right text-sm text-muted-foreground">
+                  {formatMoney(item.unit_amount_cents)}
+                </p>
+                <p className="w-24 shrink-0 text-right text-sm font-medium">
+                  {formatMoney(item.quantity * item.unit_amount_cents)}
+                </p>
+              </div>
+            ))
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Totals — computed, never stored (same math as the member app). */}
+        <div className="mt-5 flex justify-end">
+          <dl className="w-full max-w-xs space-y-1.5 text-sm">
+            <div className="flex justify-between gap-6">
+              <dt className="text-muted-foreground">Subtotal</dt>
+              <dd>{formatMoney(totals.subtotal_cents)}</dd>
+            </div>
+            <div className="flex justify-between gap-6">
+              <dt className="text-muted-foreground">
+                Tax ({invoice.tax_percent}%)
+              </dt>
+              <dd>{formatMoney(totals.tax_cents)}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-6 border-t border-border pt-2">
+              <dt className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Total
+              </dt>
+              <dd className="font-display text-xl font-bold">
+                {formatMoney(totals.total_cents)}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </PaperCard>
 
       <p className="mt-6 text-center text-xs text-muted-foreground print:hidden">
-        Shared via nookscript
+        Shared via nookscript — the sender can revoke this link at any
+        time.
       </p>
     </main>
   );

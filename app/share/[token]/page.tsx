@@ -43,7 +43,7 @@ function Brand() {
 
 function InvalidState() {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center px-6">
+    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col [justify-content:safe_center] px-6">
       <Brand />
       <span className="icon-chip icon-chip-muted mb-4 h-10 w-10">
         <Link2Off className="h-5 w-5" aria-hidden="true" />
@@ -84,7 +84,7 @@ export default async function SharePage({
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center px-6 py-16">
+    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col [justify-content:safe_center] px-6 py-16">
       <Brand />
 
       <PaperCard

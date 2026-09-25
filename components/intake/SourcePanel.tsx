@@ -8,7 +8,7 @@
  * How to test: see the comment at the top of app/(app)/intake/page.tsx.
  */
 
-import { Loader2, RotateCcw, Sparkles } from "lucide-react";
+import { ClipboardPaste, Loader2, MessageSquare, RotateCcw, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,9 @@ export function SourcePanel({
       <Card className="flex flex-col overflow-hidden">
         <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 border-b border-border bg-muted/60 px-5 py-3.5">
           <div className="flex items-center gap-2">
+            <span className="icon-chip icon-chip-muted h-7 w-7">
+              <MessageSquare className="h-4 w-4" aria-hidden="true" />
+            </span>
             <CardTitle className="text-base">Source</CardTitle>
             <Badge variant="secondary">{source?.source_type ?? "manual"}</Badge>
             <span className="text-xs text-muted-foreground">
@@ -86,7 +89,12 @@ export function SourcePanel({
   return (
     <Card className="flex flex-col overflow-hidden">
       <CardHeader className="space-y-1 border-b border-border bg-muted/60 px-5 py-3.5">
-        <CardTitle className="text-base">Paste client text</CardTitle>
+        <div className="flex items-center gap-2.5">
+          <span className="icon-chip icon-chip-muted h-7 w-7">
+            <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <CardTitle className="text-base">Paste client text</CardTitle>
+        </div>
         <CardDescription>
           An email, a chat log, or call notes — nookscript drafts the brief.
         </CardDescription>
