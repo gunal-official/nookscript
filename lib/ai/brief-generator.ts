@@ -197,9 +197,18 @@ export function generateBriefHeuristic(rawText: string): GeneratedBriefContent {
   );
   const client_name = fromMatch?.[1]?.trim() || signMatch?.[1]?.trim() || null;
 
-  // Objective: first 1–2 paragraphs, trimmed.
+  // Objective: first 1–2 BODY paragraphs — email header blocks and
+  // greetings are skipped (the same junk the title logic skips), so a
+  // pasted email yields the client's actual words, not "From: … Hi,".
+  const isJunkParagraph = (p: string) =>
+    /^(from|to|subject|date|cc|bcc):/i.test(p) || /^(hi|hello|dear|hey)\b/i.test(p);
   const objective =
-    paragraphs.slice(0, 2).join(" ").replace(/\s+/g, " ").slice(0, 500) || null;
+    paragraphs
+      .filter((p) => !isJunkParagraph(p))
+      .slice(0, 2)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .slice(0, 500) || null;
 
   // Deliverables: bulleted / numbered lines.
   const deliverables = nonEmpty
