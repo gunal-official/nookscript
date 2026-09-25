@@ -444,6 +444,95 @@ async function main() {
     await ctx.close();
   }
 
+  // ── interaction-state probes (RUN_INTERACT=1): drive the timer pill, its
+  // stop form, a select popover, and the inline destructive confirm at 320+768.
+  if (process.env.RUN_INTERACT === "1") {
+    for (const w of [320, 768]) {
+      const vh2 = w === 320 ? 568 : 1024;
+      const ctx = await browser.newContext({ viewport: { width: w, height: vh2 } });
+      await ctx.addCookies([authCookie]);
+      const page = await ctx.newPage();
+      const dir = join(SHOTS, "interact", String(w));
+      mkdirSync(dir, { recursive: true });
+      const extra = () => page.evaluate(() => {
+        const vw = document.documentElement.clientWidth; const vh = window.innerHeight;
+        const fixed = [];
+        for (const el of document.querySelectorAll("body *")) {
+          if (getComputedStyle(el).position !== "fixed") continue;
+          const r = el.getBoundingClientRect();
+          if (r.width < 2) continue;
+          fixed.push({ cls: (typeof el.className === "string" ? el.className : "").slice(0, 56), left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), w: Math.round(r.width), h: Math.round(r.height), escapes: r.right > vw + 1 || r.left < -1 || r.bottom > vh + 24 || r.top < -1 });
+        }
+        const pop = document.querySelector('[role="listbox"]');
+        let listbox = null;
+        if (pop) {
+          const r = pop.getBoundingClientRect();
+          listbox = { left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), w: Math.round(r.width), h: Math.round(r.height), fitsW: r.left >= -1 && r.right <= vw + 1, fitsH: r.top >= -1 && r.bottom <= vh + 1, innerScroll: pop.scrollHeight > pop.clientHeight };
+        }
+        return { fixed, listbox };
+      });
+      const record = async (name, ok, m) => {
+        await page.screenshot({ path: join(dir, `${name}.png`) }).catch(() => {});
+        results.push({ page: `interact-${name}`, width: w, smallTaps: m?.small ?? [], overflowX: m?.overflowX ?? -1, ...(await extra()) });
+        say(`${ok ? "✓" : "✗"} ${String(w).padStart(4)} interact-${name.padEnd(14)}`);
+        if (!ok) failures++;
+      };
+
+      try {
+        // A) timer: idle -> running pill -> stop form -> cancel -> discard
+        await page.goto(`${BASE}/time`, { waitUntil: "load", timeout: 20000 });
+        await page.waitForTimeout(300);
+        await page.click('button:has-text("Start timer")', { timeout: 8000 });
+        await page.waitForTimeout(300);
+        let m = await page.evaluate(METRICS_FN);
+        let x = await extra();
+        let ok = !x.fixed.some((f) => f.escapes) && m.overflowX === 0 && m.small.length === 0;
+        await record("timer-running", ok, m);
+
+        await page.click('button:has-text("Stop")', { timeout: 8000 });
+        await page.waitForTimeout(300);
+        m = await page.evaluate(METRICS_FN);
+        x = await extra();
+        ok = !x.fixed.some((f) => f.escapes) && m.overflowX === 0 && m.small.length === 0;
+        await record("timer-stop-form", ok, m);
+
+        const cancel = page.locator('button:has-text("Cancel")').first();
+        if (await cancel.count()) await cancel.click().catch(() => {});
+        await page.waitForTimeout(200);
+        const disc = page.locator('button[aria-label="Discard this session"]').first();
+        if (await disc.count()) await disc.click().catch(() => {});
+
+        // B) select popover on brief detail
+        await page.goto(`${BASE}/briefs/${U.brief}`, { waitUntil: "load", timeout: 20000 });
+        await page.waitForTimeout(300);
+        await page.click('button[role="combobox"]', { timeout: 8000 });
+        await page.waitForTimeout(300);
+        m = await page.evaluate(METRICS_FN);
+        x = await extra();
+        ok = !!x.listbox && x.listbox.fitsW && (x.listbox.fitsH || x.listbox.innerScroll) && m.small.length === 0;
+        await record("select-open", ok, m);
+        await page.keyboard.press("Escape");
+
+        // C) inline destructive confirm on /settings
+        await page.goto(`${BASE}/settings`, { waitUntil: "load", timeout: 20000 });
+        await page.waitForTimeout(300);
+        await page.click('button[aria-label="Remove Leo Fox"]', { timeout: 8000 });
+        await page.waitForTimeout(250);
+        m = await page.evaluate(METRICS_FN);
+        x = await extra();
+        ok = m.overflowX === 0 && m.small.length === 0 && m.offenders.length === 0;
+        await record("team-confirm", ok, m);
+        const no = page.locator('button:has-text("Cancel")').first();
+        if (await no.count()) await no.click().catch(() => {});
+      } catch (e) {
+        failures++;
+        say(`✗ ${String(w).padStart(4)} interact-error          ${String(e).slice(0, 70)}`);
+        results.push({ page: "interact-error", width: w, error: String(e).slice(0, 140) });
+      }
+      await ctx.close();
+    }
+  }
+
   writeFileSync(join(SHOTS, `summary${SUM_SUFFIX}.json`), JSON.stringify({ mode: MODE, results }, null, 2));
   await browser.close();
   freePort(APP_PORT);

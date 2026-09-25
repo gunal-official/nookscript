@@ -170,7 +170,7 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
   if (phase === "running") {
     return (
       <div className="fixed bottom-5 right-5 z-50 flex max-w-[calc(100vw-2.5rem)] items-center gap-2 rounded-full border border-border bg-card p-1.5 pr-2.5 shadow-md print:hidden">
-        <span className="pl-2 text-sm font-semibold tabular-nums text-text">
+        <span className="shrink-0 pl-2 text-sm font-semibold tabular-nums text-text">
           {formatElapsed(elapsedSeconds())}
         </span>
         <input
@@ -178,9 +178,9 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
           onChange={(e) => setLabel(e.target.value)}
           placeholder="What are you working on?"
           aria-label="What are you working on?"
-          className="w-28 min-w-0 sm:w-48 bg-transparent text-sm text-text placeholder:text-muted-foreground focus:outline-none"
+          className="h-11 w-28 min-w-0 sm:w-48 bg-transparent text-sm text-text placeholder:text-muted-foreground focus:outline-none"
         />
-        <Button size="sm" className="h-11 gap-1.5" onClick={openStopForm}>
+        <Button size="sm" className="h-11 shrink-0 gap-1.5" onClick={openStopForm}>
           <Square className="h-3.5 w-3.5" />
           Stop
         </Button>
@@ -189,7 +189,7 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
           onClick={discard}
           title="Discard this session"
           aria-label="Discard this session"
-          className="min-h-11 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-text"
+          className="min-h-11 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-text"
         >
           <X className="h-4 w-4" />
         </button>
@@ -209,7 +209,7 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
         onChange={(e) => setLabel(e.target.value)}
         placeholder="What did you work on?"
         aria-label="What did you work on?"
-        className="h-9"
+        className="h-11"
         autoFocus
       />
       <div className="mt-3 flex items-center gap-2">
@@ -219,7 +219,7 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
           step={1}
           value={minutes}
           onChange={(e) => setMinutes(e.target.value)}
-          className="h-9 w-24"
+          className="h-11 w-24"
           aria-label="Minutes"
         />
         <Input
@@ -227,7 +227,7 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
           value={workedOn}
           onChange={(e) => setWorkedOn(e.target.value)}
           aria-label="Worked on"
-          className="h-9 flex-1"
+          className="h-11 flex-1"
         />
       </div>
       <div className="mt-2">

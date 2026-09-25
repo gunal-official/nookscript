@@ -911,6 +911,7 @@ fit. Exit code 1 on any finding.
 npm install            # devDeps: playwright-core + @sparticuz/chromium (audit only)
 npm run verify:responsive            # all widths, writes summary + screenshots
 WIDTHS=320,768 RUN_DIALOG=1 npm run verify:responsive   # quick check + dialog probe
+RUN_INTERACT=1 npm run verify:responsive                # drives timer pill, stop form, select popover, inline confirm
 ```
 
 Fixes shipped with the audit: 44×44 minimum tap targets (buttons, inputs,
