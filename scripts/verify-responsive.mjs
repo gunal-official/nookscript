@@ -411,7 +411,7 @@ async function main() {
   const browser = await chromium.launch({
     executablePath: exec,
     headless: true,
-    args: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
+    args: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", "--hide-scrollbars"],
     env: { ...process.env, LD_LIBRARY_PATH: libDir },
   });
 
@@ -550,6 +550,23 @@ async function main() {
       await page.waitForTimeout(350);
       await page.screenshot({ path: join(dir, "dialog-exit-03.png") });
       say("     320 motion-dialog-frames  4 frames (capture-slowed 800ms)");
+
+      // E) page transition: slowed route-in (800ms) so screenshots catch the fade
+      await page.addStyleTag({ content: ".animate-route-in { animation-duration: 800ms !important; }" });
+      await page.goto(`${BASE}/briefs`, { waitUntil: "load", timeout: 20000 });
+      await page.waitForTimeout(400);
+      await page.click('nav a[href="/proposals"]', { timeout: 8000 }).catch(async () => {
+        await page.click('button[aria-label="Open menu"]');
+        await page.waitForTimeout(250);
+        await page.click('nav[aria-label="Primary"] a[href="/proposals"]', { timeout: 8000 });
+      });
+      await page.waitForTimeout(150);
+      await page.screenshot({ path: join(dir, "route-in-00.png") });
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: join(dir, "route-in-01.png") });
+      await page.waitForTimeout(450);
+      await page.screenshot({ path: join(dir, "route-in-02.png") });
+      say("     320 motion-route-in       3 frames (capture-slowed 800ms)");
 
       // B) line row enter
       await page.goto(`${BASE}/invoices/${U.invoice}`, { waitUntil: "load", timeout: 20000 });

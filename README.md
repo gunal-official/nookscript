@@ -928,3 +928,80 @@ shrink, invoice line-items stacking below md, TeamCard select sizing.
 - Design tokens live as CSS variables in `app/globals.css` (light + `.dark`),
   consumed by Tailwind (`tailwind.config.ts`). Dark mode via `next-themes`
   with the `dark` class; default is `system`.
+
+
+---
+
+## Step 33 — cross-platform audit fix, icon system, responsive navigation, motion
+
+### Run it on macOS (exact repro)
+
+```bash
+git pull
+npm install          # devDeps only: playwright-core, @sparticuz/chromium (audit harness)
+npm run verify:responsive
+```
+
+Expected output (abridged):
+
+```
+… building next app …
+✓  320 marketing-home        overflowX=0 off=0 cut=0 tap<44=0
+… (27 pages × every width) …
+✓  320 dialog-template       fitsW=true fitsH=true …
+✓  320 motion-dialog-exit    t0:1/anims:1 mid:0.1x gone@~220
+✓  320 interact-drawer-open
+✓  320 interact-drawer-navigate
+responsive audit passed ✔  (evidence: ~/responsive-evidence/step32-after)
+```
+
+- Exit code 0, final line `responsive audit passed ✔`, evidence in
+  `~/responsive-evidence/step32-after` (override with `SHOTS_DIR=…`).
+- **No EADDRINUSE, no orphans**: the app port is OS-assigned (bind-to-0) unless
+  `APP_PORT` is pinned; port takeover is `lsof`-first (macOS + Linux) with `ss`/
+  `fuser` fallbacks and pid-kills from Node (no BSD-incompatible `xargs -r`);
+  the `next start` child runs in its own process group and is group-killed on
+  every exit path (success, failure, SIGTERM/SIGINT, crash).
+- Useful env: `WIDTHS=320,375,414,600,768,1024,1440` `SKIP_BUILD=1`
+  `RUN_DIALOG=1` `RUN_INTERACT=1` `RUN_MOTION=1` `FRESH_SHOTS=1` `SHOTS_DIR=…`
+- Headless note: if your headless Chrome draws classic 15px scrollbars, a bare
+  600px viewport measures 585 CSS px and lands in the mobile band. The harness
+  launches with `--hide-scrollbars` so band edges measure true (real desktop
+  browsers use overlay scrollbars and match at 600 exactly).
+
+### What changed
+
+1. **Port/lifecycle bug (blocking, fixed first)** — see above. Proven by a
+   dummy-listener takeover test and two full back-to-back runs with a zero-orphan
+   process check after exit.
+2. **Icon system** — `docs/icon-audit.md`: audit of all 114 icon instances,
+   size scale 16/18/20/24 with roles, ONE stroke width (1.5, global `svg.lucide`
+   rule), semantic nav mapping, `aria-hidden` on 109 decorative icons,
+   `aria-label` on every icon-only control, 44×44 targets.
+3. **Navigation** — one icon-bearing nav model (`components/app-shell/nav-items.ts`):
+   mobile <600 = hamburger → slide-in drawer (every item a 44px icon+label row);
+   tablet 600–1023 = 64px icon rail (title tooltips); desktop ≥1024 = 232px
+   sidebar. Topbar works at every width: full-width search row on mobile,
+   touch-usable workspace switcher, account menu with every destination.
+4. **Motion** — route transitions (templates), dialog exit guaranteed via
+   forceMount presence (measured: opacity 1→0.07 mid, unmount ~220ms — it was
+   an instant unmount before), list enter/leave (`useMotionItems` on invoice
+   line items), in-house toasts (invite created / link copied / invoice saved),
+   skeleton shimmer, 150ms press feedback. Everything transform/opacity-first,
+   everything off under `prefers-reduced-motion` (probe asserts `animation:none`).
+
+### Evidence (rendered, real browser)
+
+`~/responsive-evidence/step33-seven/` — 27 pages × 320/375/414/600/768/1024/1440
+(`pages/<width>/…`), dialogs, interact states, motion captures.
+`~/responsive-evidence/step33-final/motion/320/` — `dialog-exit.gif`,
+`route-in.gif`, `row-enter.gif`, `row-leave.gif` + `reduced-motion-drawer.png`.
+
+### Your acceptance checklist → proof
+
+| You check | Proof |
+|---|---|
+| No EADDRINUSE on macOS | OS-assigned ports + lsof takeover + all-exit-path group kill; back-to-back runs pass; expected-output block above |
+| 375px: no horizontal scroll, nav works, buttons tappable, no clipped text | `step33-seven/pages/375/*` (every page) + `interact/320/drawer-open.png`, `drawer-navigate` — audit: `overflowX=0 tap<44=0 cut=0` |
+| Dialog animations smooth (open AND close) | `dialog-template` fit proof + `motion-dialog-exit` sample (`t0:1/anims:1 mid:0.14 gone@~220`) + `dialog-exit.gif` |
+| Icons intentional & consistent | `docs/icon-audit.md` + sidebar/form/team renders (`complex/1024/settings.png`, `pages/1024/*`, `interact/320/drawer-open.png`) |
