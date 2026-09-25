@@ -523,6 +523,30 @@ async function main() {
       mkdirSync(join(SHOTS, "pages", String(w)), { recursive: true }); await shot("pages", pg.slug);
       if (COMPLEX.has(pg.slug)) { mkdirSync(join(SHOTS, "complex", String(w)), { recursive: true }); await shot("complex", pg.slug); }
 
+      // SCROLL_PROOF=<slug,…>: the (app) shell scrolls inside <main>
+      // (document height = viewport), so fullPage can't see below the
+      // fold. Scroll every [data-proof] region into view and capture it.
+      // Evidence tooling only — failures here never fail the audit.
+      if (process.env.SCROLL_PROOF && process.env.SCROLL_PROOF.split(",").includes(pg.slug)) {
+        try {
+          const names = await page.evaluate(() =>
+            [...document.querySelectorAll("[data-proof]")].map((el) => el.getAttribute("data-proof"))
+          );
+          for (const name of names) {
+            await page.evaluate((n) => {
+              const el = document.querySelector(`[data-proof="${n}"]`);
+              if (el) el.scrollIntoView({ block: "center" });
+            }, name);
+            await page.waitForTimeout(250);
+            mkdirSync(join(SHOTS, "proof", String(w)), { recursive: true });
+            await page.screenshot({ path: join(SHOTS, "proof", String(w), `${pg.slug}-${name}.png`) }).catch(() => {});
+            say(`   proof ✓ ${w} ${pg.slug}-${name}`);
+          }
+        } catch (e3) {
+          say(`   proof ✗ ${w} ${pg.slug} ${String(e3).slice(0, 80)}`);
+        }
+      }
+
       const bad = !m || (m.overflowX > 0 || m.offenders.length > 0 || m.cutoffs.length > 0 || m.fixed.some((f) => f.escapes));
       const tapGate = !!m && m.small.length > 0;
       if (bad || tapGate || pageErrors.length) failures += 1;

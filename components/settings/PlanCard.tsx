@@ -45,7 +45,7 @@ export function PlanCard({
   templateCount: number;
 }) {
   return (
-    <Card className="animate-rise-in">
+    <Card className="animate-rise-in" data-proof="plan">
       <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
         <div className="flex items-center gap-2.5">
           <span className="icon-chip icon-chip-muted h-8 w-8">
