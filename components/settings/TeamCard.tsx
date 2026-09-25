@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/ui/toast";
 import {
   Ban,
   Check,
@@ -298,6 +299,7 @@ function InviteRow({
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
   const [copied, setCopied] = useState(false);
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
 
   const url = `${origin ?? ""}/invite/${invite.token}`;
@@ -307,6 +309,7 @@ function InviteRow({
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      toast("Invite link copied");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       setError("Couldn't copy — select and copy the link manually.");
@@ -418,6 +421,7 @@ export function TeamCard({
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const [warning, setWarning] = useState<string | null>(null);
 
   useEffect(() => {
@@ -466,6 +470,7 @@ export function TeamCard({
       // the email just didn't go out.
       setWarning(result.warning);
     }
+    toast("Invite created");
     setEmail(""); // the new invite appears in the list via revalidation
   }
 

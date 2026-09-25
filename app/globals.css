@@ -73,3 +73,64 @@
     animation: none;
   }
 }
+
+/* ── Motion: route transitions, press feedback, list rows, skeletons ─────── */
+@keyframes route-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-route-in { animation: route-in 200ms ease-out both; }
+
+/* Press feedback on tappable controls: 150ms in/out, never blocks interaction. */
+@media (prefers-reduced-motion: no-preference) {
+  button:not(:disabled):active,
+  [role="button"]:not(:disabled):active,
+  [role="menuitem"]:active {
+    transform: scale(0.98);
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  [role="menuitem"] {
+    transition: transform 150ms ease;
+  }
+}
+
+/* Skeleton shimmer for loading surfaces (no blank -> full pop). */
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(6px); }
+}
+.animate-toast-out { animation: toast-out 200ms ease-in both; }
+
+@keyframes row-out {
+  from { opacity: 1; max-height: 120px; }
+  to { opacity: 0; max-height: 0; }
+}
+.animate-row-out { animation: row-out 220ms ease-in both; overflow: hidden; }
+
+@keyframes shimmer {
+  from { background-position: -400px 0; }
+  to { background-position: 400px 0; }
+}
+.skeleton {
+  background-image: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--muted-foreground) / 0.08) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-route-in,
+  .animate-toast-out,
+  .animate-row-out { animation: none; }
+  .skeleton { animation: none; }
+  button:not(:disabled):active,
+  [role="button"]:not(:disabled):active,
+  [role="menuitem"]:active {
+    transform: none;
+  }
+}

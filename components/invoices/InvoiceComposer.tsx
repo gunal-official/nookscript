@@ -16,6 +16,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
+import { useMotionItems } from "@/components/ui/motion-rows";
 
 import { saveInvoiceContent } from "@/app/(app)/invoices/[id]/actions";
 import { Badge } from "@/components/ui/badge";
@@ -91,9 +93,11 @@ export function InvoiceComposer({
 }) {
   const [title, setTitle] = useState(initialTitle);
   const [client, setClient] = useState(initialClient);
+  const toast = useToast();
   const [items, setItems] = useState<LocalItem[]>(() =>
     toLocalItems(initialItems)
   );
+  const display = useMotionItems(items);
   const [tax, setTax] = useState(
     initialTaxPercent > 0 ? String(initialTaxPercent) : ""
   );
@@ -217,6 +221,7 @@ export function InvoiceComposer({
 
     setPending(false);
     if (result?.error) setError(result.error);
+    else toast("Invoice saved");
   }
 
   return (
@@ -256,31 +261,32 @@ export function InvoiceComposer({
             No line items yet — add the first one below.
           </p>
         )}
-        {items.map((item, i) => (
+        {display.map(({ item, leaving }) => (
           <div
             key={item.id}
-            className="flex flex-col gap-2 md:grid md:grid-cols-[1fr_5.5rem_7.5rem_6rem_2rem] md:items-center"
+            aria-hidden={leaving || undefined}
+            className={`flex flex-col gap-2 md:grid md:grid-cols-[1fr_5.5rem_7.5rem_6rem_2rem] md:items-center ${leaving ? "animate-row-out" : "animate-rise-in"}`}
           >
             <Input
               value={item.description}
-              onChange={(e) => updateItem(i, { description: e.target.value })}
+              onChange={(e) => updateItem(items.findIndex((x) => x.id === item.id), { description: e.target.value })}
               placeholder="What is being billed?"
-              aria-label={`Line ${i + 1} description`}
+              aria-label="Line description"
             />
             <Input
               value={item.quantity}
-              onChange={(e) => updateItem(i, { quantity: e.target.value })}
+              onChange={(e) => updateItem(items.findIndex((x) => x.id === item.id), { quantity: e.target.value })}
               inputMode="numeric"
               className="text-right"
-              aria-label={`Line ${i + 1} quantity`}
+              aria-label="Line quantity"
             />
             <Input
               value={item.unit_amount}
-              onChange={(e) => updateItem(i, { unit_amount: e.target.value })}
+              onChange={(e) => updateItem(items.findIndex((x) => x.id === item.id), { unit_amount: e.target.value })}
               inputMode="decimal"
               placeholder="0.00"
               className="text-right"
-              aria-label={`Line ${i + 1} unit price`}
+              aria-label="Line unit price"
             />
             <span className="truncate text-right text-sm text-muted-foreground">
               {centsFromDollars(item.unit_amount) !== null &&
@@ -296,8 +302,8 @@ export function InvoiceComposer({
               variant="ghost"
               size="icon"
               className="w-8 shrink-0"
-              onClick={() => removeItem(i)}
-              aria-label={`Remove line ${i + 1}`}
+              onClick={() => removeItem(items.findIndex((x) => x.id === item.id))}
+              aria-label={`Remove line ${item.id}`}
             >
               <Trash2 className="h-3.5 w-3.5"  aria-hidden="true" />
             </Button>

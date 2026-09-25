@@ -7,6 +7,7 @@ import { getBriefs } from "@/lib/data/briefs";
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import { getInitials } from "@/lib/utils";
+import { ToastProvider } from "@/components/ui/toast";
 
 export default async function AppLayout({
   children,
@@ -47,6 +48,7 @@ export default async function AppLayout({
   const briefs = await getBriefs(context.id);
 
   return (
+    <ToastProvider>
     <div className="grid h-dvh grid-cols-1 grid-rows-[auto_1fr] overflow-hidden tab:grid-cols-[64px_1fr] desk:grid-cols-[232px_1fr]">
       <a
         href="#main"
@@ -82,5 +84,6 @@ export default async function AppLayout({
         <TimeTimer briefs={briefs.map((b) => ({ id: b.id, title: b.title }))} />
       )}
     </div>
+    </ToastProvider>
   );
 }

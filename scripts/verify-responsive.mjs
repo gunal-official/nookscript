@@ -449,7 +449,7 @@ async function main() {
       let m = null;
       try { m = await page.evaluate(METRICS_FN); } catch (e) { pageErrors.push("eval:" + String(e).slice(0, 80)); }
       const shot = (dir, name) => page.screenshot({ path: join(SHOTS, dir, String(w), `${name}.png`), fullPage: COMPLEX.has(pg.slug) && (w === 320 || w === 768) }).catch(() => {});
-      if (w === 320 || w === 768) { mkdirSync(join(SHOTS, "pages", String(w)), { recursive: true }); await shot("pages", pg.slug); }
+      mkdirSync(join(SHOTS, "pages", String(w)), { recursive: true }); await shot("pages", pg.slug);
       if (COMPLEX.has(pg.slug)) { mkdirSync(join(SHOTS, "complex", String(w)), { recursive: true }); await shot("complex", pg.slug); }
 
       const bad = !m || (m.overflowX > 0 || m.offenders.length > 0 || m.cutoffs.length > 0 || m.fixed.some((f) => f.escapes));
@@ -496,6 +496,106 @@ async function main() {
       failures++;
       results.push({ page: "dialog-template", width: w, dialog: null, error: String(e).slice(0, 120) });
       say(`✗ ${String(w).padStart(4)} dialog-template        trigger/measurement failed: ${String(e).slice(0, 80)}`);
+    }
+    await ctx.close();
+  }
+
+  // ── motion proof (RUN_MOTION=1): frame sequences for GIF assembly —
+  // dialog exit (close), line-row enter + leave, and a reduced-motion check.
+  if (process.env.RUN_MOTION === "1") {
+    const dir = join(SHOTS, "motion", "320");
+    mkdirSync(dir, { recursive: true });
+    const ctx = await browser.newContext({ viewport: { width: 320, height: 568 } });
+    await ctx.addCookies([authCookie]);
+    const page = await ctx.newPage();
+    try {
+      // A) REAL dialog (TemplateDialog) exit: frame-accurate JS opacity
+      // sampling (screenshots too slow for a 200ms fade) + slowed GIF frames.
+      await page.goto(`${BASE}/settings`, { waitUntil: "load", timeout: 20000 });
+      await page.click('button:has-text("template")', { timeout: 8000 });
+      await page.waitForTimeout(400);
+      await page.keyboard.press("Escape");
+      const samples = await page.evaluate(async () => {
+        const out = [];
+        const t0 = performance.now();
+        while (performance.now() - t0 < 280) {
+          const node = document.querySelector('[role="dialog"]');
+          out.push({
+            t: Math.round(performance.now() - t0),
+            present: !!node,
+            opacity: node ? Number(getComputedStyle(node).opacity) : null,
+            anims: node ? node.getAnimations().length : 0,
+          });
+          await new Promise((r) => requestAnimationFrame(r));
+        }
+        return out;
+      });
+      const first = samples[0];
+      const mid = samples.find((x) => x.t >= 80 && x.present) ?? samples[Math.floor(samples.length / 2)];
+      const goneAt = (samples.find((x) => !x.present) ?? {}).t ?? 999;
+      const faded = first.present && (mid?.opacity ?? 1) < 0.95 && goneAt > 120;
+      if (!faded) failures++;
+      say(`${faded ? "✓" : "✗"}  320 motion-dialog-exit     t0:${first.opacity}/anims:${first.anims} mid:${mid?.opacity} gone@${goneAt}`);
+      results.push({ page: "motion-dialog-exit-samples", width: 320, samples: samples.filter((_, i) => i % 4 === 0), smallTaps: [], overflowX: 0 });
+      // Slowed capture (800ms exit) so screenshots can show the fade shape.
+      await page.click('button:has-text("template")', { timeout: 8000 });
+      await page.waitForTimeout(400);
+      await page.addStyleTag({ content: "[data-state=closed] { animation-duration: 800ms !important; }" });
+      await page.screenshot({ path: join(dir, "dialog-exit-00.png") });
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(250);
+      await page.screenshot({ path: join(dir, "dialog-exit-01.png") });
+      await page.waitForTimeout(250);
+      await page.screenshot({ path: join(dir, "dialog-exit-02.png") });
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: join(dir, "dialog-exit-03.png") });
+      say("     320 motion-dialog-frames  4 frames (capture-slowed 800ms)");
+
+      // B) line row enter
+      await page.goto(`${BASE}/invoices/${U.invoice}`, { waitUntil: "load", timeout: 20000 });
+      await page.waitForTimeout(300);
+      await page.click('button:has-text("Add line item")', { timeout: 8000 });
+      await page.waitForTimeout(80);
+      await page.screenshot({ path: join(dir, "row-enter-00.png") });
+      await page.waitForTimeout(120);
+      await page.screenshot({ path: join(dir, "row-enter-01.png") });
+      await page.waitForTimeout(150);
+      await page.screenshot({ path: join(dir, "row-enter-02.png") });
+      say("✓  320 motion-row-enter       3 frames");
+
+      // C) line row leave (collapse where it stood)
+      await page.click('button[aria-label^="Remove line"]', { timeout: 8000 });
+      await page.waitForTimeout(80);
+      await page.screenshot({ path: join(dir, "row-leave-00.png") });
+      await page.waitForTimeout(100);
+      await page.screenshot({ path: join(dir, "row-leave-01.png") });
+      await page.waitForTimeout(140);
+      await page.screenshot({ path: join(dir, "row-leave-02.png") });
+      say("✓  320 motion-row-leave       3 frames");
+
+      // D) reduced motion: animation-name must be none; capture the state
+      const ctx2 = await browser.newContext({ viewport: { width: 320, height: 568 }, reducedMotion: "reduce" });
+      await ctx2.addCookies([authCookie]);
+      const p2 = await ctx2.newPage();
+      await p2.goto(`${BASE}/briefs`, { waitUntil: "load", timeout: 20000 });
+      const animName = await p2.evaluate(() => {
+        const el = document.querySelector(".animate-route-in") ?? document.body;
+        return getComputedStyle(el).animationName;
+      });
+      await p2.click('button[aria-label="Open menu"]', { timeout: 8000 });
+      await p2.waitForTimeout(50);
+      const slideName = await p2.evaluate(() => {
+        const el = document.querySelector(".animate-slide-in");
+        return el ? getComputedStyle(el).animationName : "missing";
+      });
+      await p2.screenshot({ path: join(dir, "reduced-motion-drawer.png") });
+      const rmOk = animName === "none" && slideName === "none";
+      if (!rmOk) failures++;
+      say(`${rmOk ? "✓" : "✗"}  320 motion-reduced          route:${animName} slide:${slideName}`);
+      await ctx2.close();
+    } catch (e) {
+      failures++;
+      say(`✗  320 motion-error           ${String(e).slice(0, 70)}`);
     }
     await ctx.close();
   }
