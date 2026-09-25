@@ -13,7 +13,7 @@ import {
 import { VS_PAGES } from "./vs-pages";
 
 interface VsPageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 // Only content-backed slugs generate pages; everything else 404s.
@@ -23,8 +23,9 @@ export function generateStaticParams() {
   return Object.keys(VS_PAGES).map((slug) => ({ slug }));
 }
 
-export function generateMetadata({ params }: VsPageProps): Metadata {
-  const entry = VS_PAGES[params.slug];
+export async function generateMetadata({ params }: VsPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const entry = VS_PAGES[slug];
   if (!entry) return {};
   return {
     title: `${entry.heading} — nookscript`,
@@ -37,8 +38,9 @@ export function generateMetadata({ params }: VsPageProps): Metadata {
  * ./vs-pages.ts; comparisons stay factual and purpose-built-flavored, never
  * disparaging. Unknown slugs → notFound().
  */
-export default function VsPage({ params }: VsPageProps) {
-  const entry = VS_PAGES[params.slug];
+export default async function VsPage({ params }: VsPageProps) {
+  const { slug } = await params;
+  const entry = VS_PAGES[slug];
   if (!entry) notFound();
 
   return (

@@ -58,17 +58,18 @@ function InvalidState() {
 export default async function PublicInvoicePage({
   params,
 }: {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 }) {
+  const { token } = await params;
   // Shape-check first: /invoice/demo-token and any garbage path never
   // reach the database.
-  if (!isUuid(params.token)) {
+  if (!isUuid(token)) {
     return <InvalidState />;
   }
 
   let invoice = null;
   try {
-    invoice = await getSharedInvoiceByToken(params.token);
+    invoice = await getSharedInvoiceByToken(token);
   } catch {
     // RPC/DB failure renders the same generic state — no internals here.
     return <InvalidState />;

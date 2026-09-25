@@ -48,17 +48,18 @@ function InvalidState() {
 export default async function SharePage({
   params,
 }: {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 }) {
+  const { token } = await params;
   // Shape-check first: /share/demo-token and any garbage path never reach
   // the database.
-  if (!isUuid(params.token)) {
+  if (!isUuid(token)) {
     return <InvalidState />;
   }
 
   let document = null;
   try {
-    document = await getSharedDocumentByToken(params.token);
+    document = await getSharedDocumentByToken(token);
   } catch {
     // RPC/DB failure renders the same generic state — no internals here.
     return <InvalidState />;

@@ -86,13 +86,14 @@ function NotFoundState() {
 export default async function BriefDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  if (!isUuid(params.id)) {
+  const { id } = await params;
+  if (!isUuid(id)) {
     return <NotFoundState />;
   }
 
-  const brief = await getBriefById(params.id);
+  const brief = await getBriefById(id);
   if (!brief) {
     return <NotFoundState />;
   }

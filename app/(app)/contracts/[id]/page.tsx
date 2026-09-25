@@ -85,14 +85,15 @@ function NotFoundState() {
 export default async function ContractDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  if (!isUuid(params.id)) {
+  const { id } = await params;
+  if (!isUuid(id)) {
     return <NotFoundState />;
   }
 
   const context = await getWorkspaceContext();
-  const contract = await getContractById(params.id);
+  const contract = await getContractById(id);
   if (!contract || !context) {
     return <NotFoundState />;
   }

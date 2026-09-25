@@ -78,13 +78,14 @@ function NotFoundState() {
 export default async function ProposalDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  if (!isUuid(params.id)) {
+  const { id } = await params;
+  if (!isUuid(id)) {
     return <NotFoundState />;
   }
 
-  const proposal = await getProposalById(params.id);
+  const proposal = await getProposalById(id);
   if (!proposal) {
     return <NotFoundState />;
   }

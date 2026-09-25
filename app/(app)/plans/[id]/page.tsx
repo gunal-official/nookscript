@@ -82,13 +82,14 @@ function NotFoundState() {
 export default async function PlanDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  if (!isUuid(params.id)) {
+  const { id } = await params;
+  if (!isUuid(id)) {
     return <NotFoundState />;
   }
 
-  const plan = await getPlanById(params.id);
+  const plan = await getPlanById(id);
   if (!plan) {
     return <NotFoundState />;
   }

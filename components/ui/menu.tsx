@@ -4,12 +4,16 @@
 // Escape closes + returns focus, click-outside closes, 44px items. Serves the
 // Topbar "user menu" at every width and holds Settings on mobile (where the
 // bottom nav shows the five work destinations instead).
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function Menu({ trigger, children, label }: { trigger: React.ReactNode; children: (close: () => void) => React.ReactNode; label: string }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const close = useCallback(() => {
+    setOpen(false);
+    btnRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -43,7 +47,11 @@ export function Menu({ trigger, children, label }: { trigger: React.ReactNode; c
           aria-label={label}
           className="absolute right-0 top-full z-50 mt-1 min-w-[176px] rounded-[0.35rem] border border-border bg-background p-1 shadow-lg animate-pop-in"
         >
-          {children(() => { setOpen(false); btnRef.current?.focus(); })}
+          {/* close is an event callback (menu-item onClick) — its btnRef
+              read happens at invoke time, never during render; the rule
+              cannot see through the render-prop boundary. */}
+          {/* eslint-disable-next-line react-hooks/refs */}
+          {children(close)}
         </div>
       )}
     </div>

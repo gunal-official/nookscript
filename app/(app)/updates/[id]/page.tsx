@@ -80,13 +80,14 @@ function NotFoundState() {
 export default async function UpdateDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  if (!isUuid(params.id)) {
+  const { id } = await params;
+  if (!isUuid(id)) {
     return <NotFoundState />;
   }
 
-  const update = await getUpdateById(params.id);
+  const update = await getUpdateById(id);
   if (!update) {
     return <NotFoundState />;
   }
@@ -95,7 +96,7 @@ export default async function UpdateDetailPage({
   // the ACTIVE workspace (Step 16) like every other list read.
   const context = await getWorkspaceContext();
   const [shareLink, templates] = await Promise.all([
-    getShareLinkForUpdate(params.id),
+    getShareLinkForUpdate(id),
     context ? getTemplates(context.id) : Promise.resolve([]),
   ]);
 

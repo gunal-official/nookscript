@@ -22,10 +22,10 @@ import { isUuid } from "@/lib/utils";
 export default async function InvitePage({
   params,
 }: {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 }) {
-  const token = params.token;
-  const configured = isSupabaseConfigured();
+  const { token } = await params;
+    const configured = isSupabaseConfigured();
   const preview =
     configured && isUuid(token) ? await getTeamInvitePreview(token) : null;
 

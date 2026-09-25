@@ -78,9 +78,10 @@ function NotFoundState() {
 export default async function InvoiceDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  if (!isUuid(params.id)) {
+  const { id } = await params;
+  if (!isUuid(id)) {
     return <NotFoundState />;
   }
 
@@ -95,13 +96,13 @@ export default async function InvoiceDetailPage({
     );
   }
 
-  const invoice = await getInvoiceById(params.id);
+  const invoice = await getInvoiceById(id);
   if (!invoice) {
     return <NotFoundState />;
   }
 
   // The link read is RLS-scoped to the caller's workspaces.
-  const link = await getInvoiceLinkForInvoice(params.id);
+  const link = await getInvoiceLinkForInvoice(id);
 
   return (
     <div className="mx-auto max-w-6xl">
