@@ -1,11 +1,12 @@
 /**
- * /contracts/:id — the contract composer: title, client, brief, terms,
- * expiry, signatory, and the draft/sent/signed/void lifecycle (audit
- * stamps included).
+ * /contracts/:id — engagement letter (Step 34(b) document treatment): the
+ * agreement rendered as a paper letter with letterhead strip and a two-party
+ * signature block, a signing-flow rail (Draft → Sent → Signed with audit
+ * stamps), an activity timeline, and the composer below for editors.
  *
- * Printing: the on-screen UI is the editor; the PRINTABLE document is
- * PrintContractDocument (hidden print:block) — with the (app) chrome
- * (topbar + sidebar) also print:hidden, browser print of this page
+ * Printing: the on-screen UI is the editor + letter preview; the PRINTABLE
+ * document is PrintContractDocument (hidden print:block) — with the (app)
+ * chrome (topbar + sidebar) also print:hidden, browser print of this page
  * yields a clean contract. That is the v1 export story (D4: no public
  * surface, no PDF endpoint, no e-sign).
  *
@@ -14,7 +15,8 @@
  *      Sent + Signed dates (the audit stamps) and the signatory.
  *   2. Status: Signed → Draft CLEARS signed_at; → Sent keeps sent_at;
  *      → Signed re-stamps it; Void keeps every stamp.
- *   3. Edit terms/client/expiry/signatory → Save persists.
+ *   3. Edit terms/client/expiry/signatory in the composer → Save persists;
+ *      the letter above reflects it after save.
  *   4. Print (button or browser): a clean document renders — title,
  *      client, dates, signatory, terms — no app chrome.
  *   5. Bogus or foreign ids render the "not found" state (RLS hides
@@ -22,7 +24,17 @@
  */
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  Ban,
+  BookOpen,
+  Clock,
+  FilePlus2,
+  FileSignature,
+  Hourglass,
+  PenLine,
+  Send,
+} from "lucide-react";
 
 import { getContractById } from "@/lib/data/contracts";
 import { getBriefs } from "@/lib/data/briefs";
@@ -39,13 +51,23 @@ import { PrintContractDocument } from "@/components/contracts/PrintContractDocum
 import { PrintButton } from "@/components/invoices/PrintButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  ActivityTimeline,
+  DocHeader,
+  PaperCard,
+  StatTile,
+  type TimelineEvent,
+} from "@/components/ui/doc-detail";
+import type { ContractStatus } from "@/lib/types/contract";
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      {children}
+    </p>
+  );
+}
 
 function MetaRow({
   label,
@@ -57,8 +79,67 @@ function MetaRow({
   return (
     <div className="flex items-start justify-between gap-4 text-sm">
       <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className="text-right">{children}</span>
+      <span className="min-w-0 break-words text-right">{children}</span>
     </div>
+  );
+}
+
+const FLOW_STEPS: {
+  key: ContractStatus;
+  label: string;
+  icon: typeof Send;
+}[] = [
+  { key: "draft", label: "Draft", icon: FilePlus2 },
+  { key: "sent", label: "Sent", icon: Send },
+  { key: "signed", label: "Signed", icon: PenLine },
+];
+
+function SigningFlow({ status }: { status: ContractStatus }) {
+  const stepIndex = FLOW_STEPS.findIndex((s) => s.key === status);
+  return (
+    <div className="flex items-center gap-1.5">
+      {FLOW_STEPS.map((step, i) => {
+        const active = i === stepIndex;
+        const done = status !== "void" && i < stepIndex;
+        return (
+          <span
+            key={step.key}
+            className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-sm ${
+              active
+                ? "border-accent bg-accent-soft text-accent"
+                : done
+                  ? "border-border bg-muted/60 text-success"
+                  : "border-border text-muted-foreground"
+            }`}
+          >
+            <step.icon className="h-4 w-4" aria-hidden="true" />
+            {step.label}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function RailCard({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="animate-rise-in">
+      <CardHeader className="flex-row items-center gap-2.5 space-y-0 border-b border-border px-5 py-3.5">
+        <span className="icon-chip icon-chip-muted h-8 w-8">
+          <Icon className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3.5 p-5">{children}</CardContent>
+    </Card>
   );
 }
 
@@ -110,91 +191,275 @@ export default async function ContractDetailPage({
     new Set(briefs.map((b) => b.client_name).filter((c): c is string => !!c))
   );
 
+  const isExpired =
+    !!contract.expires_on &&
+    contract.status !== "signed" &&
+    contract.status !== "void" &&
+    contract.expires_on < new Date().toISOString().slice(0, 10);
+
+  const events: TimelineEvent[] = [
+    {
+      icon: FilePlus2,
+      title: "Created",
+      at: formatDate(contract.created_at),
+      tone: "muted",
+    },
+    ...(contract.sent_at
+      ? [
+          {
+            icon: Send,
+            title: "Sent to client",
+            detail: contract.client_name,
+            at: formatDate(contract.sent_at),
+            tone: "accent",
+          } as TimelineEvent,
+        ]
+      : []),
+    ...(contract.signed_at
+      ? [
+          {
+            icon: PenLine,
+            title: "Signed",
+            detail: contract.signed_by || undefined,
+            at: formatDate(contract.signed_at),
+            tone: "success",
+          } as TimelineEvent,
+        ]
+      : []),
+    ...(contract.status === "void"
+      ? [
+          {
+            icon: Ban,
+            title: "Voided",
+            detail: "Keeps every audit stamp",
+            at: timeAgo(contract.updated_at),
+            tone: "error",
+          } as TimelineEvent,
+        ]
+      : []),
+    ...(contract.expires_on
+      ? [
+          {
+            icon: Hourglass,
+            title: isExpired ? "Expired" : "Offer expires",
+            detail: isExpired
+              ? "The offer window has passed"
+              : "Last day to accept",
+            at: formatDate(contract.expires_on),
+            tone: isExpired ? "error" : "muted",
+          } as TimelineEvent,
+        ]
+      : []),
+  ];
+
   return (
     <div className="mx-auto max-w-6xl">
-      {/* On-screen editor — hidden when printing. */}
+      {/* On-screen editor + letter — hidden when printing. */}
       <div className="print:hidden">
-        {/* Header */}
-        <div className="mb-6">
-          <Link
-            href="/contracts"
-            className="mb-3 inline-flex min-h-11 min-w-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
-          >
-            <ArrowLeft className="h-3.5 w-3.5"  aria-hidden="true" />
-            Contracts
-          </Link>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-2xl font-bold tracking-tight">
-              {contract.title}
-            </h1>
-            <ContractStatusBadge status={contract.status} />
-            <ExpiredBadge
-              expiresOn={contract.expires_on}
-              status={contract.status}
-            />
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {contract.client_name}
-          </p>
+        <Link
+          href="/contracts"
+          className="mb-3 inline-flex min-h-11 min-w-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+          Contracts
+        </Link>
+
+        <DocHeader
+          icon={FileSignature}
+          title={contract.title}
+          badges={
+            <>
+              <ContractStatusBadge status={contract.status} />
+              <ExpiredBadge
+                expiresOn={contract.expires_on}
+                status={contract.status}
+              />
+            </>
+          }
+          subtitle={`${contract.client_name}${briefTitle ? ` — ${briefTitle}` : ""}`}
+          actions={<PrintButton />}
+        />
+
+        {/* Stat tiles */}
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatTile
+            icon={Send}
+            label="Sent"
+            value={contract.sent_at ? formatDate(contract.sent_at) : "Not sent"}
+            hint={contract.sent_at ? "Audit stamp — never overwritten" : "Draft stage"}
+            tone={contract.sent_at ? "accent" : "muted"}
+          />
+          <StatTile
+            icon={PenLine}
+            label="Signed"
+            value={
+              contract.signed_at ? formatDate(contract.signed_at) : "Awaiting"
+            }
+            hint={
+              contract.signed_by
+                ? contract.signed_by
+                : "No signatory recorded"
+            }
+            tone={contract.signed_at ? "success" : "muted"}
+          />
+          <StatTile
+            icon={Clock}
+            label="Expires"
+            value={
+              contract.expires_on ? formatDate(contract.expires_on) : "No expiry"
+            }
+            hint={
+              isExpired
+                ? "Expired offer"
+                : contract.expires_on
+                  ? "Last day to accept"
+                  : "Open-ended offer"
+            }
+            tone={isExpired ? "error" : "muted"}
+          />
         </div>
 
         <div className="grid items-start gap-6 lg:grid-cols-[2fr_1fr]">
-          {/* ── Left: composer ── */}
-          <Card>
-            <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
-              <CardTitle className="text-base">Composer</CardTitle>
-              <CardDescription>
-                Plain-text terms — the document you print and send.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-5">
-              <CanEdit>
-                <ContractComposer
-                  contract={contract}
-                  briefTitles={briefTitles}
-                  clientSuggestions={clientSuggestions}
-                />
-              </CanEdit>
-            </CardContent>
-          </Card>
+          {/* ── Left: the engagement letter + composer ── */}
+          <div className="space-y-6">
+            <PaperCard
+              letterLabel="Engagement letter"
+              letterhead={context.name}
+              meta={formatDate(contract.created_at)}
+              footer={
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div>
+                    <FieldLabel>For the studio</FieldLabel>
+                    <p className="mt-1 font-display text-xl italic tracking-tight">
+                      {context.name}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatDate(contract.created_at)}
+                    </p>
+                  </div>
+                  <div>
+                    <FieldLabel>For the client</FieldLabel>
+                    {contract.signed_at ? (
+                      <>
+                        <p className="mt-1 font-display text-xl italic tracking-tight">
+                          {contract.signed_by || contract.client_name}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Signed {formatDate(contract.signed_at)}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="mt-1 min-h-8 border-b border-dashed border-border">
+                          {contract.signed_by && (
+                            <span className="font-display text-xl italic tracking-tight">
+                              {contract.signed_by}
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {contract.status === "void"
+                            ? "Void — signature line retired"
+                            : "Awaiting signature"}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              }
+            >
+              <div className="space-y-1">
+                <h2 className="font-display text-xl font-bold tracking-tight">
+                  {contract.title}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Between {context.name} and {contract.client_name}
+                  {briefTitle ? ` — ${briefTitle}` : ""}
+                </p>
+              </div>
+              <pre className="mt-6 whitespace-pre-wrap font-sans text-[15px] leading-relaxed">
+                {contract.terms || "—"}
+              </pre>
+            </PaperCard>
 
-          {/* ── Right: details ── */}
-          <Card>
-            <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
-              <CardTitle className="text-base">Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3.5 p-5">
-              <MetaRow label="Status">
-                <CanEdit
-                  fallback={<ContractStatusBadge status={contract.status} />}
-                >
-                  <ContractStatusSelect
-                    contractId={contract.id}
-                    status={contract.status}
+            <CanEdit>
+              <Card className="animate-rise-in">
+                <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
+                  <CardTitle className="text-base">Edit terms</CardTitle>
+                </CardHeader>
+                <CardContent className="p-5">
+                  <ContractComposer
+                    contract={contract}
+                    briefTitles={briefTitles}
+                    clientSuggestions={clientSuggestions}
                   />
-                </CanEdit>
-              </MetaRow>
+                </CardContent>
+              </Card>
+            </CanEdit>
+          </div>
+
+          {/* ── Right: signing + metadata rail ── */}
+          <div className="space-y-4">
+            <RailCard icon={FileSignature} title="Signing">
+              <SigningFlow status={contract.status} />
+              {contract.status === "void" && (
+                <p className="flex items-center gap-1.5 text-sm text-error">
+                  <Ban className="h-4 w-4" aria-hidden="true" />
+                  Void — this agreement is closed out.
+                </p>
+              )}
+              <div className="border-t border-border pt-3.5">
+                <MetaRow label="Move to">
+                  <CanEdit
+                    fallback={<ContractStatusBadge status={contract.status} />}
+                  >
+                    <ContractStatusSelect
+                      contractId={contract.id}
+                      status={contract.status}
+                    />
+                  </CanEdit>
+                </MetaRow>
+              </div>
+            </RailCard>
+
+            <RailCard icon={BookOpen} title="Details">
               <MetaRow label="Client">{contract.client_name}</MetaRow>
-              <MetaRow label="Brief">{briefTitle ?? "Standalone"}</MetaRow>
-              <MetaRow label="Expires">
-                {formatDate(contract.expires_on)}
+              <MetaRow label="Brief">
+                {contract.brief_id ? (
+                  <Link
+                    href={`/briefs/${contract.brief_id}`}
+                    className="inline-block min-h-11 min-w-11 break-words px-0.5 py-3 text-accent underline-offset-2 hover:underline"
+                  >
+                    {briefTitle ?? "View brief"}
+                  </Link>
+                ) : (
+                  "Standalone"
+                )}
               </MetaRow>
               {contract.sent_at && (
                 <MetaRow label="Sent">{formatDate(contract.sent_at)}</MetaRow>
               )}
               {contract.signed_at && (
-                <MetaRow label="Signed">{formatDate(contract.signed_at)}</MetaRow>
+                <MetaRow label="Signed">
+                  {formatDate(contract.signed_at)}
+                </MetaRow>
               )}
               {contract.signed_by && (
                 <MetaRow label="Signed by">{contract.signed_by}</MetaRow>
               )}
-              <MetaRow label="Created">{formatDate(contract.created_at)}</MetaRow>
-              <MetaRow label="Updated">{timeAgo(contract.updated_at)}</MetaRow>
-              <MetaRow label="Export">
-                <PrintButton className="mt-1" />
+              <MetaRow label="Created">
+                {formatDate(contract.created_at)}
               </MetaRow>
-            </CardContent>
-          </Card>
+              <MetaRow label="Updated">{timeAgo(contract.updated_at)}</MetaRow>
+              <div className="border-t border-border pt-3.5">
+                <PrintButton />
+              </div>
+            </RailCard>
+
+            <RailCard icon={Clock} title="Activity">
+              <ActivityTimeline events={events} />
+            </RailCard>
+          </div>
         </div>
       </div>
 

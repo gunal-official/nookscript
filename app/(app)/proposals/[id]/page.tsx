@@ -1,20 +1,36 @@
 /**
- * /proposals/:id — proposal detail: status flow, budget & timeline,
- * deliverables checklist, and a link back to the source brief.
+ * /proposals/:id — proposal detail (Step 34(b) document treatment): the
+ * generated proposal rendered as a paper document with a letterhead strip,
+ * stat tiles (deliverables / budget / source), a "next step" CTA card that
+ * turns the proposal into a delivery plan, and an activity timeline.
  *
  * HOW TO TEST (locally — Supabase configured per README.md, seed loaded):
  *   1. From /proposals open the seeded "Brightloop Co." proposal.
  *   2. Status dropdown (Draft → Sent → Accepted / Declined): proposals.status
  *      updates; back on /proposals the card badge matches.
- *   3. "Source" row links to /briefs/<id> of the brief it was generated
+ *   3. "Source" card links to /briefs/<id> of the brief it was generated
  *      from; on that brief page, "Generate proposal" creates another draft
  *      and redirects here.
- *   4. Bogus or foreign-workspace ids render the "not found" state (RLS
+ *   4. "Generate delivery plan" (editors only) creates the plan and
+ *      redirects to /plans/<id>.
+ *   5. Bogus or foreign-workspace ids render the "not found" state (RLS
  *      hides them identically — no cross-tenant leakage).
  */
 
 import Link from "next/link";
-import { ArrowLeft, ArrowUpRight, Check } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  BookOpen,
+  Check,
+  Clock,
+  FilePlus2,
+  FileText,
+  ListChecks,
+  Sparkles,
+  Wallet,
+  X,
+} from "lucide-react";
 
 import { getProposalById } from "@/lib/data/proposals";
 import { formatDate, isUuid, timeAgo } from "@/lib/utils";
@@ -24,13 +40,14 @@ import { ProposalStatusBadge } from "@/components/proposals/ProposalStatusBadge"
 import { ProposalStatusSelect } from "@/components/proposals/ProposalStatusSelect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  ActivityTimeline,
+  DocHeader,
+  PaperCard,
+  StatTile,
+  type TimelineEvent,
+} from "@/components/ui/doc-detail";
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -52,6 +69,28 @@ function MetaRow({
       <span className="shrink-0 text-muted-foreground">{label}</span>
       <span className="text-right">{children}</span>
     </div>
+  );
+}
+
+function RailCard({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="animate-rise-in">
+      <CardHeader className="flex-row items-center gap-2.5 space-y-0 border-b border-border px-5 py-3.5">
+        <span className="icon-chip icon-chip-muted h-8 w-8">
+          <Icon className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3.5 p-5">{children}</CardContent>
+    </Card>
   );
 }
 
@@ -91,45 +130,114 @@ export default async function ProposalDetailPage({
   }
 
   const doneCount = proposal.deliverables.filter((d) => d.checked).length;
+  const budgetCaptured = !!proposal.budget_timeline?.trim();
+  const decided =
+    proposal.status === "accepted" ? "accepted" : proposal.status === "declined" ? "declined" : null;
+
+  const events: TimelineEvent[] = [
+    {
+      icon: FilePlus2,
+      title: "Generated from brief",
+      detail: proposal.brief ? proposal.brief.title : undefined,
+      at: formatDate(proposal.created_at),
+      tone: "accent",
+    },
+    ...(decided
+      ? [
+          {
+            icon: decided === "accepted" ? Check : X,
+            title: decided === "accepted" ? "Accepted" : "Declined",
+            detail: "Recorded on the proposal",
+            at: formatDate(proposal.updated_at),
+            tone: decided === "accepted" ? "success" : "error",
+          } as TimelineEvent,
+        ]
+      : []),
+    {
+      icon: Clock,
+      title: "Last updated",
+      at: timeAgo(proposal.updated_at),
+      tone: "muted",
+    },
+  ];
 
   return (
     <div className="mx-auto max-w-6xl">
-      {/* Header */}
-      <div className="mb-6">
-        <Link
-          href="/proposals"
-          className="mb-3 inline-flex min-h-11 min-w-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
-        >
-          <ArrowLeft className="h-3.5 w-3.5"  aria-hidden="true" />
-          Proposals
-        </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-2xl font-bold tracking-tight">
-            {proposal.title}
-          </h1>
-          <ProposalStatusBadge status={proposal.status} />
-        </div>
-        {proposal.client_name && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            {proposal.client_name}
-          </p>
-        )}
+      <Link
+        href="/proposals"
+        className="mb-3 inline-flex min-h-11 min-w-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+        Proposals
+      </Link>
+
+      <DocHeader
+        icon={FileText}
+        title={proposal.title}
+        badges={<ProposalStatusBadge status={proposal.status} />}
+        subtitle={proposal.client_name ?? undefined}
+      />
+
+      {/* Stat tiles */}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatTile
+          icon={ListChecks}
+          label="Deliverables"
+          value={`${doneCount} of ${proposal.deliverables.length} done`}
+          hint={
+            proposal.deliverables.length > 0
+              ? "Agreed scope items"
+              : "None captured"
+          }
+          tone={doneCount > 0 ? "accent" : "muted"}
+        />
+        <StatTile
+          icon={Wallet}
+          label="Budget & timeline"
+          value={budgetCaptured ? "Captured" : "Not captured"}
+          hint={
+            budgetCaptured
+              ? proposal.budget_timeline!.slice(0, 64) +
+                (proposal.budget_timeline!.length > 64 ? "…" : "")
+              : "Add when generating from the brief"
+          }
+          tone={budgetCaptured ? "success" : "muted"}
+        />
+        <StatTile
+          icon={BookOpen}
+          label="Source brief"
+          value={proposal.brief ? proposal.brief.title : "—"}
+          hint={proposal.brief ? "View the brief it came from" : undefined}
+          href={proposal.brief ? `/briefs/${proposal.brief.id}` : undefined}
+          delay={80}
+        />
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[2fr_1fr]">
-        {/* ── Left: proposal details ── */}
-        <Card>
-          <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
-            <CardTitle className="text-base">Proposal details</CardTitle>
-            <CardDescription>
-              Copied from the source brief when the proposal was generated.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5 p-5">
+        {/* ── Left: the proposal document ── */}
+        <PaperCard
+          letterLabel="Proposal"
+          letterhead={proposal.client_name ?? "Proposal"}
+          meta={formatDate(proposal.created_at)}
+          footer={
+            proposal.brief ? (
+              <p className="text-xs text-muted-foreground">
+                Generated from the brief{" "}
+                <Link
+                  href={`/briefs/${proposal.brief.id}`}
+                  className="inline-block min-h-11 min-w-11 break-words px-0.5 py-3 text-accent underline-offset-2 hover:underline"
+                >
+                  {proposal.brief.title}
+                </Link>
+              </p>
+            ) : undefined
+          }
+        >
+          <div className="space-y-6">
             <div className="space-y-1.5">
               <FieldLabel>Budget & timeline</FieldLabel>
-              {proposal.budget_timeline ? (
-                <p className="text-sm leading-relaxed">
+              {budgetCaptured ? (
+                <p className="text-[15px] leading-relaxed">
                   {proposal.budget_timeline}
                 </p>
               ) : (
@@ -165,7 +273,7 @@ export default async function ProposalDetailPage({
                         }`}
                       >
                         {d.checked && (
-                          <Check className="h-3 w-3" strokeWidth={3.5}  aria-hidden="true" />
+                          <Check className="h-3 w-3" strokeWidth={3.5} aria-hidden="true" />
                         )}
                       </span>
                       <span
@@ -182,15 +290,30 @@ export default async function ProposalDetailPage({
                 )}
               </ul>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </PaperCard>
 
-        {/* ── Right: metadata / actions ── */}
-        <Card>
-          <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
-            <CardTitle className="text-base">Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3.5 p-5">
+        {/* ── Right: action + metadata rail ── */}
+        <div className="space-y-4">
+          <Card className="animate-rise-in" style={{ animationDelay: "40ms" }}>
+            <CardHeader className="flex-row items-center gap-2.5 space-y-0 border-b border-border px-5 py-3.5">
+              <span className="icon-chip icon-chip-accent h-8 w-8">
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <CardTitle className="text-base">Next step</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 p-5">
+              <p className="text-sm text-muted-foreground">
+                Turn this proposal into a delivery plan with tasks your
+                client can follow.
+              </p>
+              <CanEdit>
+                <GeneratePlanButton proposalId={proposal.id} />
+              </CanEdit>
+            </CardContent>
+          </Card>
+
+          <RailCard icon={FileText} title="Details">
             <MetaRow label="Status">
               <CanEdit
                 fallback={<ProposalStatusBadge status={proposal.status} />}
@@ -206,27 +329,25 @@ export default async function ProposalDetailPage({
             )}
             <MetaRow label="Created">{formatDate(proposal.created_at)}</MetaRow>
             <MetaRow label="Updated">{timeAgo(proposal.updated_at)}</MetaRow>
-            {proposal.brief && (
-              <div className="border-t border-border pt-3.5">
-                <Link
-                  href={`/briefs/${proposal.brief.id}`}
-                  className="inline-flex min-h-11 min-w-11 items-center group inline-flex items-center gap-1.5 text-sm text-accent underline-offset-2 hover:underline"
-                >
-                  View source brief
-                  <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                </Link>
-                <p className="mt-1 truncate text-xs text-muted-foreground">
-                  {proposal.brief.title}
-                </p>
-              </div>
-            )}
-            <div className="border-t border-border pt-4">
-              <CanEdit>
-                <GeneratePlanButton proposalId={proposal.id} />
-              </CanEdit>
-            </div>
-          </CardContent>
-        </Card>
+          </RailCard>
+
+          {proposal.brief && (
+            <RailCard icon={BookOpen} title="Source">
+              <p className="text-sm">{proposal.brief.title}</p>
+              <Link
+                href={`/briefs/${proposal.brief.id}`}
+                className="inline-flex min-h-11 min-w-11 items-center group gap-1.5 text-sm text-accent underline-offset-2 hover:underline"
+              >
+                View source brief
+                <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Link>
+            </RailCard>
+          )}
+
+          <RailCard icon={Clock} title="Activity">
+            <ActivityTimeline events={events} />
+          </RailCard>
+        </div>
       </div>
     </div>
   );
