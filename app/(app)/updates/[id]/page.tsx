@@ -1,7 +1,8 @@
 /**
- * /updates/:id — the client update composer: editable title + body with
- * explicit save, draft/sent status, markdown export, and a link back to
- * the source plan.
+ * /updates/:id — the client update document (Step 34(b)): the update
+ * rendered as a paper document (letterhead + body), stat tiles (status /
+ * source plan / public link), the composer below for editors, share-link
+ * panel, markdown export, and an activity timeline.
  *
  * HOW TO TEST (locally — Supabase configured per README.md, ⚠ apply the
  * new updates migration + seed first):
@@ -14,12 +15,25 @@
  *      (exports last-saved content).
  *   5. "View source plan" links to /plans/<id>; from that plan page,
  *      "Compose update" creates another draft and redirects here.
- *   6. Bogus or foreign ids render the "not found" state (RLS hides them
- *      identically).
+ *   6. Share panel: create → copy the /share/<token> URL → open it in an
+ *      INCOGNITO window: the update renders read-only. Revoke → the URL
+ *      shows the generic "unavailable" state.
+ *   7. Bogus or foreign ids render the "not found" state (RLS hides
+ *      them identically).
  */
 
 import Link from "next/link";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  BookOpen,
+  Clock,
+  FilePlus2,
+  FileText,
+  Link2,
+  Megaphone,
+  Send,
+} from "lucide-react";
 
 import { getUpdateById } from "@/lib/data/updates";
 import { getShareLinkForUpdate } from "@/lib/data/shares";
@@ -34,13 +48,14 @@ import { UpdateStatusBadge } from "@/components/updates/UpdateStatusBadge";
 import { UpdateStatusSelect } from "@/components/updates/UpdateStatusSelect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  ActivityTimeline,
+  DocHeader,
+  PaperCard,
+  StatTile,
+  type TimelineEvent,
+} from "@/components/ui/doc-detail";
 
 function MetaRow({
   label,
@@ -52,8 +67,35 @@ function MetaRow({
   return (
     <div className="flex items-start justify-between gap-4 text-sm">
       <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className="text-right">{children}</span>
+      <span className="min-w-0 break-words text-right">{children}</span>
     </div>
+  );
+}
+
+function RailCard({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="animate-rise-in">
+      <CardHeader className="flex-row items-center gap-2.5 space-y-0 border-b border-border px-5 py-3.5">
+        <span className="icon-chip icon-chip-muted h-8 w-8">
+          <Icon className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <div className="space-y-1">
+          <CardTitle className="text-base">{title}</CardTitle>
+          {description && <CardDescription>{description}</CardDescription>}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3.5 p-5">{children}</CardContent>
+    </Card>
   );
 }
 
@@ -100,58 +142,142 @@ export default async function UpdateDetailPage({
     context ? getTemplates(context.id) : Promise.resolve([]),
   ]);
 
+  const events: TimelineEvent[] = [
+    {
+      icon: FilePlus2,
+      title: "Drafted",
+      detail: update.plan ? `From “${update.plan.title}”` : undefined,
+      at: formatDate(update.created_at),
+      tone: "accent",
+    },
+    ...(update.status === "sent"
+      ? [
+          {
+            icon: Send,
+            title: "Marked sent",
+            detail: update.client_name ?? undefined,
+            at: formatDate(update.updated_at),
+            tone: "success",
+          } as TimelineEvent,
+        ]
+      : []),
+    {
+      icon: Clock,
+      title: "Last updated",
+      at: timeAgo(update.updated_at),
+      tone: "muted",
+    },
+  ];
+
   return (
     <div className="mx-auto max-w-6xl">
-      {/* Header */}
-      <div className="mb-6">
-        <Link
-          href="/updates"
-          className="mb-3 inline-flex min-h-11 min-w-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
-        >
-          <ArrowLeft className="h-3.5 w-3.5"  aria-hidden="true" />
-          Updates
-        </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-2xl font-bold tracking-tight">
-            {update.title}
-          </h1>
-          <UpdateStatusBadge status={update.status} />
-        </div>
-        {update.client_name && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            {update.client_name}
-          </p>
-        )}
+      <Link
+        href="/updates"
+        className="mb-3 inline-flex min-h-11 min-w-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+        Updates
+      </Link>
+
+      <DocHeader
+        icon={Megaphone}
+        title={update.title}
+        badges={<UpdateStatusBadge status={update.status} />}
+        subtitle={update.client_name ?? undefined}
+      />
+
+      {/* Stat tiles */}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatTile
+          icon={FileText}
+          label="Status"
+          value={<UpdateStatusBadge status={update.status} />}
+          hint={update.status === "sent" ? "Delivered to the client" : "Not sent yet"}
+          tone={update.status === "sent" ? "success" : "muted"}
+        />
+        <StatTile
+          icon={BookOpen}
+          label="Source plan"
+          value={update.plan ? update.plan.title : "—"}
+          hint={update.plan ? "View the plan it came from" : "Standalone update"}
+          href={update.plan ? `/plans/${update.plan.id}` : undefined}
+          delay={40}
+        />
+        <StatTile
+          icon={Link2}
+          label="Public link"
+          value={shareLink ? "Live" : "Private"}
+          hint={
+            shareLink
+              ? "Clients can open the read-only view"
+              : "Create one to share this update"
+          }
+          tone={shareLink ? "success" : "muted"}
+          delay={80}
+        />
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[2fr_1fr]">
-        {/* ── Left: composer ── */}
-        <CanEdit>
-        <Card>
-          <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
-            <CardTitle className="text-base">Composer</CardTitle>
-            <CardDescription>
-              Edit the title and body, then save — the client gets the
-              exported markdown.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-5">
-            <UpdateComposer
-              updateId={update.id}
-              initialTitle={update.title}
-              initialBody={update.body}
-              templates={templates}
-            />
-          </CardContent>
-        </Card>
-        </CanEdit>
+        {/* ── Left: the update document + composer ── */}
+        <div className="space-y-6">
+          <PaperCard
+            letterLabel="Client update"
+            letterhead={update.client_name ?? "Client update"}
+            meta={formatDate(update.created_at)}
+            footer={
+              update.plan ? (
+                <p className="text-xs text-muted-foreground">
+                  From the plan{" "}
+                  <Link
+                    href={`/plans/${update.plan.id}`}
+                    className="inline-block min-h-11 min-w-11 break-words px-0.5 py-3 text-accent underline-offset-2 hover:underline"
+                  >
+                    {update.plan.title}
+                  </Link>
+                </p>
+              ) : undefined
+            }
+          >
+            <h2 className="font-display text-xl font-bold tracking-tight">
+              {update.title}
+            </h2>
+            <pre className="mt-4 whitespace-pre-wrap font-sans text-[15px] leading-relaxed">
+              {update.body}
+            </pre>
+          </PaperCard>
 
-        {/* ── Right: metadata / actions ── */}
-        <Card>
-          <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
-            <CardTitle className="text-base">Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3.5 p-5">
+          <CanEdit>
+            <Card className="animate-rise-in">
+              <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
+                <CardTitle className="text-base">Edit update</CardTitle>
+                <CardDescription>
+                  Edit the title and body, then save — the client gets the
+                  exported markdown.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-5">
+                <UpdateComposer
+                  updateId={update.id}
+                  initialTitle={update.title}
+                  initialBody={update.body}
+                  templates={templates}
+                />
+              </CardContent>
+            </Card>
+          </CanEdit>
+        </div>
+
+        {/* ── Right: share + metadata rail ── */}
+        <div className="space-y-4">
+          <RailCard
+            icon={Link2}
+            title="Public link"
+            description="Read-only update the client can open — revocable any time."
+          >
+            <ShareLinkPanel updateId={update.id} shareLink={shareLink} />
+          </RailCard>
+
+          <RailCard icon={Megaphone} title="Details">
             <MetaRow label="Status">
               <CanEdit fallback={<UpdateStatusBadge status={update.status} />}>
                 <UpdateStatusSelect updateId={update.id} status={update.status} />
@@ -162,42 +288,31 @@ export default async function UpdateDetailPage({
             )}
             <MetaRow label="Created">{formatDate(update.created_at)}</MetaRow>
             <MetaRow label="Updated">{timeAgo(update.updated_at)}</MetaRow>
-            {update.plan && (
-              <div className="border-t border-border pt-3.5">
-                <Link
-                  href={`/plans/${update.plan.id}`}
-                  className="inline-flex min-h-11 min-w-11 items-center group inline-flex items-center gap-1.5 text-sm text-accent underline-offset-2 hover:underline"
-                >
-                  View source plan
-                  <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                </Link>
-                <p className="mt-1 truncate text-xs text-muted-foreground">
-                  {update.plan.title}
-                </p>
-              </div>
-            )}
-            <div className="border-t border-border pt-4">
+            <div className="border-t border-border pt-3.5">
               <ExportUpdateMarkdownButton
                 title={update.title}
                 body={update.body}
               />
             </div>
-          </CardContent>
-        </Card>
+          </RailCard>
 
-        <CanEdit>
-        <Card>
-          <CardHeader className="space-y-1 border-b border-border px-5 py-3.5">
-            <CardTitle className="text-base">Share</CardTitle>
-            <CardDescription>
-              Public, read-only link — revocable any time.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-5">
-            <ShareLinkPanel updateId={update.id} shareLink={shareLink} />
-          </CardContent>
-        </Card>
-        </CanEdit>
+          {update.plan && (
+            <RailCard icon={BookOpen} title="Source">
+              <p className="text-sm">{update.plan.title}</p>
+              <Link
+                href={`/plans/${update.plan.id}`}
+                className="inline-flex min-h-11 min-w-11 items-center group gap-1.5 text-sm text-accent underline-offset-2 hover:underline"
+              >
+                View source plan
+                <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Link>
+            </RailCard>
+          )}
+
+          <RailCard icon={Clock} title="Activity">
+            <ActivityTimeline events={events} />
+          </RailCard>
+        </div>
       </div>
     </div>
   );
