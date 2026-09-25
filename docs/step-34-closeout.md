@@ -17,7 +17,7 @@ user-flow commands, gotchas).
 | — 3.3 wrap | `07a87de` | icon-audit §2b delta (44-instance size sweep, 2 documented glyph exceptions), README truths |
 | — dark-mode proof | `d2ec76e` | `DARK=1` runs + quantified flip (means 0.116–0.128 vs 0.957 light), FRESH_SHOTS lesson |
 | — marketing + `/vs/bonsai` | `9b7bb46` | pricing/about vocabulary chips, 15th page (`/vs/bonsai`) — the 15-PDF "bonsai" gap |
-| — tests | `984e089` + wrap | behavioral coverage for all pure logic (59 tests, 0 fail) |
+| — tests | `984e089` + wrap | behavioral coverage for all pure logic (84 tests, 0 fail) |
 
 ## 2. The design language (as built)
 
@@ -50,7 +50,7 @@ user-flow commands, gotchas).
 - **Dark mode**: `DARK=1` runs, quantified mean-luminance flip.
 - **Empty states**: `EMPTY_FIXTURES=1` runs.
 - **Motion/dialog**: `RUN_MOTION`/`RUN_DIALOG`/`RUN_INTERACT` gates green.
-- **Tests**: 59/59 via `npm test` (`node --test tests/lib/*.test.ts
+- **Tests**: 84/84 via `npm test` (`node --test tests/lib/*.test.ts
   tests/components/*.test.ts` — native type stripping, zero test deps)
   covers every pure module: `invoice-totals` (money math), `reports`
   (`computeReport` buckets/top-5/expiry), `dashboard` (clock + week strip),
@@ -90,7 +90,7 @@ user-flow commands, gotchas).
 git pull && npm install && npm run verify:responsive:setup   # first run
 npm run verify:responsive                                    # 25 pages, 7 widths
 npx tsc --noEmit && npm run lint
-npm test                                                     # 59 tests, bare node
+npm test                                                     # 84 tests, bare node
 npm run verify:db
 # capture variants (each run needs its OWN SHOTS_DIR — FRESH_SHOTS wipes it):
 SHOTS_DIR=…/step34-dark WIDTHS=320,768,1024 DARK=1 SCROLL_PROOF=settings FRESH_SHOTS=1 node scripts/verify-responsive.mjs

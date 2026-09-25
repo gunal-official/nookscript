@@ -8,13 +8,7 @@
  * Presentational only; safe to use from server or client components.
  */
 import { MessageSquare } from "lucide-react";
-
-function toMessages(raw: string): string[] {
-  return raw
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-}
+import { toMessages } from "@/lib/to-messages";
 
 export function SourceBubbles({ text }: { text: string }) {
   return (
