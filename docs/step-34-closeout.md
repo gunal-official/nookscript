@@ -50,12 +50,14 @@ user-flow commands, gotchas).
 - **Dark mode**: `DARK=1` runs, quantified mean-luminance flip.
 - **Empty states**: `EMPTY_FIXTURES=1` runs.
 - **Motion/dialog**: `RUN_MOTION`/`RUN_DIALOG`/`RUN_INTERACT` gates green.
-- **Tests**: 59/59 — `npx tsx --test tests/lib/*.test.ts tests/components/*.test.ts`
+- **Tests**: 59/59 via `npm test` (`node --test tests/lib/*.test.ts
+  tests/components/*.test.ts` — native type stripping, zero test deps)
   covers every pure module: `invoice-totals` (money math), `reports`
   (`computeReport` buckets/top-5/expiry), `dashboard` (clock + week strip),
   `utils` (formatting/guards), `rate-limit` (prefix surface + `clientKey`),
   nav behavior (`visibleGroups`/`isActive`), toast queue, motion items,
-  and the Step-33 component contracts.
+  and the Step-33 component contracts. CI (`.github/workflows/verify.yml`)
+  runs all five offline gates: typecheck, lint, test, build, `verify:db`.
 - **Database**: `npm run verify:db` green (144 checks / 19 groups).
 - **Gates**: `npx tsc --noEmit` 0 errors; `npm run lint` (`eslint .`) exit 0.
 
@@ -74,9 +76,13 @@ user-flow commands, gotchas).
    `eslint-config-next@16.3.6`'s nested `eslint-plugin-react` (the
    `eslint '>=9.0.0'` peer range is aspirational; the plugin uses the
    `context.getFilename` API removed in eslint 10). Reverted to the
-   certified `eslint@^9.39.5` with zero repo footprint.
-   **Trigger:** an `eslint-config-next` release shipping an
-   eslint-10-compatible `eslint-plugin-react` → bump + full battery.
+   certified `eslint@^9.39.5` with zero repo footprint. **Verdict
+   (2026-09-26): no workaround exists today** — `eslint-plugin-react@latest`
+   (7.37.5) itself only peers `eslint ^3–^9.7`, and `eslint-config-next`'s
+   latest stable is 16.3.6 (16.4.0-canary.* only beyond). An override
+   cannot help while the plugin's own peer range excludes 10.
+   **Trigger:** `eslint-plugin-react` releases eslint-10 support AND
+   `eslint-config-next` ships it → bump + full battery.
 
 ## 5. Commands (the standing user flow)
 
@@ -84,7 +90,7 @@ user-flow commands, gotchas).
 git pull && npm install && npm run verify:responsive:setup   # first run
 npm run verify:responsive                                    # 25 pages, 7 widths
 npx tsc --noEmit && npm run lint
-npx tsx --test tests/lib/*.test.ts tests/components/*.test.ts
+npm test                                                     # 59 tests, bare node
 npm run verify:db
 # capture variants (each run needs its OWN SHOTS_DIR — FRESH_SHOTS wipes it):
 SHOTS_DIR=…/step34-dark WIDTHS=320,768,1024 DARK=1 SCROLL_PROOF=settings FRESH_SHOTS=1 node scripts/verify-responsive.mjs

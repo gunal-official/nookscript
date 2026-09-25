@@ -19,7 +19,7 @@
  *    "expired" (past) — both ignoring void contracts.
  */
 
-import { localToday } from "@/lib/utils";
+import { localToday } from "./utils.ts";
 import type { BriefSummary } from "@/lib/types/brief";
 import type { InvoiceSummary } from "@/lib/types/invoice";
 import type { TimeEntry } from "@/lib/types/time";

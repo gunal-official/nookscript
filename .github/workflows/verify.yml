@@ -1,4 +1,4 @@
-# Step 14 — CI. Runs the three offline gates on every push/PR.
+# Step 14 — CI. Runs the five offline gates on every push/PR.
 # INTENTIONALLY EXCLUDES `npm run verify:live`: that probe needs real
 # production Supabase credentials and must stay a manual pre-deploy step —
 # no production secrets belong in this project's CI.
@@ -16,7 +16,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ">=20.0.0"
+          # >=22.18: node --test runs the TypeScript suite via native type
+          # stripping (zero test deps — the project's standing doctrine).
+          node-version: ">=22.18.0"
           cache: npm
 
       - name: Install
@@ -24,6 +26,12 @@ jobs:
 
       - name: Typecheck
         run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
 
       - name: Build
         run: npm run build
