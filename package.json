@@ -11,6 +11,7 @@
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "verify:db": "node scripts/verify-db.mjs",
+    "verify:responsive": "node scripts/verify-responsive.mjs",
     "verify:live": "node scripts/verify-live-schema.mjs",
     "verify:live:policies": "node scripts/verify-live-policies.mjs",
     "test": "node --test tests/components/*.test.ts"

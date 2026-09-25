@@ -103,7 +103,7 @@ export async function createTeamInviteAction(input: {
   // Best-effort email (Step 23) — no SMTP config skips it silently (dev
   // mode); a failure never blocks the already-created invite.
   let warning: string | undefined;
-  const h = headers();
+  const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   if (!host) {
     warning =
