@@ -979,6 +979,8 @@ land on it, guests keep the marketing home on the same URL
   (`proof/<width>/<slug>-<name>.png`) — the (app) shell scrolls inside
   `<main>`, so `fullPage` screenshots can never see below the fold.
 - `DARK=1` captures the dark theme (`colorScheme: dark`).
+- `FRESH_SHOTS=1` **clears the evidence dir first** — give parallel or
+  successive runs their own `SHOTS_DIR` or earlier captures are lost.
 
 ### Public client documents
 
