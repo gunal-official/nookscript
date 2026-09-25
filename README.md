@@ -943,6 +943,10 @@ shrink, invoice line-items stacking below md, TeamCard select sizing.
 
 ## Step 34 — ui.webp design system + Next 16 migration
 
+**Closeout**: `docs/step-34-closeout.md` — final Step-34 summary (what
+shipped per slice, the as-built design language, evidence index, and the
+two parked items with triggers: PDF pixel-parity + the eslint-10 bump).
+
 ### Design language (34(a) → ongoing)
 
 Tokens in `app/globals.css` (light + `.dark`): vivid orange accent, warm-gray
