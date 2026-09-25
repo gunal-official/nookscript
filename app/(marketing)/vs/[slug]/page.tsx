@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Scale } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -46,9 +47,14 @@ export default async function VsPage({ params }: VsPageProps) {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
       <Badge variant="secondary">Comparison</Badge>
-      <h1 className="mt-4 font-display text-3xl font-bold tracking-tight">
-        {entry.heading}
-      </h1>
+      <div className="mt-4 flex items-center gap-3">
+        <span className="icon-chip icon-chip-accent h-10 w-10 shrink-0">
+          <Scale className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <h1 className="font-display text-3xl font-bold tracking-tight">
+          {entry.heading}
+        </h1>
+      </div>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
         {entry.intro}
       </p>

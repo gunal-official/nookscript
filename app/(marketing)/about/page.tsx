@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MessageSquare, PenLine, Share2, Workflow } from "lucide-react";
 import type { Metadata } from "next";
 
 import { Button } from "@/components/ui/button";
@@ -17,18 +18,22 @@ export const metadata: Metadata = {
 
 const BUILT_TODAY = [
   {
+    icon: PenLine,
     title: "Intake with gap-flagged briefs",
     copy: "Paste a client email, call notes, or a chat log; get a structured draft that flags what's vague or missing as tracked open questions.",
   },
   {
+    icon: MessageSquare,
     title: "A real source trail",
     copy: "Every pasted message stays verbatim and immutable, threaded onto its brief — you can always point back to what the client actually said.",
   },
   {
+    icon: Workflow,
     title: "A pipeline, not a pile of docs",
     copy: "Briefs become proposals, proposals become plans, plans drive client updates. Each stage carries the last one's structure forward.",
   },
   {
+    icon: Share2,
     title: "Client-facing output",
     copy: "Public, revocable share links for updates, plus reusable templates for the messages you send most.",
   },
@@ -61,10 +66,15 @@ export default function AboutPage() {
         What&apos;s inside today
       </h2>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        {BUILT_TODAY.map(({ title, copy }) => (
+        {BUILT_TODAY.map(({ icon: Icon, title, copy }) => (
           <Card key={title}>
             <CardHeader className="space-y-1 p-4">
-              <CardTitle className="text-sm">{title}</CardTitle>
+              <div className="flex items-center gap-2.5">
+                <span className="icon-chip icon-chip-accent h-8 w-8">
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                </span>
+                <CardTitle className="text-sm">{title}</CardTitle>
+              </div>
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <p className="text-xs leading-relaxed text-muted-foreground">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CheckCircle2, Sparkles, type LucideIcon } from "lucide-react";
 import type { Metadata } from "next";
 
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,8 @@ export const metadata: Metadata = {
 // what's true in code; the Pro list is forward-looking roadmap only.
 const TIERS: {
   name: string;
+  icon: LucideIcon;
+  chip: string;
   badge?: string;
   blurb: string;
   features: string[];
@@ -32,6 +35,8 @@ const TIERS: {
 }[] = [
   {
     name: "Free",
+    icon: CheckCircle2,
+    chip: "icon-chip-success",
     blurb: "The full product as it exists today — early access.",
     features: [
       "Solo use · 1 workspace",
@@ -48,6 +53,8 @@ const TIERS: {
   },
   {
     name: "Pro",
+    icon: Sparkles,
+    chip: "icon-chip-accent",
     badge: "Early access",
     blurb: "Nothing here exists yet — this is the shape of the roadmap.",
     features: [
@@ -79,11 +86,16 @@ export default function PricingPage() {
       </p>
 
       <div className="mt-10 grid gap-5 text-left sm:grid-cols-2">
-        {TIERS.map(({ name, badge, blurb, features, cta }) => (
+        {TIERS.map(({ name, icon: Icon, chip, badge, blurb, features, cta }) => (
           <Card key={name} className="flex flex-col">
             <CardHeader className="space-y-1.5 border-b border-border px-5 py-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">{name}</CardTitle>
+                <div className="flex items-center gap-2.5">
+                  <span className={`icon-chip h-8 w-8 ${chip}`}>
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <CardTitle className="text-base">{name}</CardTitle>
+                </div>
                 {badge && <Badge variant="secondary">{badge}</Badge>}
               </div>
               <CardDescription className="text-sm">{blurb}</CardDescription>
