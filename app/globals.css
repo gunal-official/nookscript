@@ -3,27 +3,36 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── Design tokens (Step 34 — ui.webp language) ─────────────────────────
+     Warm-gray backdrop, pure white cards, vivid orange accent, near-black
+     ink, soft elevation. Pills are rounded-full; cards 20px; inputs 10px. */
   :root {
-    --bg: #fefbfa;
-    --text: #16100f;
-    --accent: #c12c01;
-    --muted: #f6f0ef;
-    --card: #fffffe;
-    --border: #e3dcda;
-    --error: #b4462f;
-    --accent-soft: color-mix(in srgb, var(--accent) 8%, var(--card));
-    --radius: 0.35rem;
+    --bg: #f5f5f7;
+    --text: #17171c;
+    --accent: #ff6a2b;
+    --muted: #f0f0f3;
+    --card: #ffffff;
+    --border: #e9e9ee;
+    --error: #e5484d;
+    --success: #1f9d68;
+    --success-soft: #e3f5ec;
+    --dark: #17171c;
+    --accent-soft: color-mix(in srgb, var(--accent) 12%, var(--card));
+    --radius: 0.625rem;
   }
 
   .dark {
-    --bg: #120b0a;
-    --text: #f6f0ef;
-    --accent: #f35e3d;
-    --muted: #2a2220;
-    --card: #1c1412;
-    --border: #f5ffff1a;
-    --error: #e78a71;
-    --accent-soft: color-mix(in srgb, var(--accent) 14%, var(--card));
+    --bg: #121216;
+    --text: #f2f2f5;
+    --accent: #ff7a45;
+    --muted: #26262e;
+    --card: #1b1b22;
+    --border: #f5ffff14;
+    --error: #f2656a;
+    --success: #3ecf8e;
+    --success-soft: #123226;
+    --dark: #f2f2f5;
+    --accent-soft: color-mix(in srgb, var(--accent) 18%, var(--card));
   }
 }
 
@@ -41,6 +50,22 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ── Presentation helpers (ui.webp) ──────────────────────────────────────── */
+/* Tinted icon chip: soft colored tile behind a small icon (stat cards, active
+   nav, empty states). Usage: <span class="icon-chip icon-chip-accent">… */
+.icon-chip {
+  @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl;
+}
+.icon-chip-accent {
+  @apply bg-accent-soft text-accent;
+}
+.icon-chip-success {
+  @apply bg-success-soft text-success;
+}
+.icon-chip-muted {
+  @apply bg-muted text-muted-foreground;
 }
 
 /* ── Motion system (Step 33) — transform/opacity only, 150–250ms ─────────── */
@@ -126,9 +151,9 @@
 .skeleton {
   background-image: linear-gradient(
     90deg,
-    hsl(var(--muted)) 25%,
-    hsl(var(--muted-foreground) / 0.08) 50%,
-    hsl(var(--muted)) 75%
+    var(--muted) 25%,
+    color-mix(in srgb, var(--text) 6%, var(--card)) 50%,
+    var(--muted) 75%
   );
   background-size: 800px 100%;
   animation: shimmer 1.4s linear infinite;

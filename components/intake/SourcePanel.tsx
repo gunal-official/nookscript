@@ -105,7 +105,7 @@ export function SourcePanel({
         {error ? <p className="mt-3 text-sm text-error">{error}</p> : null}
       </CardContent>
 
-      <CardFooter className="border-t border-border bg-muted/40 px-5 py-3.5">
+      <CardFooter className="flex-wrap gap-2 border-t border-border bg-muted/40 px-5 py-3.5">
         <span
           className={cn(
             "text-xs text-muted-foreground",
@@ -116,7 +116,7 @@ export function SourcePanel({
         >
           {rawText.trim().length.toLocaleString()} chars
         </span>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {!aiConfigured && (
             <span className="hidden text-xs text-muted-foreground md:inline">
               No OPENAI_API_KEY — local parser will draft

@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
-import { MONEY_HREFS, NAV_ITEMS, isActive } from "./nav-items";
+import { isActive, visibleGroups } from "./nav-items";
 import { WorkspaceSwitcher, type SwitcherWorkspace } from "./WorkspaceSwitcher";
 
 // Mobile (<tab) navigation: hamburger in the Topbar opens this drawer —
-// slide-in panel with every destination as icon + label (nothing clips at
-// 320px, every item is a 44px row). Tablet+ get the Sidebar rail instead.
+// slide-in panel with grouped icon-chip rows (ui.webp language). Nothing
+// clips at 320px, every item is a 44px row.
 export function MobileNav({
   open,
   onClose,
@@ -24,7 +24,7 @@ export function MobileNav({
 }) {
   const pathname = usePathname();
   if (!open) return null;
-  const items = NAV_ITEMS.filter((item) => canSeeMoney || !MONEY_HREFS.has(item.href));
+  const groups = visibleGroups(canSeeMoney);
 
   return (
     <div className="fixed inset-0 z-50 tab:hidden" role="presentation">
@@ -36,7 +36,7 @@ export function MobileNav({
       />
       <nav
         aria-label="Primary"
-        className="absolute left-0 top-0 flex h-full w-[min(288px,86vw)] flex-col gap-1 overflow-y-auto border-r border-border bg-background p-3 shadow-xl animate-slide-in"
+        className="absolute left-0 top-0 flex h-full w-[min(288px,86vw)] flex-col gap-1 overflow-y-auto border-r border-border bg-card p-3 shadow-pop animate-slide-in"
       >
         <div className="mb-2 flex items-center justify-between gap-2">
           <WorkspaceSwitcher workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} />
@@ -44,30 +44,52 @@ export function MobileNav({
             type="button"
             aria-label="Close menu"
             onClick={onClose}
-            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[0.35rem] text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-text"
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-text"
           >
             <X aria-hidden="true" className="h-[18px] w-[18px]" />
           </button>
         </div>
-        {items.map(({ label, href, icon: Icon }) => {
-          const active = isActive(pathname, href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              aria-current={active ? "page" : undefined}
-              onClick={onClose}
-              className={[
-                "flex min-h-11 items-center gap-3 rounded-[0.35rem] px-3 text-sm transition-colors duration-150",
-                "hover:bg-muted/70 hover:text-text",
-                active ? "bg-muted font-medium text-text" : "text-muted",
-              ].join(" ")}
+        {groups.map((group) => (
+          <div key={group.label} className="mb-2">
+            <p
+              aria-hidden="true"
+              className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70"
             >
-              <Icon aria-hidden="true" className={`h-5 w-5 shrink-0 ${active ? "text-accent-fg" : ""}`} />
-              {label}
-            </Link>
-          );
-        })}
+              {group.label}
+            </p>
+            <div className="flex flex-col gap-1">
+              {group.items.map(({ label, href, icon: Icon }) => {
+                const active = isActive(pathname, href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    aria-current={active ? "page" : undefined}
+                    onClick={onClose}
+                    className={[
+                      "flex min-h-11 items-center gap-3 rounded-xl px-1.5 text-sm transition-colors duration-150",
+                      "hover:bg-muted/70",
+                      active
+                        ? "bg-accent-soft font-semibold text-accent"
+                        : "text-muted-foreground hover:text-text",
+                    ].join(" ")}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={[
+                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                        active ? "bg-accent-soft text-accent" : "text-muted-foreground",
+                      ].join(" ")}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
     </div>
   );

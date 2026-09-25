@@ -6,14 +6,22 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 
-// Inter is self-hosted via @fontsource (the same Google font, without a build-time
-// network dependency on fonts.googleapis.com). Exposes the `--font-inter` variable
-// that `font-sans` in tailwind.config.ts points at. To use next/font/google instead,
-// replace with: `const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })`
+// Both faces are self-hosted via @fontsource (the same Google fonts, without a
+// build-time network dependency on fonts.googleapis.com). Inter is the body
+// face; Plus Jakarta Sans is the display face (ui.webp language: headings,
+// numbers, brand). To use next/font/google instead, swap for e.g.
+// `const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })`.
 const inter = localFont({
   src: "../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2",
   variable: "--font-inter",
   weight: "100 900",
+  display: "swap",
+});
+
+const jakarta = localFont({
+  src: "../node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2",
+  variable: "--font-display",
+  weight: "200 800",
   display: "swap",
 });
 
@@ -32,6 +40,7 @@ export default function RootLayout({
       <body
         className={cn(
           inter.variable,
+          jakarta.variable,
           "min-h-screen bg-background font-sans text-foreground antialiased"
         )}
       >

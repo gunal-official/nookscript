@@ -13,7 +13,9 @@ const config = {
       // desktop ≥1024. Named screens so shell code reads `tab:` / `desk:`.
       screens: { tab: "600px", desk: "1024px" },
       colors: {
-        // Raw design tokens (CSS variables defined in app/globals.css)
+        // Raw design tokens (CSS variables defined in app/globals.css).
+        // Step 34 retuned to the ui.webp language: warm gray backdrop, white
+        // cards, vivid orange accent, near-black ink.
         bg: "var(--bg)",
         text: "var(--text)",
         accent: {
@@ -27,10 +29,18 @@ const config = {
         },
         muted: {
           DEFAULT: "var(--muted)",
-          foreground: "color-mix(in srgb, var(--text) 55%, transparent)",
+          foreground: "color-mix(in srgb, var(--text) 52%, transparent)",
         },
         border: "var(--border)",
         error: "var(--error)",
+        success: {
+          DEFAULT: "var(--success)",
+          soft: "var(--success-soft)",
+        },
+        dark: {
+          DEFAULT: "var(--dark)",
+          foreground: "#ffffff",
+        },
         // shadcn-style semantic aliases mapped onto the design tokens
         background: "var(--bg)",
         foreground: "var(--text)",
@@ -45,7 +55,7 @@ const config = {
           foreground: "var(--text)",
         },
         destructive: {
-          DEFAULT: "#b91c1c",
+          DEFAULT: "var(--error)",
           foreground: "#ffffff",
         },
         popover: {
@@ -54,13 +64,29 @@ const config = {
         },
       },
       borderRadius: {
-        lg: "calc(var(--radius) * 2)", // 0.7rem — card-level containers
+        // --radius = 0.625rem (inputs/buttons); lg doubles to 20px cards —
+        // the ui.webp scale. Pills use rounded-full in components.
+        lg: "calc(var(--radius) * 2)", // 1.25rem — card-level containers
         md: "var(--radius)",
         DEFAULT: "var(--radius)",
         sm: "calc(var(--radius) / 2)",
       },
+      boxShadow: {
+        // Soft elevation language from ui.webp: hairline + wide low shadow.
+        card: "0 1px 2px rgb(21 21 24 / 0.04), 0 12px 32px -16px rgb(21 21 24 / 0.10)",
+        pop: "0 8px 30px -6px rgb(21 21 24 / 0.14)",
+        rail: "0 1px 2px rgb(21 21 24 / 0.05)",
+      },
       fontFamily: {
-        display: ["Georgia", "Times New Roman", "serif"],
+        // Plus Jakarta Sans self-hosted via @fontsource-variable (no build-time
+        // fetch): display headings, numbers, brand. Inter stays the body face.
+        display: [
+          "var(--font-display)",
+          "Plus Jakarta Sans",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
         sans: [
           "var(--font-inter)",
           "Inter",
