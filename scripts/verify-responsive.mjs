@@ -22,7 +22,8 @@
 import { execFileSync, spawn } from "node:child_process";
 import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
+import net from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -31,11 +32,47 @@ import zlib from "node:zlib";
 const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MODE = (process.argv.includes("--mode") ? process.argv[process.argv.indexOf("--mode") + 1] : "after") || "after";
-const SHOTS = process.env.SHOTS_DIR || join(tmpdir(), "..", "home", "user", "responsive-evidence", `step32-${MODE}`);
-const STUB_PORT = 54330;
-const APP_PORT = Number(process.env.APP_PORT ?? 3200 + Math.floor(Math.random() * 700));
-const BASE = `http://127.0.0.1:${APP_PORT}`;
-const freePort = (port) => { try { execFileSync("bash", ["-c", `ss -tlnp 2>/dev/null | grep ":${port} " | grep -o "pid=[0-9]*" | cut -d= -f2 | sort -u | xargs -r kill -9`], { stdio: "ignore" }); } catch {} };
+const SHOTS = process.env.SHOTS_DIR || join(homedir(), "responsive-evidence", `step32-${MODE}`);
+const STUB_PORT = Number(process.env.STUB_PORT ?? 54330);
+let APP_PORT = Number(process.env.APP_PORT ?? 0); // 0 => OS-assigned free port at startup
+let BASE = "";
+
+/** Cross-platform "who holds this port?": lsof (macOS + Linux) -> ss -> fuser.
+ *  Kills by pid from Node (no xargs -r — BSD xargs has no -r flag). Empty match
+ *  is NOT an error; tool absence is reported, never silently swallowed. */
+const toolAvailable = (name) => {
+  try { execFileSync("bash", ["-c", `command -v ${name}`], { stdio: "ignore" }); return true; } catch { return false; }
+};
+const HAS_LSOF = toolAvailable("lsof");
+const HAS_SS = toolAvailable("ss");
+const HAS_FUSER = toolAvailable("fuser");
+const pidsOnPort = (port) => {
+  const pids = new Set();
+  const scan = (out, re) => {
+    for (const m of String(out).matchAll(re)) { const pid = Number(m[1]); if (pid > 1) pids.add(pid); }
+    return [...pids];
+  };
+  const run = (cmd) => execFileSync("bash", ["-c", cmd], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  if (HAS_LSOF) return scan(run(`lsof -ti tcp:${port} 2>/dev/null || true`), /(\d+)/g);       // one pid per line
+  if (HAS_SS) return scan(run(`ss -tlnp 2>/dev/null | grep -F ':${port} ' || true`), /pid=(\d+)/g); // ONLY pid=… — never port digits
+  if (HAS_FUSER) return scan(run(`fuser ${port}/tcp 2>/dev/null || true`), /(\d+)/g);
+  console.warn(`[verify-responsive] no lsof/ss/fuser available — cannot sweep port ${port} leftovers`);
+  return [];
+};
+const freePort = (port) => {
+  for (const pid of pidsOnPort(port)) {
+    try { process.kill(pid, "SIGKILL"); } catch {}
+  }
+};
+/** OS-assigned free port (bind to 0). Retries on the rare post-close race. */
+const findFreePort = () => new Promise((res, rej) => {
+  const srv = net.createServer();
+  srv.once("error", rej);
+  srv.listen(0, "127.0.0.1", () => {
+    const { port } = srv.address();
+    srv.close(() => res(port));
+  });
+});
 
 const WIDTHS_ALL = [
   { w: 320, h: 568 },
@@ -196,12 +233,25 @@ function startStub() {
     server.listen(STUB_PORT, "127.0.0.1", () => resolveServer(server));
   });
 }
+// ── child lifecycle: the `next start` server runs in its own process group so
+// every exit path (success, failure, signal, crash) can group-kill it. No orphans.
+let APP_CHILD = null;
+const killGroup = (child) => {
+  if (!child || !child.pid) return;
+  try { process.kill(-child.pid, "SIGKILL"); } catch {}
+  try { child.kill("SIGKILL"); } catch {}
+};
 const cleanup = () => {
-  freePort(STUB_PORT); freePort(APP_PORT);
+  killGroup(APP_CHILD);
+  APP_CHILD = null;
+  try { freePort(STUB_PORT); } catch {}
+  try { if (APP_PORT) freePort(APP_PORT); } catch {}
 };
 process.on("SIGTERM", () => { cleanup(); process.exit(1); });
 process.on("SIGINT", () => { cleanup(); process.exit(1); });
 process.on("exit", cleanup);
+process.on("uncaughtException", (e) => { console.error(e); cleanup(); process.exit(1); });
+process.on("unhandledRejection", (e) => { console.error(e); cleanup(); process.exit(1); });
 
 // ───────────────────────── chromium bootstrap (npm-shipped binary) ──
 async function ensureChromium() {
@@ -277,12 +327,6 @@ async function main() {
   mkdirSync(SHOTS, { recursive: true });
   const stub = await startStub();
   const { exec, libDir } = await ensureChromium();
-  const app = spawn(process.execPath, [join(ROOT, "node_modules", "next", "dist", "bin", "next"), "dev", "-p", String(APP_PORT)], {
-    env: { ...process.env, HOST: "stub-project.supabase.co", NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${STUB_PORT}`, NEXT_PUBLIC_SUPABASE_ANON_KEY: "stub-anon-key", AUTH_SECRET: "stub-auth-secret" },
-    stdio: ["pipe", "pipe", "pipe"],
-    cwd: ROOT,
-    detached: true,
-  });
   let appLog = "";
   const alive = () => new Promise((res) => {
     const rq = http.get(`${BASE}/`, (rs) => { rs.resume(); res(true); });
@@ -290,13 +334,23 @@ async function main() {
     rq.setTimeout(4000, () => { rq.destroy(); res(false); });
   });
   const readAppLog = () => { try { return readFileSync(join(SHOTS, "app.log"), "utf8"); } catch { return ""; } };
-  // Run `next dev` as a detached daemon (nohup + stdio ignore), matching the
-  // manual-run conditions that proved stable. The managed-child form kept
-  // exiting gracefully (code 0) mid-run under automation.
+  // Managed child in its own process group: killed by killGroup() on every
+  // exit path (see cleanup handlers). stdout/stderr tee to SHOTS/app.log.
   const startApp = () => {
+    killGroup(APP_CHILD);
     freePort(APP_PORT);
-    const child = spawn("bash", ["-c", `NEXT_DIST_DIR="${DIST}" nohup ${process.execPath} '${join(ROOT, "node_modules", "next", "dist", "bin", "next")}' start -p ${APP_PORT} > '${join(SHOTS, "app.log")}' 2>&1 &`], { stdio: "ignore", detached: true });
-    child.unref?.();
+    writeFileSync(join(SHOTS, "app.log"), "");
+    const child = spawn(process.execPath, [join(ROOT, "node_modules", "next", "dist", "bin", "next"), "start", "-p", String(APP_PORT)], {
+      env: APP_ENV,
+      stdio: ["ignore", "pipe", "pipe"],
+      cwd: ROOT,
+      detached: true,
+    });
+    const tee = createWriteStream(join(SHOTS, "app.log"), { flags: "a" });
+    child.stdout.pipe(tee);
+    child.stderr.pipe(tee);
+    child.on("error", () => {});
+    APP_CHILD = child;
     return child;
   };
   // Production server: `next dev` kept gracefully self-exiting under
@@ -318,6 +372,8 @@ async function main() {
     });
     b.stdin?.on("error", () => {});
   });
+  if (!APP_PORT) APP_PORT = await findFreePort();
+  BASE = `http://127.0.0.1:${APP_PORT}`;
   let appRef = startApp();
   let readySeen = false;
   const appReady = await new Promise((r) => {
