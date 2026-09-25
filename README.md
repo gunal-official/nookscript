@@ -941,6 +941,36 @@ shrink, invoice line-items stacking below md, TeamCard select sizing.
 
 ---
 
+## Step 34 — ui.webp design system + Next 16 migration
+
+### Design language (34(a) → ongoing)
+
+Tokens in `app/globals.css` (light + `.dark`): vivid orange accent, warm-gray
+backdrop, white 20px cards (`rounded-lg` = `--radius * 2`), pill buttons and
+chips, soft elevation (`shadow-card`/`shadow-pop`), Plus Jakarta Sans display
+face over Inter body. Shell: grouped nav (Workspace/Money/Account) with
+tinted icon chips. Empty states use the shared `icon-chip` pattern.
+
+### Next 16 notes (34(a-fix2/4)) — read before adding pages
+
+- `next` is `^16.3.6` with `eslint@^9.39.5` + `eslint-config-next@^16.3.6`
+  (flat config in `eslint.config.mjs`; `next lint` no longer exists).
+- **Dynamic pages must await their route params** — the runtime passes a
+  Promise (`params: Promise<{ id: string }>` + `const { id } = await params;`).
+  Plain `tsc` will NOT catch a miss here (it trusts your declared types);
+  the same applies to `generateMetadata`. `headers()`/`cookies()` are
+  async too (see `lib/supabase/server.ts` and `lib/use-origin.ts`).
+- `middleware.ts` is renamed `proxy.ts` (Next 16 convention).
+- `next build` may rewrite `tsconfig.json` (it added `jsx: react-jsx`,
+  `target: ES2017`, `.next/dev/types` includes). Commit those changes.
+
+### Audit harness extras
+
+- `EMPTY_FIXTURES=1 npm run verify:responsive` renders every list's empty
+  state (stub serves empty lists) — used to prove the empty-state polish and
+  to catch tap-target regressions in empty-only UI.
+- `DARK=1` captures the dark theme (`colorScheme: dark`).
+
 ## Step 33 — cross-platform audit fix, icon system, responsive navigation, motion
 
 ### Run it on macOS (exact repro)

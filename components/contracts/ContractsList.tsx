@@ -15,7 +15,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Loader2, Plus, Search, X } from "lucide-react";
+import { Loader2, Plus, Search, X, FileSignature } from "lucide-react";
 
 import { createContract } from "@/app/(app)/contracts/actions";
 import {
@@ -62,6 +62,9 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-16 text-center">
+      <span className="icon-chip icon-chip-accent" aria-hidden="true">
+        <FileSignature className="h-5 w-5" />
+      </span>
       {hasContracts ? (
         <>
           <div>

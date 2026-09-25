@@ -125,7 +125,7 @@ export function UpdateComposer({
               No templates yet —{" "}
               <Link
                 href="/settings"
-                className="underline underline-offset-2 transition-colors hover:text-text"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline underline-offset-2 transition-colors hover:text-text"
               >
                 create one in Settings
               </Link>

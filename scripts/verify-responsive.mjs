@@ -237,21 +237,21 @@ function startStub() {
       }
       if (p.startsWith("/rest/v1/profiles")) return send(one({ id: sub, full_name: USERS[sub]?.full_name ?? "Sam Member", avatar_initials: "MC", active_workspace_id: sub === "usr-new" ? null : WS.id }));
       if (p.startsWith("/rest/v1/team_invites")) return send(INVITES);
-      if (p.startsWith("/rest/v1/templates")) return send(TEMPLATES);
+      if (p.startsWith("/rest/v1/templates")) return send(process.env.EMPTY_FIXTURES ? [] : TEMPLATES);
       if (p.startsWith("/rest/v1/brief_sources")) return send([]);
       if (p.startsWith("/rest/v1/brief_questions")) return send([]);
       if (p.startsWith("/rest/v1/brief_edit_history")) return send([]);
       if (p.startsWith("/rest/v1/briefs")) {
         if (eq("id")) return send(one(BRIEF_DETAIL));
         const rows = [{ id: U.brief, title: BRIEF_ROW.title, client_name: BRIEF_ROW.client_name, status: BRIEF_ROW.status, updated_at: NOW, questions: [{ status: "open" }, { status: "resolved" }] }];
-        return send(rows);
+        return send(process.env.EMPTY_FIXTURES ? [] : rows);
       }
-      if (p.startsWith("/rest/v1/proposals")) return send(eq("id") ? one(PROPOSAL) : [{ id: PROPOSAL.id, title: PROPOSAL.title, client_name: PROPOSAL.client_name, status: PROPOSAL.status, updated_at: NOW, deliverables: PROPOSAL.deliverables }]);
-      if (p.startsWith("/rest/v1/plans")) return send(eq("id") ? one(PLAN) : [{ id: PLAN.id, title: PLAN.title, client_name: PLAN.client_name, status: PLAN.status, updated_at: NOW, tasks: PLAN.tasks }]);
-      if (p.startsWith("/rest/v1/updates")) return send(eq("id") ? one(UPDATE_ROW) : [{ id: UPDATE_ROW.id, title: UPDATE_ROW.title, client_name: UPDATE_ROW.client_name, status: UPDATE_ROW.status, updated_at: NOW, body: UPDATE_ROW.body }]);
+      if (p.startsWith("/rest/v1/proposals")) return send(eq("id") ? one(PROPOSAL) : process.env.EMPTY_FIXTURES ? [] : [{ id: PROPOSAL.id, title: PROPOSAL.title, client_name: PROPOSAL.client_name, status: PROPOSAL.status, updated_at: NOW, deliverables: PROPOSAL.deliverables }]);
+      if (p.startsWith("/rest/v1/plans")) return send(eq("id") ? one(PLAN) : process.env.EMPTY_FIXTURES ? [] : [{ id: PLAN.id, title: PLAN.title, client_name: PLAN.client_name, status: PLAN.status, updated_at: NOW, tasks: PLAN.tasks }]);
+      if (p.startsWith("/rest/v1/updates")) return send(eq("id") ? one(UPDATE_ROW) : process.env.EMPTY_FIXTURES ? [] : [{ id: UPDATE_ROW.id, title: UPDATE_ROW.title, client_name: UPDATE_ROW.client_name, status: UPDATE_ROW.status, updated_at: NOW, body: UPDATE_ROW.body }]);
       if (p.startsWith("/rest/v1/invoice_links")) return send(eq("id") || eq("invoice_id") ? one(INVOICE_LINK) : [INVOICE_LINK]);
-      if (p.startsWith("/rest/v1/invoices")) return send(eq("id") ? one(INVOICE) : [{ id: INVOICE.id, invoice_number: 7, title: INVOICE.title, client_name: INVOICE.client_name, status: INVOICE.status, items: INVOICE.items, tax_percent: 20, due_date: INVOICE.due_date, updated_at: NOW }]);
-      if (p.startsWith("/rest/v1/contracts")) return send(eq("id") ? one(CONTRACT) : [{ id: CONTRACT.id, title: CONTRACT.title, client_name: CONTRACT.client_name, status: CONTRACT.status, brief_id: CONTRACT.brief_id, expires_on: CONTRACT.expires_on, updated_at: NOW }]);
+      if (p.startsWith("/rest/v1/invoices")) return send(eq("id") ? one(INVOICE) : process.env.EMPTY_FIXTURES ? [] : [{ id: INVOICE.id, invoice_number: 7, title: INVOICE.title, client_name: INVOICE.client_name, status: INVOICE.status, items: INVOICE.items, tax_percent: 20, due_date: INVOICE.due_date, updated_at: NOW }]);
+      if (p.startsWith("/rest/v1/contracts")) return send(eq("id") ? one(CONTRACT) : process.env.EMPTY_FIXTURES ? [] : [{ id: CONTRACT.id, title: CONTRACT.title, client_name: CONTRACT.client_name, status: CONTRACT.status, brief_id: CONTRACT.brief_id, expires_on: CONTRACT.expires_on, updated_at: NOW }]);
       if (p.startsWith("/rest/v1/time_entries")) {
         // POST = real insert (time-entry-added motion round-trips): accept the
         // row, stamp defaults, and serve it back so the list grows on refresh.
@@ -273,7 +273,7 @@ function startStub() {
           TIME_ENTRIES.unshift(created);
           return send(req.headers["accept"]?.includes("vnd.pgrst.object") ? created : [created]);
         }
-        return send(TIME_ENTRIES);
+        return send(process.env.EMPTY_FIXTURES ? [] : TIME_ENTRIES);
       }
       if (p.startsWith("/rest/v1/share_links")) return send([]);
       if (p.startsWith("/rest/v1/workspaces")) return send([WS]);

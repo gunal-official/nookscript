@@ -30,7 +30,9 @@ export function InboxThreadList({ threads }: { threads: InboxThread[] }) {
   if (threads.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-16 text-center">
-        <MessageSquare className="h-6 w-6 text-muted-foreground"  aria-hidden="true" />
+        <span className="icon-chip icon-chip-accent" aria-hidden="true">
+          <MessageSquare className="h-5 w-5" />
+        </span>
         <div>
           <p className="text-sm font-medium">No sources yet</p>
           <p className="mt-1 text-sm text-muted-foreground">

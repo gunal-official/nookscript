@@ -38,8 +38,8 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-16 text-center">
-      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-muted">
-        <ListTodo className="h-5 w-5 text-muted-foreground" />
+      <span className="icon-chip icon-chip-accent">
+        <ListTodo className="h-5 w-5" />
       </span>
       {hasPlans ? (
         <>
