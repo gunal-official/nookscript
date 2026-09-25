@@ -107,7 +107,7 @@ function TemplateRow({
               onClick={() => onEdit(template)}
               aria-label={`Edit ${template.title}`}
             >
-              <Pencil className="h-3.5 w-3.5" />
+              <Pencil className="h-4 w-4" />
             </Button>
             <Button
               type="button"
@@ -117,7 +117,7 @@ function TemplateRow({
               onClick={() => setConfirming(true)}
               aria-label={`Delete ${template.title}`}
             >
-              <Trash2 className="h-3.5 w-3.5"  aria-hidden="true" />
+              <Trash2 className="h-4 w-4"  aria-hidden="true" />
             </Button>
           </div>
         )}
@@ -141,7 +141,7 @@ function TemplateRow({
               onClick={handleDelete}
               disabled={pending}
             >
-              {pending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"  aria-hidden="true" />}
+              {pending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin"  aria-hidden="true" />}
               Delete
             </Button>
           </div>
@@ -181,7 +181,7 @@ export function TemplatesList({
             </div>
             {isOwner && templates.length > 0 && (
               <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
-                <Plus className="mr-1.5 h-3.5 w-3.5"  aria-hidden="true" />
+                <Plus className="mr-1.5 h-4 w-4"  aria-hidden="true" />
                 New template
               </Button>
             )}

@@ -964,12 +964,29 @@ tinted icon chips. Empty states use the shared `icon-chip` pattern.
 - `next build` may rewrite `tsconfig.json` (it added `jsx: react-jsx`,
   `target: ES2017`, `.next/dev/types` includes). Commit those changes.
 
+### The dashboard at `/`
+
+Authed `/` rewrites (URL stays `/`) to the Pipeline dashboard — members
+land on it, guests keep the marketing home on the same URL
+(`lib/supabase/middleware.ts`). `/dashboard` is the underlying app route.
+
 ### Audit harness extras
 
 - `EMPTY_FIXTURES=1 npm run verify:responsive` renders every list's empty
   state (stub serves empty lists) — used to prove the empty-state polish and
   to catch tap-target regressions in empty-only UI.
+- `SCROLL_PROOF=<slug,…>` captures `[data-proof]` regions of long pages
+  (`proof/<width>/<slug>-<name>.png`) — the (app) shell scrolls inside
+  `<main>`, so `fullPage` screenshots can never see below the fold.
 - `DARK=1` captures the dark theme (`colorScheme: dark`).
+
+### Public client documents
+
+`/share/:token` and `/invoice/:token` render as paper documents on the same
+vocabulary as the member app. Their vertical centering uses
+`[justify-content:safe_center]` so tall content never clips off the top of
+short viewouts. Plan/subscription copy follows the pricing doctrine: no
+billing system exists, so no prices are shown and none are implied.
 
 ## Step 33 — cross-platform audit fix, icon system, responsive navigation, motion
 

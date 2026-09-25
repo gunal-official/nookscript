@@ -24,7 +24,7 @@ export function PrintButton({ className }: { className?: string }) {
       className={cn("print:hidden", className)}
       onClick={() => window.print()}
     >
-      <Printer className="mr-2 h-3.5 w-3.5"  aria-hidden="true" />
+      <Printer className="mr-2 h-4 w-4"  aria-hidden="true" />
       Print
     </Button>
   );

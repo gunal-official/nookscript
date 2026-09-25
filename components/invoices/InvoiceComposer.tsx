@@ -309,12 +309,12 @@ export function InvoiceComposer({
               onClick={() => removeItem(items.findIndex((x) => x.id === item.id))}
               aria-label={`Remove line ${item.id}`}
             >
-              <Trash2 className="h-3.5 w-3.5"  aria-hidden="true" />
+              <Trash2 className="h-4 w-4"  aria-hidden="true" />
             </Button>
           </div>
         ))}
         <Button type="button" variant="ghost" size="sm" onClick={addItem}>
-          <Plus className="mr-1.5 h-3.5 w-3.5"  aria-hidden="true" />
+          <Plus className="mr-1.5 h-4 w-4"  aria-hidden="true" />
           Add line item
         </Button>
       </div>

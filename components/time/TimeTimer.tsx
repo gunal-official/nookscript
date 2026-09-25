@@ -188,7 +188,7 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
           className="h-11 w-28 min-w-0 sm:w-48 bg-transparent text-sm text-text placeholder:text-muted-foreground focus:outline-none"
         />
         <Button size="sm" className="h-11 shrink-0 gap-1.5" onClick={openStopForm}>
-          <Square className="h-3.5 w-3.5" />
+          <Square className="h-4 w-4" />
           Stop
         </Button>
         <button

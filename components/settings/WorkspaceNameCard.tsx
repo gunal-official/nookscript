@@ -93,12 +93,12 @@ export function WorkspaceNameCard({
               >
                 {saving ? (
                   <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin"  aria-hidden="true" />
+                    <Loader2 className="h-4 w-4 animate-spin"  aria-hidden="true" />
                     Saving…
                   </>
                 ) : (
                   <>
-                    <Save className="h-3.5 w-3.5"  aria-hidden="true" />
+                    <Save className="h-4 w-4"  aria-hidden="true" />
                     Save
                   </>
                 )}

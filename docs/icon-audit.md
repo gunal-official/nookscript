@@ -37,6 +37,27 @@ have a semantic icon (`components/app-shell/nav-items.ts` — one model for rail
 | Reports | BarChart3 | analytics |
 | Settings | Settings | gear convention |
 
+## 2b. Step 34 delta (vocabulary icons + a conformance sweep)
+
+The 34(b) surface work introduced a shared icon vocabulary, all decorative
+(`aria-hidden`) inside labeled controls, at 16 (h-4) or 20 (h-5) px:
+
+| Where | Icons | Role |
+|---|---|---|
+| `ui/doc-detail.tsx` | per-surface (FileText, FileSignature, Receipt, ClipboardList, Megaphone…), timeline (FilePlus2, Send, PenLine, CircleDollarSign, Ban, Hourglass, Clock…) | icon-chip tiles + activity timeline |
+| `dashboard` + list stats | LayoutDashboard, Wallet, Timer, Bell, CheckCircle2, ListChecks… | stat tiles, flow stages, attention rows |
+| `settings/PlanCard` | CreditCard, Sparkles, Check | the honest subscription surface |
+| `settings/*` section heads | Building2, Users, LayoutTemplate, TriangleAlert | tinted section chips |
+| public client pages | Link2Off | invalid-link states |
+| intake thread | MessageSquare, ClipboardPaste | source bubbles + panel heads |
+
+Conformance sweep in the same pass: **44 off-scale `h-3.5` (14px) instances
+across 28 files were normalized to 16px (`h-4`)** — the scale is
+16/18/20/24, full stop. Two glyph-in-control exceptions stand, both
+inside 16px faces rather than standalone: the shared Checkbox `Check`
+(12px, stroke 3) and the deliverable-checkbox `Check` marks (12px,
+stroke 3.5) — heavy tiny glyphs so a checked box reads at a glance.
+
 ## 3. Full inventory (every icon location)
 
 | File | n | Icons (name@size) |

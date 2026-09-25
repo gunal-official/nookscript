@@ -72,7 +72,7 @@ export function ContractStatusSelect({
           </SelectContent>
         </Select>
         {pending && (
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground"  aria-hidden="true" />
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground"  aria-hidden="true" />
         )}
       </div>
       {error && <p className="text-xs text-error">{error}</p>}

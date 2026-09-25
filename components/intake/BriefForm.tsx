@@ -265,7 +265,7 @@ export function BriefForm({
               <span className="text-error">{saveError}</span>
             ) : savedLabel && !dirty ? (
               <span className="flex items-center gap-1.5 text-muted-foreground">
-                <Check className="h-3.5 w-3.5 text-accent"  aria-hidden="true" />
+                <Check className="h-4 w-4 text-accent"  aria-hidden="true" />
                 {savedLabel}
               </span>
             ) : dirty ? (

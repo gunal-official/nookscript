@@ -71,7 +71,7 @@ export function SourcePanel({
             onClick={onReset}
             className="text-muted-foreground hover:text-text"
           >
-            <RotateCcw className="h-3.5 w-3.5"  aria-hidden="true" />
+            <RotateCcw className="h-4 w-4"  aria-hidden="true" />
             New source
           </Button>
         </CardHeader>

@@ -166,7 +166,7 @@ export default async function PlanDetailPage({
         href="/plans"
         className="mb-3 inline-flex min-h-11 min-w-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
       >
-        <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         Plans
       </Link>
 
@@ -293,7 +293,7 @@ export default async function PlanDetailPage({
                 className="inline-flex min-h-11 min-w-11 items-center group gap-1.5 text-sm text-accent underline-offset-2 hover:underline"
               >
                 View source proposal
-                <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </Link>
             </RailCard>
           )}
