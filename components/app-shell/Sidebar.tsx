@@ -23,7 +23,7 @@ function NavItem({
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-2.5 rounded-md border border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-card hover:text-text",
+        "min-h-11 min-w-11 items-center flex items-center gap-2.5 rounded-md border border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-card hover:text-text",
         active && "border-border bg-card font-semibold text-text"
       )}
     >

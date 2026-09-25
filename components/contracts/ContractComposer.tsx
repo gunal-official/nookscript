@@ -107,7 +107,7 @@ export function ContractComposer({
               setBriefId(value === STANDALONE ? "" : value)
             }
           >
-            <SelectTrigger className="h-10" aria-label="Brief">
+            <SelectTrigger className="" aria-label="Brief">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

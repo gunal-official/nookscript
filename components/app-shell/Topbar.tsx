@@ -18,18 +18,18 @@ export function Topbar({
     <header className="col-span-2 flex h-14 items-center justify-between border-b border-border bg-card px-5">
       <Link
         href="/intake"
-        className="font-display text-xl font-bold tracking-tight text-text"
+        className="inline-flex min-h-11 items-center font-display text-xl font-bold tracking-tight text-text"
       >
         nook<span className="text-accent">script</span>
       </Link>
 
       <div className="flex items-center gap-3">
-        <div className="relative">
+        <div className="relative hidden sm:block">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
             placeholder="Search..."
-            className="h-9 w-64 border-border bg-muted pl-8 shadow-none"
+            className="h-11 w-52 border-border bg-muted pl-8 shadow-none"
           />
         </div>
 

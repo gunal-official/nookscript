@@ -111,7 +111,7 @@ function ContractCard({
           <div className="min-w-0">
             <Link
               href={`/contracts/${contract.id}`}
-              className="font-display text-base font-semibold leading-snug underline-offset-2 hover:underline"
+              className="inline-flex min-h-11 min-w-11 items-center font-display text-base font-semibold leading-snug underline-offset-2 hover:underline"
             >
               {contract.title}
             </Link>
@@ -305,7 +305,7 @@ export function ContractsList({
                     setNewBrief(value === STANDALONE ? "" : value)
                   }
                 >
-                  <SelectTrigger className="h-10">
+                  <SelectTrigger className="">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

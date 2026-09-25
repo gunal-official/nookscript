@@ -19,7 +19,7 @@ export function AuthCard({
     <div className="w-full max-w-[400px]">
       <Link
         href="/"
-        className="mb-6 block text-center font-display text-2xl font-bold tracking-tight text-text"
+        className="inline-flex min-h-11 min-w-11 items-center mb-6 block text-center font-display text-2xl font-bold tracking-tight text-text"
       >
         nook<span className="text-accent">script</span>
       </Link>

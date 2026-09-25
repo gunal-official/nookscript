@@ -22,7 +22,7 @@ export function ThemeToggle() {
           type="button"
           onClick={() => setTheme(t)}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm capitalize text-muted-foreground transition-colors hover:text-text",
+            "min-h-11 min-w-14 rounded-md px-3 py-1.5 text-sm capitalize text-muted-foreground transition-colors hover:text-text",
             mounted && theme === t && "bg-muted font-medium text-text"
           )}
         >

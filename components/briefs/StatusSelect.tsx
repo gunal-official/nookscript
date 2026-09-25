@@ -57,7 +57,7 @@ export function StatusSelect({
     <div className="space-y-1.5">
       <div className="flex items-center gap-2">
         <Select value={value} onValueChange={handleChange} disabled={pending}>
-          <SelectTrigger className="h-8 w-[150px]">
+          <SelectTrigger className="h-11 w-[150px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

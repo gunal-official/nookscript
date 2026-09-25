@@ -67,7 +67,7 @@ function EmptyState({
             </p>
           </div>
           <Button asChild>
-            <Link href="/proposals">Open proposals</Link>
+            <Link href="/proposals" className="inline-flex min-h-11 min-w-11 items-center">Open proposals</Link>
           </Button>
         </>
       )}
@@ -83,7 +83,7 @@ function PlanCard({ plan }: { plan: PlanSummary }) {
           <div className="min-w-0">
             <Link
               href={`/plans/${plan.id}`}
-              className="font-display text-base font-semibold leading-snug underline-offset-2 hover:underline"
+              className="inline-flex min-h-11 min-w-11 items-center font-display text-base font-semibold leading-snug underline-offset-2 hover:underline"
             >
               {plan.title}
             </Link>

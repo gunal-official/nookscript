@@ -105,7 +105,7 @@ export function UpdateComposer({
                 );
               }}
             >
-              <SelectTrigger className="h-8 w-[190px]" aria-label="Insert template">
+              <SelectTrigger className="w-[190px]" aria-label="Insert template">
                 <SelectValue placeholder="Insert template…" />
               </SelectTrigger>
               <SelectContent>

@@ -69,7 +69,7 @@ function NotFoundState() {
         </p>
       </div>
       <Button asChild variant="secondary">
-        <Link href="/proposals">Back to proposals</Link>
+        <Link href="/proposals" className="inline-flex min-h-11 min-w-11 items-center">Back to proposals</Link>
       </Button>
     </div>
   );
@@ -97,7 +97,7 @@ export default async function ProposalDetailPage({
       <div className="mb-6">
         <Link
           href="/proposals"
-          className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
+          className="mb-3 inline-flex min-h-11 min-w-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Proposals
@@ -209,7 +209,7 @@ export default async function ProposalDetailPage({
               <div className="border-t border-border pt-3.5">
                 <Link
                   href={`/briefs/${proposal.brief.id}`}
-                  className="group inline-flex items-center gap-1.5 text-sm text-accent underline-offset-2 hover:underline"
+                  className="inline-flex min-h-11 min-w-11 items-center group inline-flex items-center gap-1.5 text-sm text-accent underline-offset-2 hover:underline"
                 >
                   View source brief
                   <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />

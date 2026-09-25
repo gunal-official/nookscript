@@ -95,7 +95,7 @@ export function AddSourceForm({ briefId }: { briefId: string }) {
             onValueChange={(v) => setSourceType(v as SourceType)}
             disabled={submitting}
           >
-            <SelectTrigger className="h-8 w-[130px]" aria-label="Source type">
+            <SelectTrigger className="w-[130px]" aria-label="Source type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

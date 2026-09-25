@@ -244,7 +244,7 @@ export function InvoiceComposer({
 
       {/* ── Line items ── */}
       <div className="space-y-2">
-        <div className="grid grid-cols-[1fr_5.5rem_7.5rem_6rem_2rem] items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <div className="hidden items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground md:grid md:grid-cols-[1fr_5.5rem_7.5rem_6rem_2rem]">
           <span>Description</span>
           <span className="text-right">Qty</span>
           <span className="text-right">Unit</span>
@@ -259,7 +259,7 @@ export function InvoiceComposer({
         {items.map((item, i) => (
           <div
             key={item.id}
-            className="grid grid-cols-[1fr_5.5rem_7.5rem_6rem_2rem] items-center gap-2"
+            className="flex flex-col gap-2 md:grid md:grid-cols-[1fr_5.5rem_7.5rem_6rem_2rem] md:items-center"
           >
             <Input
               value={item.description}
@@ -295,7 +295,7 @@ export function InvoiceComposer({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0"
+              className="w-8 shrink-0"
               onClick={() => removeItem(i)}
               aria-label={`Remove line ${i + 1}`}
             >

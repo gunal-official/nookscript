@@ -82,7 +82,7 @@ export default function VsPage({ params }: VsPageProps) {
 
       <div className="mt-8 flex items-center gap-3">
         <Button asChild>
-          <Link href="/signup">Try nookscript</Link>
+          <Link href="/signup" className="inline-flex min-h-11 min-w-11 items-center">Try nookscript</Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/pricing">See pricing</Link>

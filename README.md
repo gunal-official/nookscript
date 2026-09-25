@@ -899,6 +899,26 @@ One smoke-harness bug caught en route (stub auth must accept the Bearer
 header — server-side supabase-js never forwards cookies) — the app's
 viewer gating was correct once the stub resolved personas properly.
 
+## Verify Step 32 (responsive — real-browser audit)
+
+Step 32 is the rendered responsive audit + fixes: `scripts/verify-responsive.mjs`
+boots the app against an in-process Supabase stub and renders every page at
+every breakpoint in headless Chromium, measuring horizontal overflow, cut-off
+text, sub-44px tap targets, escaping fixed elements (timer pill), and dialog
+fit. Exit code 1 on any finding.
+
+```bash
+npm install            # devDeps: playwright-core + @sparticuz/chromium (audit only)
+npm run verify:responsive            # all widths, writes summary + screenshots
+WIDTHS=320,768 RUN_DIALOG=1 npm run verify:responsive   # quick check + dialog probe
+```
+
+Fixes shipped with the audit: 44×44 minimum tap targets (buttons, inputs,
+selects, nav/row links, chips), marketing navbar wrap + clamp-sized hero,
+app topbar compaction (<sm search hidden), dialogs inset with scroll
+(`w-[calc(100%-2rem)] max-h-[85dvh]`), timer-pill width bounds + label
+shrink, invoice line-items stacking below md, TeamCard select sizing.
+
 ## Notes
 
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through

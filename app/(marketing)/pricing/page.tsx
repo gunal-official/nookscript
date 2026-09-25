@@ -119,7 +119,7 @@ export default function PricingPage() {
         Questions about teams or multiple workspaces?{" "}
         <a
           href="mailto:hello@nookscript.dev"
-          className="underline underline-offset-2 transition-colors hover:text-text"
+          className="inline-flex min-h-11 min-w-11 items-center underline underline-offset-2 transition-colors hover:text-text"
         >
           Get in touch
         </a>

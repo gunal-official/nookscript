@@ -91,7 +91,7 @@ function InvoiceCard({ invoice }: { invoice: InvoiceSummary }) {
           <div className="min-w-0">
             <Link
               href={`/invoices/${invoice.id}`}
-              className="font-display text-base font-semibold leading-snug underline-offset-2 hover:underline"
+              className="inline-flex min-h-11 min-w-11 items-center font-display text-base font-semibold leading-snug underline-offset-2 hover:underline"
             >
               {invoice.title}
             </Link>

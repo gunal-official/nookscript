@@ -86,12 +86,7 @@ export function TaskChecklist({
         ) : (
           tasks.map((task) => (
             <li key={task.id}>
-              <button
-                type="button"
-                onClick={() => handleToggle(task)}
-                disabled={pending || readOnly}
-                aria-pressed={task.checked}
-                className="flex w-full items-start gap-2.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-muted disabled:cursor-wait disabled:opacity-70"
+              <button className="min-h-11 flex w-full items-start gap-2.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-muted disabled:cursor-wait disabled:opacity-70"
               >
                 <span
                   className={cn(

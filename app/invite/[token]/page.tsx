@@ -51,7 +51,7 @@ export default async function InvitePage({
           title="Invite unavailable"
           subtitle="This link was already accepted, revoked, or expired — or it never existed."
           footer={
-            <Link href="/" className="text-accent hover:underline">
+            <Link href="/" className="inline-flex min-h-11 min-w-11 items-center text-accent hover:underline">
               Back to nookscript
             </Link>
           }

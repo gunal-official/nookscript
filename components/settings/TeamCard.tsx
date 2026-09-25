@@ -149,7 +149,7 @@ function MemberRow({
 
         {roleOptions.length > 0 && !confirmingRole && !confirming && (
           <select
-            className="shrink-0 rounded-md border border-border bg-card px-2 py-1 text-xs text-muted-foreground"
+            className="min-h-11 shrink-0 rounded-md border border-border bg-card px-2 py-1 text-xs text-muted-foreground"
             value=""
             onChange={(e) => {
               const value = e.target.value;

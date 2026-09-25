@@ -66,7 +66,7 @@ function EmptyState({
             </p>
           </div>
           <Button asChild>
-            <Link href="/intake">
+            <Link href="/intake" className="inline-flex min-h-11 min-w-11 items-center">
               <Plus className="mr-2 h-4 w-4" />
               Create your first brief
             </Link>
@@ -85,7 +85,7 @@ function BriefCard({ brief }: { brief: BriefSummary }) {
           <div className="min-w-0">
             <Link
               href={`/briefs/${brief.id}`}
-              className="font-display text-base font-semibold leading-snug underline-offset-2 hover:underline"
+              className="inline-flex min-h-11 min-w-11 items-center font-display text-base font-semibold leading-snug underline-offset-2 hover:underline"
             >
               {brief.title}
             </Link>

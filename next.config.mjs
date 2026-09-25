@@ -2,6 +2,10 @@ import { withSentryConfig } from "@sentry/nextjs/config";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Sandbox-safe override: `.next` sits on the workspace snapshot exclusion
+  // list and gets wiped mid-run in some environments. Default stays ".next";
+  // verify tooling points NEXT_DIST_DIR outside the tree.
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   // Expose the Sentry DSN to the browser under the NEXT_PUBLIC_* prefix
   // without needing a second documented variable. A DSN is a public
   // ingestion endpoint by design (it can't read data, only submit events).

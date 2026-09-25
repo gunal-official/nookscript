@@ -275,7 +275,7 @@ export function BriefForm({
           <div className="ml-auto flex items-center gap-2">
             {briefId && (
               <Button asChild variant="outline" size="sm">
-                <Link href={`/briefs/${briefId}`}>Open in Briefs</Link>
+                <Link href={`/briefs/${briefId}`} className="inline-flex min-h-11 min-w-11 items-center">Open in Briefs</Link>
               </Button>
             )}
             <Button onClick={onSave} disabled={!dirty || saving}>

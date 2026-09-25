@@ -39,7 +39,7 @@ export function InboxThreadList({ threads }: { threads: InboxThread[] }) {
           </p>
         </div>
         <Button asChild size="sm" variant="secondary">
-          <Link href="/intake">Go to Intake</Link>
+          <Link href="/intake" className="inline-flex min-h-11 min-w-11 items-center">Go to Intake</Link>
         </Button>
       </div>
     );
@@ -54,7 +54,7 @@ export function InboxThreadList({ threads }: { threads: InboxThread[] }) {
               <CardTitle className="text-base">
                 <Link
                   href={`/briefs/${thread.briefId}`}
-                  className="transition-colors hover:text-accent"
+                  className="inline-flex min-h-11 min-w-11 items-center transition-colors hover:text-accent"
                 >
                   {thread.title}
                 </Link>

@@ -77,7 +77,7 @@ function NotFoundState() {
         </p>
       </div>
       <Button asChild variant="secondary">
-        <Link href="/briefs">Back to briefs</Link>
+        <Link href="/briefs" className="inline-flex min-h-11 min-w-11 items-center">Back to briefs</Link>
       </Button>
     </div>
   );
@@ -123,7 +123,7 @@ export default async function BriefDetailPage({
       <div className="mb-6">
         <Link
           href="/briefs"
-          className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
+          className="mb-3 inline-flex min-h-11 min-w-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Briefs

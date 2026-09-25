@@ -208,7 +208,7 @@ export function TimeLog({
               setConfirmDeleteId(null);
             }}
           >
-            <SelectTrigger className="h-9 w-52" aria-label="Filter by brief">
+            <SelectTrigger className="w-52" aria-label="Filter by brief">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -286,7 +286,7 @@ export function TimeLog({
                 }))
               }
             >
-              <SelectTrigger className="h-9 w-48" aria-label="Brief">
+              <SelectTrigger className="w-48" aria-label="Brief">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -354,7 +354,7 @@ export function TimeLog({
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-7 px-2 text-muted-foreground"
+                        className="min-h-11 min-w-11 px-2 text-muted-foreground"
                         onClick={() => openEdit(entry)}
                       >
                         Edit
@@ -367,7 +367,7 @@ export function TimeLog({
                             : "ghost"
                         }
                         className={cn(
-                          "h-7 px-2",
+                          "min-h-11 min-w-11 px-2",
                           confirmDeleteId !== entry.id && "text-muted-foreground"
                         )}
                         disabled={deleting}

@@ -71,7 +71,7 @@ function NotFoundState() {
         </p>
       </div>
       <Button asChild variant="secondary">
-        <Link href="/updates">Back to updates</Link>
+        <Link href="/updates" className="inline-flex min-h-11 min-w-11 items-center">Back to updates</Link>
       </Button>
     </div>
   );
@@ -105,7 +105,7 @@ export default async function UpdateDetailPage({
       <div className="mb-6">
         <Link
           href="/updates"
-          className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
+          className="mb-3 inline-flex min-h-11 min-w-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Updates
@@ -165,7 +165,7 @@ export default async function UpdateDetailPage({
               <div className="border-t border-border pt-3.5">
                 <Link
                   href={`/plans/${update.plan.id}`}
-                  className="group inline-flex items-center gap-1.5 text-sm text-accent underline-offset-2 hover:underline"
+                  className="inline-flex min-h-11 min-w-11 items-center group inline-flex items-center gap-1.5 text-sm text-accent underline-offset-2 hover:underline"
                 >
                   View source plan
                   <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />

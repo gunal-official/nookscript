@@ -43,7 +43,7 @@ export function MobileNav({
             key={item.href}
             href={item.href}
             className={cn(
-              "shrink-0 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-card hover:text-text",
+              "min-h-11 min-w-11 items-center shrink-0 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-card hover:text-text",
               active && "bg-card font-semibold text-text"
             )}
           >

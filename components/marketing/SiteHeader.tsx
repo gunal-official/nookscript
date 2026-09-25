@@ -12,24 +12,24 @@ import { Button } from "@/components/ui/button";
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-bg/80 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-6">
+      <div className="mx-auto flex min-h-14 max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 sm:px-6">
         <Link
           href="/"
-          className="font-display text-lg font-bold tracking-tight"
+          className="inline-flex min-h-11 items-center font-display text-lg font-bold tracking-tight"
         >
           nook<span className="text-accent">script</span>
         </Link>
 
-        <nav className="hidden items-center gap-5 text-sm text-muted-foreground sm:flex">
-          <Link href="/about" className="transition-colors hover:text-text">
+        <nav className="hidden items-center gap-1 text-sm text-muted-foreground sm:flex">
+          <Link href="/about" className="inline-flex min-h-11 min-w-11 items-center transition-colors hover:text-text">
             About
           </Link>
-          <Link href="/pricing" className="transition-colors hover:text-text">
+          <Link href="/pricing" className="inline-flex min-h-11 min-w-11 items-center transition-colors hover:text-text">
             Pricing
           </Link>
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           <ThemeToggle />
           <Button asChild variant="ghost" size="sm">
             <Link href="/login">Log in</Link>
