@@ -111,7 +111,7 @@ export default async function InvoiceDetailPage({
           href="/invoices"
           className="mb-3 inline-flex min-h-11 min-w-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-text"
         >
-          <ArrowLeft className="h-3.5 w-3.5" />
+          <ArrowLeft className="h-3.5 w-3.5"  aria-hidden="true" />
           Invoices
         </Link>
         <div className="flex flex-wrap items-center gap-3">

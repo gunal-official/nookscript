@@ -580,6 +580,25 @@ async function main() {
         await record("team-confirm", ok, m);
         const no = page.locator('button:has-text("Cancel")').first();
         if (await no.count()) await no.click().catch(() => {});
+
+        // D) mobile drawer: hamburger -> every destination visible -> navigate.
+        if (w === 320) {
+          await page.goto(`${BASE}/briefs`, { waitUntil: "load", timeout: 20000 });
+          await page.waitForTimeout(300);
+          await page.click('button[aria-label="Open menu"]', { timeout: 8000 });
+          await page.waitForTimeout(350); // slide-in is 200ms
+          m = await page.evaluate(METRICS_FN);
+          x = await extra();
+          const links = await page.$$eval('nav[aria-label="Primary"] a', (as) => as.map((a) => a.getAttribute("href")));
+          ok = m.overflowX === 0 && m.small.length === 0 && links.length >= 9 && !x.fixed.some((f) => f.escapes);
+          await record("drawer-open", ok, m);
+          await page.click('nav[aria-label="Primary"] a[href="/proposals"]', { timeout: 8000 });
+          await page.waitForLoadState("load");
+          await page.waitForTimeout(250);
+          const landed = new URL(page.url()).pathname.startsWith("/proposals");
+          m = await page.evaluate(METRICS_FN);
+          await record("drawer-navigate", landed && m.small.length === 0 && m.overflowX === 0, m);
+        }
       } catch (e) {
         failures++;
         say(`✗ ${String(w).padStart(4)} interact-error          ${String(e).slice(0, 70)}`);

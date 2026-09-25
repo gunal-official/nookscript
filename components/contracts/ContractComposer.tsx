@@ -174,9 +174,9 @@ export function ContractComposer({
       <div className="flex items-center gap-2">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="mr-2 h-4 w-4 animate-spin"  aria-hidden="true" />
           ) : (
-            <Save className="mr-2 h-4 w-4" />
+            <Save className="mr-2 h-4 w-4"  aria-hidden="true" />
           )}
           Save
         </Button>

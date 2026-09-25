@@ -44,7 +44,7 @@ export default async function BriefsPage() {
         </div>
         <Button asChild>
           <Link href="/intake">
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="mr-2 h-4 w-4"  aria-hidden="true" />
             New brief
           </Link>
         </Button>

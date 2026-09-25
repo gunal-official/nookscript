@@ -81,7 +81,7 @@ export function ExportMarkdownButton({
       onClick={handleExport}
     >
       {exported ? (
-        <Check className="mr-2 h-4 w-4" />
+        <Check className="mr-2 h-4 w-4"  aria-hidden="true" />
       ) : (
         <Download className="mr-2 h-4 w-4" />
       )}

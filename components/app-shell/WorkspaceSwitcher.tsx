@@ -81,7 +81,7 @@ export function WorkspaceSwitcher({
         >
           <span className="flex items-center gap-2 truncate">
             {pending ? (
-              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin"  aria-hidden="true" />
             ) : (
               <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
             )}

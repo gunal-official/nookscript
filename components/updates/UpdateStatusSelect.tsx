@@ -68,7 +68,7 @@ export function UpdateStatusSelect({
           </SelectContent>
         </Select>
         {pending && (
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground"  aria-hidden="true" />
         )}
       </div>
       {error && <p className="text-xs text-error">{error}</p>}

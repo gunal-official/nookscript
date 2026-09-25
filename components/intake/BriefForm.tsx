@@ -120,7 +120,7 @@ export function BriefForm({
     return (
       <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card/50 px-8 text-center">
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-          <Sparkles className="h-4 w-4 text-muted-foreground" />
+          <Sparkles className="h-4 w-4 text-muted-foreground"  aria-hidden="true" />
         </span>
         <div>
           <p className="font-display font-semibold">Brief preview</p>
@@ -137,7 +137,7 @@ export function BriefForm({
     return (
       <Card>
         <CardHeader className="flex-row items-center gap-2 space-y-0 border-b border-border px-5 py-3.5">
-          <Loader2 className="h-4 w-4 animate-spin text-accent" />
+          <Loader2 className="h-4 w-4 animate-spin text-accent"  aria-hidden="true" />
           <CardTitle className="text-base">
             Generating your brief…
           </CardTitle>
@@ -265,7 +265,7 @@ export function BriefForm({
               <span className="text-error">{saveError}</span>
             ) : savedLabel && !dirty ? (
               <span className="flex items-center gap-1.5 text-muted-foreground">
-                <Check className="h-3.5 w-3.5 text-accent" />
+                <Check className="h-3.5 w-3.5 text-accent"  aria-hidden="true" />
                 {savedLabel}
               </span>
             ) : dirty ? (
@@ -281,7 +281,7 @@ export function BriefForm({
             <Button onClick={onSave} disabled={!dirty || saving}>
               {saving ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin"  aria-hidden="true" />
                   Saving…
                 </>
               ) : (

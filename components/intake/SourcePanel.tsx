@@ -68,7 +68,7 @@ export function SourcePanel({
             onClick={onReset}
             className="text-muted-foreground hover:text-text"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
+            <RotateCcw className="h-3.5 w-3.5"  aria-hidden="true" />
             New source
           </Button>
         </CardHeader>
@@ -125,12 +125,12 @@ export function SourcePanel({
           <Button onClick={onGenerate} disabled={!canGenerate}>
             {generating ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin"  aria-hidden="true" />
                 Generating…
               </>
             ) : (
               <>
-                <Sparkles className="h-4 w-4" />
+                <Sparkles className="h-4 w-4"  aria-hidden="true" />
                 Generate
               </>
             )}

@@ -74,7 +74,7 @@ export function TaskChecklist({
           Tasks
         </p>
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          {pending && <Loader2 className="h-3 w-3 animate-spin" />}
+          {pending && <Loader2 className="h-3 w-3 animate-spin"  aria-hidden="true" />}
           {doneCount} of {tasks.length} done
         </span>
       </div>
@@ -97,7 +97,7 @@ export function TaskChecklist({
                   )}
                 >
                   {task.checked && (
-                    <Check className="h-3 w-3" strokeWidth={3.5} />
+                    <Check className="h-3 w-3" strokeWidth={3.5}  aria-hidden="true" />
                   )}
                 </span>
                 <span

@@ -191,7 +191,7 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
           aria-label="Discard this session"
           className="min-h-11 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-text"
         >
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4"  aria-hidden="true" />
         </button>
       </div>
     );

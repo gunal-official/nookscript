@@ -159,7 +159,7 @@ export function PlansList({ plans }: { plans: PlanSummary[] }) {
           </TabsList>
         </Tabs>
         <div className="relative w-full sm:w-64">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"  aria-hidden="true" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}

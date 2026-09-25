@@ -9,6 +9,9 @@ const config = {
   ],
   theme: {
     extend: {
+      // User-specified shell bands (Step 33): mobile <600, tablet 600–1023,
+      // desktop ≥1024. Named screens so shell code reads `tab:` / `desk:`.
+      screens: { tab: "600px", desk: "1024px" },
       colors: {
         // Raw design tokens (CSS variables defined in app/globals.css)
         bg: "var(--bg)",

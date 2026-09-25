@@ -38,7 +38,7 @@ function EmptyState({
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-14 text-center">
       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-muted">
-        <FileText className="h-5 w-5 text-muted-foreground" />
+        <FileText className="h-5 w-5 text-muted-foreground"  aria-hidden="true" />
       </span>
       <div>
         <h2 className="font-display text-lg font-semibold tracking-tight">
@@ -52,7 +52,7 @@ function EmptyState({
       </div>
       {isOwner && (
         <Button onClick={onCreate}>
-          <Plus className="mr-2 h-4 w-4" />
+          <Plus className="mr-2 h-4 w-4"  aria-hidden="true" />
           New template
         </Button>
       )}
@@ -117,7 +117,7 @@ function TemplateRow({
               onClick={() => setConfirming(true)}
               aria-label={`Delete ${template.title}`}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-3.5 w-3.5"  aria-hidden="true" />
             </Button>
           </div>
         )}
@@ -141,7 +141,7 @@ function TemplateRow({
               onClick={handleDelete}
               disabled={pending}
             >
-              {pending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              {pending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"  aria-hidden="true" />}
               Delete
             </Button>
           </div>
@@ -176,7 +176,7 @@ export function TemplatesList({
             </div>
             {isOwner && templates.length > 0 && (
               <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                <Plus className="mr-1.5 h-3.5 w-3.5"  aria-hidden="true" />
                 New template
               </Button>
             )}

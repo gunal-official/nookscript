@@ -74,7 +74,7 @@ function EmptyState({
             </p>
           </div>
           <Button onClick={onNewInvoice}>
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="mr-2 h-4 w-4"  aria-hidden="true" />
             New invoice
           </Button>
         </>
@@ -200,7 +200,7 @@ export function InvoicesList({
         </Tabs>
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"  aria-hidden="true" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -211,7 +211,7 @@ export function InvoicesList({
           </div>
           {!creating && (
             <Button onClick={() => setCreating(true)}>
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 h-4 w-4"  aria-hidden="true" />
               New invoice
             </Button>
           )}
@@ -292,9 +292,9 @@ export function InvoicesList({
                 disabled={creatingPending}
               >
                 {creatingPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin"  aria-hidden="true" />
                 ) : (
-                  <Plus className="mr-2 h-4 w-4" />
+                  <Plus className="mr-2 h-4 w-4"  aria-hidden="true" />
                 )}
                 Create draft
               </Button>
@@ -309,7 +309,7 @@ export function InvoicesList({
                   setCreateError(null);
                 }}
               >
-                <X className="mr-2 h-4 w-4" />
+                <X className="mr-2 h-4 w-4"  aria-hidden="true" />
                 Cancel
               </Button>
             </div>

@@ -178,7 +178,7 @@ function MemberRow({
             onClick={() => setConfirming(true)}
             aria-label={`Remove ${member.full_name ?? "member"}`}
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3.5 w-3.5"  aria-hidden="true" />
           </Button>
         )}
 
@@ -207,7 +207,7 @@ function MemberRow({
               disabled={rolePending}
             >
               {rolePending && (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"  aria-hidden="true" />
               )}
               Make {pendingRole === "viewer" ? "viewer" : pendingRole}
             </Button>
@@ -234,7 +234,7 @@ function MemberRow({
               disabled={pending}
             >
               {pending && (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"  aria-hidden="true" />
               )}
               Remove
             </Button>
@@ -250,7 +250,7 @@ function MemberRow({
             onClick={() => setConfirmingLeave(true)}
             aria-label="Leave workspace"
           >
-            <LogOut className="h-3.5 w-3.5" />
+            <LogOut className="h-3.5 w-3.5"  aria-hidden="true" />
           </Button>
         )}
 
@@ -274,7 +274,7 @@ function MemberRow({
               disabled={leavePending}
             >
               {leavePending && (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"  aria-hidden="true" />
               )}
               Leave workspace
             </Button>
@@ -348,9 +348,9 @@ function InviteRow({
               aria-label={`Copy invite link for ${invite.email}`}
             >
               {copied ? (
-                <Check className="h-3.5 w-3.5" />
+                <Check className="h-3.5 w-3.5"  aria-hidden="true" />
               ) : (
-                <Copy className="h-3.5 w-3.5" />
+                <Copy className="h-3.5 w-3.5"  aria-hidden="true" />
               )}
             </Button>
             <Button
@@ -361,7 +361,7 @@ function InviteRow({
               onClick={() => setConfirming(true)}
               aria-label={`Revoke invite for ${invite.email}`}
             >
-              <Ban className="h-3.5 w-3.5" />
+              <Ban className="h-3.5 w-3.5"  aria-hidden="true" />
             </Button>
           </div>
         )}
@@ -386,7 +386,7 @@ function InviteRow({
               disabled={pending}
             >
               {pending && (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"  aria-hidden="true" />
               )}
               Revoke
             </Button>
@@ -514,9 +514,9 @@ export function TeamCard({
               />
               <Button type="submit" disabled={pending} className="shrink-0">
                 {pending ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"  aria-hidden="true" />
                 ) : (
-                  <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+                  <UserPlus className="mr-1.5 h-3.5 w-3.5"  aria-hidden="true" />
                 )}
                 Create invite
               </Button>

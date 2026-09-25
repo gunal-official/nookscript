@@ -65,7 +65,7 @@ export function WorkspaceDangerCard({ name }: { name: string }) {
             className="mt-3"
             onClick={() => setConfirming(true)}
           >
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            <Trash2 className="mr-1.5 h-3.5 w-3.5"  aria-hidden="true" />
             Delete workspace
           </Button>
         ) : (
@@ -90,7 +90,7 @@ export function WorkspaceDangerCard({ name }: { name: string }) {
               disabled={pending}
             >
               {pending && (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"  aria-hidden="true" />
               )}
               Delete forever
             </Button>

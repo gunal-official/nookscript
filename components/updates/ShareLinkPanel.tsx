@@ -80,9 +80,9 @@ export function ShareLinkPanel({
             onClick={() => run(() => createShareLink({ updateId }))}
           >
             {pending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin"  aria-hidden="true" />
             ) : (
-              <Link2 className="mr-2 h-4 w-4" />
+              <Link2 className="mr-2 h-4 w-4"  aria-hidden="true" />
             )}
             Create share link
           </Button>
@@ -103,9 +103,9 @@ export function ShareLinkPanel({
               aria-label="Copy share link"
             >
               {copied ? (
-                <Check className="h-3.5 w-3.5" />
+                <Check className="h-3.5 w-3.5"  aria-hidden="true" />
               ) : (
-                <Copy className="h-3.5 w-3.5" />
+                <Copy className="h-3.5 w-3.5"  aria-hidden="true" />
               )}
             </Button>
           </div>
@@ -121,9 +121,9 @@ export function ShareLinkPanel({
             }
           >
             {pending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin"  aria-hidden="true" />
             ) : (
-              <Ban className="mr-2 h-4 w-4" />
+              <Ban className="mr-2 h-4 w-4"  aria-hidden="true" />
             )}
             Revoke link
           </Button>
@@ -148,9 +148,9 @@ export function ShareLinkPanel({
             }
           >
             {pending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin"  aria-hidden="true" />
             ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
+              <RefreshCw className="mr-2 h-4 w-4"  aria-hidden="true" />
             )}
             Regenerate link
           </Button>

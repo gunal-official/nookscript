@@ -299,12 +299,12 @@ export function InvoiceComposer({
               onClick={() => removeItem(i)}
               aria-label={`Remove line ${i + 1}`}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-3.5 w-3.5"  aria-hidden="true" />
             </Button>
           </div>
         ))}
         <Button type="button" variant="ghost" size="sm" onClick={addItem}>
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          <Plus className="mr-1.5 h-3.5 w-3.5"  aria-hidden="true" />
           Add line item
         </Button>
       </div>
@@ -377,9 +377,9 @@ export function InvoiceComposer({
           disabled={pending || !dirty}
         >
           {pending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="mr-2 h-4 w-4 animate-spin"  aria-hidden="true" />
           ) : (
-            <Save className="mr-2 h-4 w-4" />
+            <Save className="mr-2 h-4 w-4"  aria-hidden="true" />
           )}
           Save
         </Button>

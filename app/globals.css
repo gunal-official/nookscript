@@ -32,7 +32,44 @@
     @apply border-border;
   }
 
+  /* Icon system (docs/icon-audit.md): one stroke width everywhere. Lucide
+     defaults to 2; 1.5 keeps 16px icons from looking heavy against 14px text. */
+  svg.lucide {
+    stroke-width: 1.5;
+  }
+
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* ── Motion system (Step 33) — transform/opacity only, 150–250ms ─────────── */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slide-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-in 150ms ease-out both; }
+.animate-slide-in { animation: slide-in 200ms ease-out both; }
+.animate-pop-in { animation: pop-in 150ms ease-out both; }
+.animate-rise-in { animation: rise-in 200ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-in,
+  .animate-pop-in,
+  .animate-rise-in {
+    animation: none;
   }
 }

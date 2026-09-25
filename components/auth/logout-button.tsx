@@ -31,7 +31,7 @@ export function LogoutButton() {
       title="Log out"
       className="text-muted-foreground hover:text-text"
     >
-      <LogOut className="h-4 w-4" />
+      <LogOut className="h-4 w-4"  aria-hidden="true" />
       <span className="hidden sm:inline">
         {pending ? "Logging out…" : "Log out"}
       </span>

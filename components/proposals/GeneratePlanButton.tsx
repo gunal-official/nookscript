@@ -40,7 +40,7 @@ export function GeneratePlanButton({ proposalId }: { proposalId: string }) {
         disabled={pending}
       >
         {pending ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          <Loader2 className="mr-2 h-4 w-4 animate-spin"  aria-hidden="true" />
         ) : (
           <ListTodo className="mr-2 h-4 w-4" />
         )}

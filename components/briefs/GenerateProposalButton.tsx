@@ -38,7 +38,7 @@ export function GenerateProposalButton({ briefId }: { briefId: string }) {
         disabled={pending}
       >
         {pending ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          <Loader2 className="mr-2 h-4 w-4 animate-spin"  aria-hidden="true" />
         ) : (
           <FileSignature className="mr-2 h-4 w-4" />
         )}

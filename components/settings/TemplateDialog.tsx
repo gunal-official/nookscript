@@ -122,7 +122,7 @@ export function TemplateDialog({
             onClick={handleSubmit}
             disabled={pending || !title.trim()}
           >
-            {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin"  aria-hidden="true" />}
             {isEdit ? "Save changes" : "Create template"}
           </Button>
         </DialogFooter>

@@ -35,7 +35,7 @@ export default async function IntakeInboxPage() {
 
       {threads === null ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-16 text-center">
-          <MessageSquare className="h-6 w-6 text-muted-foreground" />
+          <MessageSquare className="h-6 w-6 text-muted-foreground"  aria-hidden="true" />
           <p className="text-sm font-medium">Couldn&apos;t load the inbox</p>
           <p className="max-w-sm text-sm text-muted-foreground">
             Refresh to retry. If this persists, check your Supabase

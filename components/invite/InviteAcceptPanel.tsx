@@ -58,9 +58,9 @@ export function InviteAcceptPanel({
     <div className="space-y-3">
       <Button onClick={handleAccept} disabled={pending} className="w-full">
         {pending ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          <Loader2 className="mr-2 h-4 w-4 animate-spin"  aria-hidden="true" />
         ) : (
-          <UserPlus className="mr-2 h-4 w-4" />
+          <UserPlus className="mr-2 h-4 w-4"  aria-hidden="true" />
         )}
         {pending ? "Joining…" : "Join workspace"}
       </Button>

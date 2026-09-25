@@ -152,9 +152,9 @@ export function UpdateComposer({
           disabled={pending || !dirty || !title.trim()}
         >
           {pending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="mr-2 h-4 w-4 animate-spin"  aria-hidden="true" />
           ) : (
-            <Save className="mr-2 h-4 w-4" />
+            <Save className="mr-2 h-4 w-4"  aria-hidden="true" />
           )}
           Save update
         </Button>
