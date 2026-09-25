@@ -9,7 +9,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Search, Send } from "lucide-react";
+import { Search, Send, Megaphone, FileText } from "lucide-react";
 
 import { UpdateStatusBadge } from "@/components/updates/UpdateStatusBadge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { timeAgo } from "@/lib/utils";
+import { ListStats, StatTile, StackedBar } from "@/components/ui/doc-detail";
 import type { UpdateStatus, UpdateSummary } from "@/lib/types/update";
 
 type StatusFilter = "all" | UpdateStatus;
@@ -137,8 +138,30 @@ export function UpdatesList({ updates }: { updates: UpdateSummary[] }) {
     });
   }, [updates, statusFilter, query]);
 
+  const sentCount = updates.filter((u) => u.status === "sent").length;
+  const draftCount = updates.filter((u) => u.status === "draft").length;
+
   return (
     <div>
+      <ListStats>
+        <StatTile icon={Megaphone} label="Total updates" value={updates.length} hint="All time" />
+        <StatTile
+          icon={Send}
+          label="Sent"
+          value={sentCount}
+          hint="Delivered to clients"
+          tone={sentCount > 0 ? "success" : "muted"}
+          delay={40}
+        />
+        <StatTile
+          icon={FileText}
+          label="Drafts"
+          value={draftCount}
+          hint="Work in progress"
+          tone={draftCount > 0 ? "accent" : "muted"}
+          delay={80}
+        />
+      </ListStats>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Tabs
           value={statusFilter}

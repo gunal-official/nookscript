@@ -200,7 +200,6 @@ export function ActivityTimeline({ events }: { events: TimelineEvent[] }) {
                 ? "icon-chip"
                 : "icon-chip-muted";
         return (
-          // eslint-disable-next-line react/no-array-index-key -- append-only audit events, order is the identity
           <li key={i} className="relative flex items-start gap-3">
             <span
               className={cn(
@@ -225,5 +224,92 @@ export function ActivityTimeline({ events }: { events: TimelineEvent[] }) {
         );
       })}
     </ul>
+  );
+}
+
+/* ── List stats: stat-card rows + distribution bars for the list pages ── */
+
+export function ListStats({
+  cols = 3,
+  bar,
+  children,
+}: {
+  cols?: 3 | 4;
+  /** Optional chart card under the tiles (e.g. a StackedBar breakdown). */
+  bar?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-6 animate-rise-in">
+      <div
+        className={
+          cols === 4
+            ? "grid grid-cols-2 gap-4 lg:grid-cols-4"
+            : "grid grid-cols-1 gap-4 sm:grid-cols-3"
+        }
+      >
+        {children}
+      </div>
+      {bar && (
+        <div className="mt-4 rounded-lg border border-border bg-card p-4 shadow-card">
+          {bar}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Distribution bar (chart vocabulary, no dependency): proportional
+ *  segments with a text legend. The bar itself carries no text (audit). */
+export function StackedBar({
+  segments,
+}: {
+  segments: {
+    label: string;
+    /** Numeric weight for the segment's width. */
+    weight: number;
+    /** Legend display (e.g. formatted money); defaults to `weight`. */
+    display?: React.ReactNode;
+    className: string;
+  }[];
+}) {
+  const total = segments.reduce((n, s) => n + Math.max(0, s.weight), 0);
+  if (!total) return null;
+  return (
+    <div>
+      <div
+        role="img"
+        aria-label={segments
+          .map((s) => `${s.label}: ${s.display ?? s.weight}`)
+          .join(", ")}
+        className="flex h-2 w-full overflow-hidden rounded-full bg-muted"
+      >
+        {segments.map(
+          (s) =>
+            s.weight > 0 && (
+              <div
+                key={s.label}
+                className={cn("h-full", s.className)}
+                style={{ width: `${(Math.max(0, s.weight) / total) * 100}%` }}
+              />
+            )
+        )}
+      </div>
+      <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1">
+        {segments.map((s) => (
+          <span
+            key={s.label}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground"
+          >
+            <span
+              className={cn("h-2 w-2 rounded-full", s.className)}
+              aria-hidden="true"
+            />
+            {s.label}{" "}
+            <span className="font-medium text-text">{s.display ?? s.weight}</span>
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }

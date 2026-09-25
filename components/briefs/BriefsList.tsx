@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { FileText, Plus, Search } from "lucide-react";
+import { FileText, Plus, Search, Eye, HelpCircle } from "lucide-react";
 
 import { StatusBadge } from "@/components/briefs/StatusBadge";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { timeAgo } from "@/lib/utils";
+import { ListStats, StatTile, StackedBar } from "@/components/ui/doc-detail";
 import type { BriefStatus, BriefSummary } from "@/lib/types/brief";
 
 type StatusFilter = "all" | BriefStatus;
@@ -142,8 +143,39 @@ export function BriefsList({ briefs }: { briefs: BriefSummary[] }) {
     });
   }, [briefs, statusFilter, query]);
 
+  const openQuestions = briefs.reduce((n, b) => n + (b.openQuestionCount ?? 0), 0);
+
   return (
     <div>
+      <ListStats
+        bar={
+          <StackedBar
+            segments={[
+              { label: "Draft", weight: statusCounts.draft, className: "bg-muted-foreground/50" },
+              { label: "In review", weight: statusCounts.in_review, className: "bg-accent" },
+              { label: "Approved", weight: statusCounts.approved, className: "bg-success" },
+            ]}
+          />
+        }
+      >
+        <StatTile icon={FileText} label="Total briefs" value={briefs.length} hint="All time" />
+        <StatTile
+          icon={Eye}
+          label="In review"
+          value={statusCounts.in_review}
+          hint="On your desk"
+          tone={statusCounts.in_review > 0 ? "accent" : "muted"}
+          delay={40}
+        />
+        <StatTile
+          icon={HelpCircle}
+          label="Open questions"
+          value={openQuestions}
+          hint="Across all briefs"
+          tone={openQuestions > 0 ? "accent" : "muted"}
+          delay={80}
+        />
+      </ListStats>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Tabs
           value={statusFilter}

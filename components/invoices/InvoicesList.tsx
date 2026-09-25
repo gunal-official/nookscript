@@ -1,5 +1,8 @@
 "use client";
 
+// Overdue cutoff, stamped at import (React render must stay pure).
+const TODAY_I = new Date().toISOString().slice(0, 10);
+
 /**
  * Client side of /invoices — status filter tabs + search over the list
  * the server page fetched, plus create-on-list (the settings/templates
@@ -16,7 +19,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Loader2, Plus, Search, X, Receipt } from "lucide-react";
+import { Loader2, Plus, Search, X, Receipt, Wallet, CircleDollarSign, Clock } from "lucide-react";
 
 import { createInvoice } from "@/app/(app)/invoices/actions";
 import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
@@ -25,6 +28,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate, formatMoney, invoiceNumberLabel, timeAgo } from "@/lib/utils";
+import { ListStats, StatTile, StackedBar } from "@/components/ui/doc-detail";
 import type { InvoiceStatus, InvoiceSummary } from "@/lib/types/invoice";
 
 type StatusFilter = "all" | InvoiceStatus;
@@ -183,8 +187,53 @@ export function InvoicesList({
     if (result?.id) router.push(`/invoices/${result.id}`);
   }
 
+  const outstandingCents = invoices
+    .filter((i) => i.status === "sent")
+    .reduce((n, i) => n + i.total_cents, 0);
+  const paidCents = invoices
+    .filter((i) => i.status === "paid")
+    .reduce((n, i) => n + i.total_cents, 0);
+  const overdueCount = invoices.filter(
+    (i) => i.status === "sent" && i.due_date && i.due_date < TODAY_I
+  ).length;
+
   return (
     <div>
+      <ListStats
+        cols={3}
+        bar={
+          <StackedBar
+            segments={[
+              { label: "Paid", weight: paidCents, display: formatMoney(paidCents), className: "bg-success" },
+              { label: "Outstanding", weight: outstandingCents, display: formatMoney(outstandingCents), className: "bg-accent" },
+            ]}
+          />
+        }
+      >
+        <StatTile
+          icon={Wallet}
+          label="Outstanding"
+          value={formatMoney(outstandingCents)}
+          hint="Sent, awaiting payment"
+          tone="accent"
+        />
+        <StatTile
+          icon={CircleDollarSign}
+          label="Paid"
+          value={formatMoney(paidCents)}
+          hint="Recorded in full"
+          tone="success"
+          delay={40}
+        />
+        <StatTile
+          icon={Clock}
+          label="Overdue"
+          value={overdueCount}
+          hint="Past the due date"
+          tone={overdueCount > 0 ? "error" : "muted"}
+          delay={80}
+        />
+      </ListStats>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Tabs
           value={statusFilter}

@@ -1,5 +1,9 @@
 "use client";
 
+// Expiry windows, stamped at import (React render must stay pure).
+const TODAY_C = new Date().toISOString().slice(0, 10);
+const SOON_C = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+
 /**
  * Client side of /contracts — status filter tabs + search over the list
  * the server page fetched, plus create-on-list (the invoices precedent:
@@ -15,7 +19,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Loader2, Plus, Search, X, FileSignature } from "lucide-react";
+import { Loader2, Plus, Search, X, FileSignature, PenLine, Send, Hourglass } from "lucide-react";
 
 import { createContract } from "@/app/(app)/contracts/actions";
 import {
@@ -34,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate, timeAgo } from "@/lib/utils";
+import { ListStats, StatTile, StackedBar } from "@/components/ui/doc-detail";
 import type {
   ContractStatus,
   ContractSummary,
@@ -210,8 +215,60 @@ export function ContractsList({
     if (result?.id) router.push(`/contracts/${result.id}`);
   }
 
+  const signedCount = contracts.filter((c) => c.status === "signed").length;
+  const awaitingCount = contracts.filter((c) => c.status === "sent").length;
+  const draftCountC = contracts.filter((c) => c.status === "draft").length;
+  const voidCountC = contracts.filter((c) => c.status === "void").length;
+  const expiringCount = contracts.filter(
+    (c) =>
+      c.expires_on &&
+      c.status !== "signed" &&
+      c.status !== "void" &&
+      c.expires_on >= TODAY_C &&
+      c.expires_on <= SOON_C
+  ).length;
+
   return (
     <div>
+      <ListStats
+        cols={4}
+        bar={
+          <StackedBar
+            segments={[
+              { label: "Draft", weight: draftCountC, className: "bg-muted-foreground/50" },
+              { label: "Sent", weight: awaitingCount, className: "bg-accent" },
+              { label: "Signed", weight: signedCount, className: "bg-success" },
+              { label: "Void", weight: voidCountC, className: "bg-error/60" },
+            ]}
+          />
+        }
+      >
+        <StatTile icon={FileSignature} label="Total contracts" value={contracts.length} hint="All time" />
+        <StatTile
+          icon={Send}
+          label="Awaiting signature"
+          value={awaitingCount}
+          hint="Sent to clients"
+          tone={awaitingCount > 0 ? "accent" : "muted"}
+          delay={40}
+        />
+        <StatTile
+          icon={PenLine}
+          label="Signed"
+          value={signedCount}
+          hint="Fully executed"
+          tone={signedCount > 0 ? "success" : "muted"}
+          delay={80}
+        />
+        <StatTile
+          icon={Hourglass}
+          label="Expiring soon"
+          value={expiringCount}
+          hint="Within 30 days"
+          tone={expiringCount > 0 ? "error" : "muted"}
+          delay={120}
+        />
+      </ListStats>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Tabs
           value={statusFilter}

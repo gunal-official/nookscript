@@ -9,7 +9,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { FileSignature, Search } from "lucide-react";
+import { FileSignature, Search, Hourglass, CheckCircle2, ListChecks } from "lucide-react";
 
 import { ProposalStatusBadge } from "@/components/proposals/ProposalStatusBadge";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { timeAgo } from "@/lib/utils";
+import { ListStats, StatTile, StackedBar } from "@/components/ui/doc-detail";
 import type { ProposalStatus, ProposalSummary } from "@/lib/types/proposal";
 
 type StatusFilter = "all" | ProposalStatus;
@@ -146,8 +147,39 @@ export function ProposalsList({ proposals }: { proposals: ProposalSummary[] }) {
     });
   }, [proposals, statusFilter, query]);
 
+  const inPlay = proposals.filter((p) => p.status === "draft" || p.status === "sent").length;
+  const accepted = proposals.filter((p) => p.status === "accepted").length;
+  const deliverablesDone = proposals.reduce((n, p) => n + p.deliverablesDone, 0);
+  const deliverablesTotal = proposals.reduce((n, p) => n + p.deliverablesTotal, 0);
+
   return (
     <div>
+      <ListStats cols={4}>
+        <StatTile icon={FileSignature} label="Total proposals" value={proposals.length} hint="All time" />
+        <StatTile
+          icon={Hourglass}
+          label="In play"
+          value={inPlay}
+          hint="Draft or sent"
+          tone={inPlay > 0 ? "accent" : "muted"}
+          delay={40}
+        />
+        <StatTile
+          icon={CheckCircle2}
+          label="Accepted"
+          value={accepted}
+          hint="Won work"
+          tone={accepted > 0 ? "success" : "muted"}
+          delay={80}
+        />
+        <StatTile
+          icon={ListChecks}
+          label="Scope done"
+          value={`${deliverablesDone}/${deliverablesTotal}`}
+          hint="Deliverables checked"
+          delay={120}
+        />
+      </ListStats>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Tabs
           value={statusFilter}

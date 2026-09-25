@@ -9,7 +9,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ListTodo, Search } from "lucide-react";
+import { ListTodo, Search, Timer, CheckCircle2, ListChecks } from "lucide-react";
 
 import { PlanStatusBadge } from "@/components/plans/PlanStatusBadge";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { timeAgo } from "@/lib/utils";
+import { ListStats, StatTile, StackedBar } from "@/components/ui/doc-detail";
 import type { PlanStatus, PlanSummary } from "@/lib/types/plan";
 
 type StatusFilter = "all" | PlanStatus;
@@ -140,8 +141,39 @@ export function PlansList({ plans }: { plans: PlanSummary[] }) {
     });
   }, [plans, statusFilter, query]);
 
+  const inProgress = plans.filter((p) => p.status === "in_progress").length;
+  const donePlans = plans.filter((p) => p.status === "done").length;
+  const tasksDone = plans.reduce((n, p) => n + p.tasksDone, 0);
+  const tasksTotal = plans.reduce((n, p) => n + p.tasksTotal, 0);
+
   return (
     <div>
+      <ListStats cols={4}>
+        <StatTile icon={ListTodo} label="Total plans" value={plans.length} hint="All time" />
+        <StatTile
+          icon={Timer}
+          label="In progress"
+          value={inProgress}
+          hint="Actively moving"
+          tone={inProgress > 0 ? "accent" : "muted"}
+          delay={40}
+        />
+        <StatTile
+          icon={CheckCircle2}
+          label="Delivered"
+          value={donePlans}
+          hint="Plans done"
+          tone={donePlans > 0 ? "success" : "muted"}
+          delay={80}
+        />
+        <StatTile
+          icon={ListChecks}
+          label="Tasks done"
+          value={`${tasksDone}/${tasksTotal}`}
+          hint="Across all plans"
+          delay={120}
+        />
+      </ListStats>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Tabs
           value={statusFilter}
