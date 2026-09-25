@@ -908,7 +908,8 @@ text, sub-44px tap targets, escaping fixed elements (timer pill), and dialog
 fit. Exit code 1 on any finding.
 
 ```bash
-npm install            # devDeps: playwright-core + @sparticuz/chromium (audit only)
+npm install            # devDeps: playwright-core (audit only)
+npm run verify:responsive:setup   # one-time: downloads platform-correct Chromium
 npm run verify:responsive            # all widths, writes summary + screenshots
 WIDTHS=320,768 RUN_DIALOG=1 npm run verify:responsive   # quick check + dialog probe
 RUN_INTERACT=1 npm run verify:responsive                # drives timer pill, stop form, select popover, inline confirm
@@ -922,6 +923,14 @@ shrink, invoice line-items stacking below md, TeamCard select sizing.
 
 ## Notes
 
+- Audit browser provisioning (Step 34(a-fix3)): `playwright-core` +
+  `npm run verify:responsive:setup` (= `npx playwright-core install chromium`)
+  downloads the build matching this OS/arch (macOS arm64/x64, Linux x64) into
+  `~/.cache/ms-playwright`, and the harness launches it via the standard
+  `chromium.launch()`. The earlier `@sparticuz/chromium` package shipped
+  AWS-Lambda Linux x86-64 binaries only and could never run on any Mac —
+  removed entirely (no Lambda/CI path used it; CI gates are tsc + build +
+  verify:db).
 - Inter is self-hosted via `@fontsource-variable/inter` (loaded through
   `next/font/local`) instead of `next/font/google` — no build-time dependency
   on fonts.googleapis.com. See the comment in `app/layout.tsx`.
@@ -938,7 +947,8 @@ shrink, invoice line-items stacking below md, TeamCard select sizing.
 
 ```bash
 git pull
-npm install          # devDeps only: playwright-core, @sparticuz/chromium (audit harness)
+npm install          # devDeps only: playwright-core (audit harness)
+npm run verify:responsive:setup   # one-time: npx playwright-core install chromium
 npm run verify:responsive
 ```
 

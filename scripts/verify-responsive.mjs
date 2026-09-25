@@ -22,12 +22,11 @@
 import { execFileSync, spawn } from "node:child_process";
 import { appendFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
-import { homedir, tmpdir } from "node:os";
+import { homedir } from "node:os";
 import net from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import zlib from "node:zlib";
 
 const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -302,23 +301,31 @@ process.on("exit", cleanup);
 process.on("uncaughtException", (e) => { console.error(e); cleanup(); process.exit(1); });
 process.on("unhandledRejection", (e) => { console.error(e); cleanup(); process.exit(1); });
 
-// ───────────────────────── chromium bootstrap (npm-shipped binary) ──
-async function ensureChromium() {
-  const base = join(tmpdir(), "resp-audit");
-  const exec = join(base, "chromium");
-  const libDir = join(base, "al2023-lib", "lib");
-  if (!existsSync(exec) || !existsSync(join(libDir, "libnss3.so"))) {
-    mkdirSync(join(base, "al2023-lib"), { recursive: true });
-    const binDir = join(ROOT, "node_modules", "@sparticuz", "chromium", "bin");
-    writeFileSync(join(base, "chromium.z"), readFileSync(join(binDir, "chromium.br")));
-    writeFileSync(join(base, "chromium.raw"), zlib.brotliDecompressSync(readFileSync(join(base, "chromium.z"))));
-    rmSync(join(base, "chromium.z"));
-    execFileSync("bash", ["-c", `cat '${join(base, "chromium.raw")}' | gzip -dc > '${exec}' 2>/dev/null || cp '${join(base, "chromium.raw")}' '${exec}'`]);
-    writeFileSync(join(base, "al2023.tar"), zlib.brotliDecompressSync(readFileSync(join(binDir, "al2023.tar.br"))));
-    execFileSync("tar", ["-xf", join(base, "al2023.tar"), "-C", join(base, "al2023-lib")]);
-    execFileSync("chmod", ["+x", exec]);
+// ───────────────────────── chromium bootstrap (Playwright registry) ──
+// Platform-correct provisioning (Step 34(a-fix3)): `npx playwright-core
+// install chromium` downloads the build matching this OS/arch (macOS
+// arm64/x64, Linux x64) into ~/.cache/ms-playwright; chromium.launch()
+// below resolves it from the registry. The previous @sparticuz/chromium
+// extraction shipped AWS-Lambda Linux x86-64 binaries only and could never
+// run on any Mac (Intel or Apple Silicon).
+function ensureChromium() {
+  const { chromium } = require("playwright-core");
+  let ok = false;
+  try {
+    const p = chromium.executablePath();
+    ok = !!p && existsSync(p);
+  } catch {
+    ok = false;
   }
-  return { exec, libDir };
+  if (!ok) {
+    console.error(
+      "Chromium is not installed for playwright-core on this machine.\n" +
+        "One-time setup (downloads the platform-correct build):\n\n" +
+        "    npx playwright-core install chromium\n\n" +
+        "(npm script: npm run verify:responsive:setup)"
+    );
+    process.exit(1);
+  }
 }
 
 // ───────────────────────── metrics ──
@@ -375,7 +382,7 @@ async function main() {
   if (process.env.FRESH_SHOTS === "1") rmSync(SHOTS, { recursive: true, force: true });
   mkdirSync(SHOTS, { recursive: true });
   const stub = await startStub();
-  const { exec, libDir } = await ensureChromium();
+  ensureChromium();
   let appLog = "";
   const alive = () => new Promise((res) => {
     const rq = http.get(`${BASE}/`, (rs) => { rs.resume(); res(true); });
@@ -458,10 +465,8 @@ async function main() {
 
   const { chromium } = require("playwright-core");
   const browser = await chromium.launch({
-    executablePath: exec,
     headless: true,
     args: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", "--hide-scrollbars"],
-    env: { ...process.env, LD_LIBRARY_PATH: libDir },
   });
 
   const results = [];

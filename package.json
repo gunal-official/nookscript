@@ -14,7 +14,8 @@
     "verify:responsive": "node scripts/verify-responsive.mjs",
     "verify:live": "node scripts/verify-live-schema.mjs",
     "verify:live:policies": "node scripts/verify-live-policies.mjs",
-    "test": "node --test tests/components/*.test.ts"
+    "test": "node --test tests/components/*.test.ts",
+    "verify:responsive:setup": "playwright-core install chromium"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.1.0",
@@ -43,7 +44,6 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
-    "@sparticuz/chromium": "^153.0.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
