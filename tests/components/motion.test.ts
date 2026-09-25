@@ -31,6 +31,19 @@ describe("Motion system (Step 33)", () => {
     assert.ok(composer.includes("animate-rise-in"));
   });
 
+  it("removed members collapse where they stood (roster uses useMotionItems)", () => {
+    const src = read("components/settings/TeamCard.tsx");
+    assert.ok(src.includes("useMotionItems(members.map"));
+    assert.ok(src.includes('rowClass={leaving ? "animate-row-out overflow-hidden"'));
+  });
+
+  it("checkbox, radio and switch controls get press feedback", () => {
+    const css = read("app/globals.css");
+    assert.ok(css.includes('input[type="checkbox"]'));
+    assert.ok(css.includes('input[type="radio"]'));
+    assert.ok(css.includes("[role=\"switch\"]"));
+  });
+
   it("toasts announce politely and animate in/out — wired to invite + invoice", () => {
     const src = read("components/ui/toast.tsx");
     assert.ok(src.includes('aria-live="polite"'));

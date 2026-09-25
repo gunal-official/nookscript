@@ -995,7 +995,10 @@ responsive audit passed ✔  (evidence: ~/responsive-evidence/step32-after)
 `~/responsive-evidence/step33-seven/` — 27 pages × 320/375/414/600/768/1024/1440
 (`pages/<width>/…`), dialogs, interact states, motion captures.
 `~/responsive-evidence/step33-final/motion/320/` — `dialog-exit.gif`,
-`route-in.gif`, `row-enter.gif`, `row-leave.gif` + `reduced-motion-drawer.png`.
+`route-in.gif`, `row-enter.gif`, `row-leave.gif`, `member-leave.gif` +
+`reduced-motion-drawer.png`. The member-removal trace is sampled in-process
+(`motion-member-leave-trace` in the summary): the `animate-row-out` class lands
+~150ms after the action resolves and the row count drops 3→2 where it stood.
 
 ### Your acceptance checklist → proof
 

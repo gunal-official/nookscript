@@ -85,13 +85,24 @@
 @media (prefers-reduced-motion: no-preference) {
   button:not(:disabled):active,
   [role="button"]:not(:disabled):active,
-  [role="menuitem"]:active {
+  [role="menuitem"]:active,
+  [role="switch"]:active {
     transform: scale(0.98);
   }
   button:not(:disabled),
   [role="button"]:not(:disabled),
-  [role="menuitem"] {
+  [role="menuitem"],
+  [role="switch"] {
     transition: transform 150ms ease;
+  }
+  /* checkbox + radio: quick press squeeze (150ms) */
+  input[type="checkbox"],
+  input[type="radio"] {
+    transition: transform 150ms ease;
+  }
+  input[type="checkbox"]:active,
+  input[type="radio"]:active {
+    transform: scale(0.9);
   }
 }
 

@@ -20,7 +20,7 @@
  *         or true cut-offs (tap-target gaps gate only at phone widths).
  */
 import { execFileSync, spawn } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { homedir, tmpdir } from "node:os";
 import net from "node:net";
@@ -133,10 +133,10 @@ const COMPLEX = new Set(["invoice-detail", "time", "reports", "settings"]);
 const NOW = "2026-09-25T10:00:00Z";
 const USERS = { "usr-a": { full_name: "Maya Chen", avatar_initials: "MC" } };
 const WS = { id: "ws-1", name: "Atelier North" };
-const ROSTER = [
-  { user_id: "usr-a", full_name: "Maya Chen", avatar_initials: "MC", role: "owner", joined_at: NOW },
-  { user_id: "usr-b", full_name: "Leo Fox", avatar_initials: "LF", role: "member", joined_at: NOW },
-  { user_id: "usr-c", full_name: "Tess Ray", avatar_initials: "TR", role: "viewer", joined_at: NOW },
+let ROSTER = [
+  { user_id: "00000000-0000-0000-0000-000000000001", full_name: "Maya Chen", avatar_initials: "MC", role: "owner", joined_at: NOW },
+  { user_id: "00000000-0000-0000-0000-000000000070", full_name: "Leo Fox", avatar_initials: "LF", role: "member", joined_at: NOW },
+  { user_id: "00000000-0000-0000-0000-000000000071", full_name: "Tess Ray", avatar_initials: "TR", role: "viewer", joined_at: NOW },
 ];
 const TEMPLATES = [
   { id: "tpl-1", workspace_id: WS.id, title: "Weekly cadence", body: "## Cadence\n\nLong reusable body text that wraps across several lines in the dialog editor.", created_at: NOW, updated_at: NOW },
@@ -199,11 +199,37 @@ function startStub() {
         const u = USERS[sub];
         return send({ id: sub, email: `${sub}@example.com`, user_metadata: { full_name: u?.full_name ?? "Sam Member" }, app_metadata: { provider: "email", providers: ["email"] }, aud: "authenticated", created_at: NOW, updated_at: NOW });
       }
-      if (p.startsWith("/rest/v1/rpc/get_workspace_members")) return send(ROSTER);
+      if (p.startsWith("/rest/v1/rpc/get_workspace_members")) {
+        appendFileSync(join(SHOTS, "stub.log"), `RPC get_workspace_members -> ${ROSTER.length} rows\n`);
+        return send(ROSTER);
+      }
       if (p.startsWith("/rest/v1/rpc/get_team_invite_preview")) return send([INVITE_PREVIEW]);
       if (p.startsWith("/rest/v1/rpc/get_shared_document")) return send([SHARED_DOC]);
       if (p.startsWith("/rest/v1/rpc/get_shared_invoice")) return send([SHARED_INVOICE]);
-      if (p.startsWith("/rest/v1/workspace_members")) return send([{ workspace_id: WS.id, role: "owner", workspace: WS }]);
+      if (p.startsWith("/rest/v1/workspace_members")) {
+        appendFileSync(join(SHOTS, "stub.log"), `${req.method} ${p}?${url.searchParams.toString()} accept=${req.headers["accept"] ?? ""}\n`);
+        // Shapes used by removeMemberAction only (page renders take the
+        // original response below): DELETE mutates the roster, HEAD answers
+        // owner-counts, and the action's target lookup (user_id + no order=)
+        // resolves against ROSTER. Member-removal motion round-trips.
+        const uid = eq("user_id");
+        if (req.method === "DELETE") {
+          if (uid) ROSTER = ROSTER.filter((r) => r.user_id !== uid);
+          return send([]);
+        }
+        if (req.method === "HEAD") {
+          let n = ROSTER.length;
+          const roleF = eq("role");
+          if (roleF) n = ROSTER.filter((r) => r.role === roleF).length;
+          res.writeHead(200, { "content-range": `0-${Math.max(n - 1, 0)}/${n}` });
+          return res.end();
+        }
+        if (uid && !url.searchParams.has("order")) {
+          const hit = ROSTER.find((r) => r.user_id === uid);
+          return send(hit ? [{ user_id: hit.user_id, role: hit.role }] : []);
+        }
+        return send([{ workspace_id: WS.id, role: "owner", workspace: WS }]);
+      }
       if (p.startsWith("/rest/v1/profiles")) return send(one({ id: sub, full_name: USERS[sub]?.full_name ?? "Sam Member", avatar_initials: "MC", active_workspace_id: WS.id }));
       if (p.startsWith("/rest/v1/team_invites")) return send(INVITES);
       if (p.startsWith("/rest/v1/templates")) return send(TEMPLATES);
@@ -567,6 +593,44 @@ async function main() {
       await page.waitForTimeout(450);
       await page.screenshot({ path: join(dir, "route-in-02.png") });
       say("     320 motion-route-in       3 frames (capture-slowed 800ms)");
+
+      // F) member removed: roster row collapses where it stood (Tess — Leo is
+      // the interact probe's target). In-page height sampler = the hard proof.
+      await page.goto(`${BASE}/settings`, { waitUntil: "load", timeout: 20000 });
+      await page.waitForTimeout(300);
+      await page.click('button[aria-label="Remove Tess Ray"]', { timeout: 8000 });
+      await page.waitForTimeout(250);
+      await page.click('button:has-text("Remove")', { timeout: 8000 });
+      const mo = await page.evaluate(async () => {
+        const ul = document.querySelector("ul.divide-y");
+        const seen = [];
+        if (!ul) return ["no-ul"];
+        const obs = new MutationObserver(() => {
+          for (const li of ul.querySelectorAll("li")) {
+            if (String(li.className).includes("animate-row-out") && !seen.includes("CLASS")) seen.push("CLASS");
+          }
+        });
+        obs.observe(ul, { subtree: true, attributes: true, attributeFilter: ["class"], childList: true });
+        const t0 = performance.now();
+        while (performance.now() - t0 < 2500) {
+          seen.push(`t${Math.round(performance.now() - t0)}:n${ul.querySelectorAll("li").length}`);
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        obs.disconnect();
+        return seen;
+      });
+      const classSeen = mo.includes("CLASS");
+      const counts = mo.filter((x) => String(x).startsWith("t")).map((x) => Number(x.split("n")[1]));
+      const dropped = counts.length > 1 && Math.min(...counts) < Math.max(...counts);
+      const mlOk = classSeen && dropped;
+      if (!mlOk) failures++;
+      say(`${mlOk ? "✓" : "✗"}  320 motion-member-leave     class:${classSeen} dropped:${dropped} trace:${String(mo.slice(0, 8))}`);
+      results.push({ page: "motion-member-leave-trace", width: 320, trace: mo, smallTaps: [], overflowX: 0 });
+      await page.screenshot({ path: join(dir, "member-leave-00.png") });
+      await page.goto(`${BASE}/settings`, { waitUntil: "load", timeout: 20000 });
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: join(dir, "member-leave-01.png") });
+      say("     320 motion-member-frames  2 frames");
 
       // B) line row enter
       await page.goto(`${BASE}/invoices/${U.invoice}`, { waitUntil: "load", timeout: 20000 });

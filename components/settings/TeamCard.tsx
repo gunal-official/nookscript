@@ -20,7 +20,9 @@
  */
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
+import { useMotionItems } from "@/components/ui/motion-rows";
 import {
   Ban,
   Check,
@@ -54,11 +56,17 @@ import { formatDate, getInitials } from "@/lib/utils";
 
 function MemberRow({
   member,
+  rowClass,
+  leaving,
   removable,
   roleOptions,
   leavable,
 }: {
   member: TeamMember;
+  /** Extra classes for list enter/leave motion (Step 33). */
+  rowClass?: string;
+  /** True while the row animates out (aria-hidden + collapse). */
+  leaving?: boolean;
   /** True when the viewer (an owner) may remove this member: not their
    *  own row, and not the workspace's last owner. */
   removable: boolean;
@@ -84,6 +92,7 @@ function MemberRow({
   const [confirmingLeave, setConfirmingLeave] = useState(false);
   const [leavePending, setLeavePending] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  const router = useRouter();
 
   async function handleRemove() {
     setPending(true);
@@ -93,8 +102,11 @@ function MemberRow({
     if (result?.error) {
       setError(result.error);
       setConfirming(false);
+    } else {
+      // revalidatePath alone does not re-render the calling page's flight
+      // payload here — refresh() lands the new roster so the row can animate.
+      router.refresh();
     }
-    // On success the row disappears via revalidated server props.
   }
 
   async function handleRoleChange() {
@@ -109,8 +121,9 @@ function MemberRow({
     if (result?.error) {
       setRoleError(result.error);
       setConfirmingRole(false);
+    } else {
+      router.refresh();
     }
-    // On success the badge updates via revalidated server props.
   }
 
   async function handleLeave() {
@@ -129,7 +142,10 @@ function MemberRow({
   const roleLabel = member.role === "viewer" ? "View only" : member.role;
 
   return (
-    <li className="py-3 first:pt-0 last:pb-0">
+    <li
+      aria-hidden={leaving || undefined}
+      className={`py-3 first:pt-0 last:pb-0${rowClass ? ` ${rowClass}` : ""}`}
+    >
       <div className="flex items-center gap-3">
         <Avatar className="h-8 w-8 shrink-0">
           <AvatarFallback className="bg-accent text-xs font-semibold text-white">
@@ -300,6 +316,7 @@ function InviteRow({
   const [pending, setPending] = useState(false);
   const [copied, setCopied] = useState(false);
   const toast = useToast();
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
 
   const url = `${origin ?? ""}/invite/${invite.token}`;
@@ -324,8 +341,9 @@ function InviteRow({
     if (result?.error) {
       setError(result.error);
       setConfirming(false);
+    } else {
+      router.refresh();
     }
-    // On success the row disappears via revalidated server props.
   }
 
   return (
@@ -422,6 +440,7 @@ export function TeamCard({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
+  const router = useRouter();
   const [warning, setWarning] = useState<string | null>(null);
 
   useEffect(() => {
@@ -454,6 +473,8 @@ export function TeamCard({
     member.user_id === currentUserId &&
     !(member.role === "owner" && ownerCount === 1);
 
+  const memberRows = useMotionItems(members.map((member) => ({ id: member.user_id, member })), 220, "settings-roster");
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
@@ -471,7 +492,8 @@ export function TeamCard({
       setWarning(result.warning);
     }
     toast("Invite created");
-    setEmail(""); // the new invite appears in the list via revalidation
+    setEmail("");
+    router.refresh(); // the new invite appears in the list
   }
 
   return (
@@ -489,13 +511,15 @@ export function TeamCard({
       </CardHeader>
       <CardContent className="p-5">
         <ul className="divide-y divide-border">
-          {members.map((member) => (
+          {memberRows.map(({ item, leaving }) => (
             <MemberRow
-              key={member.user_id}
-              member={member}
-              removable={isRemovable(member)}
-              roleOptions={roleOptionsFor(member)}
-              leavable={isLeavable(member)}
+              key={item.id}
+              member={item.member}
+              removable={isRemovable(item.member)}
+              roleOptions={roleOptionsFor(item.member)}
+              leavable={isLeavable(item.member)}
+              rowClass={leaving ? "animate-row-out overflow-hidden" : "animate-rise-in"}
+              leaving={leaving}
             />
           ))}
         </ul>
