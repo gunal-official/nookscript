@@ -55,11 +55,15 @@ export function UpdateComposer({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Re-sync when the server re-renders with fresh data after save.
-  useEffect(() => {
+  // Re-sync when the server re-renders with fresh data after save
+  // (adjust-state-during-render — the endorsed props→state pattern).
+  const seedKey = JSON.stringify([initialTitle, initialBody]);
+  const [prevSeed, setPrevSeed] = useState(seedKey);
+  if (prevSeed !== seedKey) {
+    setPrevSeed(seedKey);
     setTitle(initialTitle);
     setBody(initialBody);
-  }, [initialTitle, initialBody]);
+  }
 
   const dirty = title !== initialTitle || body !== initialBody;
 

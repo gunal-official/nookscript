@@ -49,14 +49,18 @@ export function TemplateDialog({
 
   const isEdit = Boolean(template);
 
-  // (Re)seed the form whenever the dialog opens or the target changes.
-  useEffect(() => {
+  // (Re)seed the form whenever the dialog opens or the target changes
+  // (adjust-state-during-render — the endorsed props→state pattern).
+  const seedKey = JSON.stringify([open, template?.id ?? null, template?.title ?? "", template?.body ?? ""]);
+  const [prevSeed, setPrevSeed] = useState(seedKey);
+  if (prevSeed !== seedKey) {
+    setPrevSeed(seedKey);
     if (open) {
       setTitle(template?.title ?? "");
       setBody(template?.body ?? "");
       setError(null);
     }
-  }, [open, template]);
+  }
 
   async function handleSubmit() {
     setPending(true);

@@ -25,11 +25,12 @@ const Dialog = ({
   const actual = isControlled ? open : internal;
   const [keep, setKeep] = React.useState(actual ?? false);
 
+  // keep turns on at render-time when the dialog opens (adjust-state-during-
+  // render); the effect owns only the deferred exit timer.
+  if (actual && !keep) setKeep(true);
+
   React.useEffect(() => {
-    if (actual) {
-      setKeep(true);
-      return undefined;
-    }
+    if (actual) return undefined;
     const t = setTimeout(() => setKeep(false), EXIT_MS);
     return () => clearTimeout(t);
   }, [actual]);

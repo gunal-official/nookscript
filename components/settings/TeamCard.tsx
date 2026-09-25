@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useOrigin } from "@/lib/use-origin";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import { useMotionItems } from "@/components/ui/motion-rows";
@@ -435,7 +436,7 @@ export function TeamCard({
    *  instead of a remove control. */
   currentUserId: string | null;
 }) {
-  const [origin, setOrigin] = useState<string | null>(null);
+  const origin = useOrigin() || null;
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -443,9 +444,7 @@ export function TeamCard({
   const router = useRouter();
   const [warning, setWarning] = useState<string | null>(null);
 
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
+
 
   // The last owner can never be removed (a workspace must keep one
   // owner); every other member's row is removable for owners.

@@ -71,7 +71,10 @@ function LoginForm() {
       footer={
         <>
           Don’t have an account?{" "}
-          <Link href={signupHref} className="text-accent hover:underline">
+          <Link
+            href={signupHref}
+            className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-accent hover:underline"
+          >
             Sign up
           </Link>
         </>

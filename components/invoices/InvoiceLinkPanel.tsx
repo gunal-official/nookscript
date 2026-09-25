@@ -21,6 +21,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useOrigin } from "@/lib/use-origin";
 import { Ban, Check, Copy, Link2, Loader2, RefreshCw } from "lucide-react";
 
 import {
@@ -42,14 +43,8 @@ export function InvoiceLinkPanel({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const [linkUrl, setLinkUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (invoiceLink) {
-      setLinkUrl(`${window.location.origin}/invoice/${invoiceLink.token}`);
-    } else {
-      setLinkUrl(null);
-    }
-  }, [invoiceLink]);
+  const origin = useOrigin();
+  const linkUrl = invoiceLink ? `${origin}/invoice/${invoiceLink.token}` : null;
 
   const isActive = invoiceLink !== null && invoiceLink.revoked_at === null;
 

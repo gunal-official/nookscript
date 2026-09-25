@@ -1,5 +1,12 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- The list diff + 220ms
+   drop-timer choreography IS the feature: leaving entries must be appended
+   to state when the incoming items change and removed by a timer. The
+   effect keys on the id join (never the items array identity) and the
+   behavior is proven by tests/components/motion.test.ts and the
+   motion-member-leave/time-entry probes. */
+
 // In-house list motion (Step 33 — no new dependency): items added to the list
 // rise in; removed items collapse where they stood (fade + height — the one
 // documented exception to transform/opacity, since height must animate to

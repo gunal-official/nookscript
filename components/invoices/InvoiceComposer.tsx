@@ -106,22 +106,26 @@ export function InvoiceComposer({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Re-sync when the server re-renders with fresh data after save.
-  useEffect(() => {
+  // Re-sync when the server re-renders with fresh data after save
+  // (adjust-state-during-render — the endorsed props→state pattern).
+  const seedKey = JSON.stringify([
+    initialTitle,
+    initialClient,
+    initialItems,
+    initialTaxPercent,
+    initialNotes,
+    initialDueDate ?? null,
+  ]);
+  const [prevSeed, setPrevSeed] = useState(seedKey);
+  if (prevSeed !== seedKey) {
+    setPrevSeed(seedKey);
     setTitle(initialTitle);
     setClient(initialClient);
     setItems(toLocalItems(initialItems));
     setTax(initialTaxPercent > 0 ? String(initialTaxPercent) : "");
     setNotes(initialNotes);
     setDueDate(initialDueDate ?? "");
-  }, [
-    initialTitle,
-    initialClient,
-    initialItems,
-    initialTaxPercent,
-    initialNotes,
-    initialDueDate,
-  ]);
+  }
 
   const dirty =
     title !== initialTitle ||

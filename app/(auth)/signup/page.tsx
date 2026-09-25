@@ -130,7 +130,7 @@ function SignupForm() {
             href={
               inviteToken ? `/login?next=/invite/${inviteToken}` : "/login"
             }
-            className="text-accent hover:underline"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-accent hover:underline"
           >
             Log in
           </Link>

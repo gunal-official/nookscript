@@ -67,26 +67,33 @@ export function TimeTimer({ briefs }: { briefs: BriefOption[] }) {
   // truth (elapsed = now - startedAt), so a refresh mid-run resumes
   // exactly where it left off.
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as StoredTimer;
-      if (
-        typeof parsed.startedAt === "number" &&
-        parsed.startedAt <= Date.now()
-      ) {
-        setStored(parsed);
-        setPhase("running");
+    // Deferred one tick (timer callback, not effect body): keeps the
+    // hydration path free of synchronous setState while preserving the
+    // startedAt-as-source-of-truth resume semantics.
+    const t = setTimeout(() => {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as StoredTimer;
+        if (
+          typeof parsed.startedAt === "number" &&
+          parsed.startedAt <= Date.now()
+        ) {
+          setStored(parsed);
+          setPhase("running");
+        }
+      } catch {
+        // Corrupted storage → start fresh; nothing to clean up server-side.
       }
-    } catch {
-      // Corrupted storage → start fresh; nothing to clean up server-side.
-    }
+    }, 0);
+    return () => clearTimeout(t);
   }, []);
 
   // Tick once per second, only while running.
   useEffect(() => {
     if (phase !== "running") return;
-    setNow(Date.now());
+    // now() is lazily seeded at mount (elapsed renders correctly at once);
+    // only the interval callback mutates state after that.
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [phase]);

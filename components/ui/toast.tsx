@@ -5,7 +5,14 @@
 // invite created / invite copied / invoice saved.
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 
-type Toast = { id: number; title: string; leaving?: boolean };
+import {
+  leaveToast,
+  pushToast,
+  removeToast,
+  type ToastEntry,
+} from "@/lib/toast-queue";
+
+type Toast = ToastEntry;
 
 const ToastCtx = createContext<(title: string) => void>(() => {});
 export const useToast = () => useContext(ToastCtx);
@@ -16,9 +23,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const push = useCallback((title: string) => {
     const id = ++seq.current;
-    setToasts((t) => [...t, { id, title }]);
-    setTimeout(() => setToasts((t) => t.map((x) => (x.id === id ? { ...x, leaving: true } : x))), 2800);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3100);
+    setToasts((t) => pushToast(t, id, title));
+    setTimeout(() => setToasts((t) => leaveToast(t, id)), 2800);
+    setTimeout(() => setToasts((t) => removeToast(t, id)), 3100);
   }, []);
 
   return (

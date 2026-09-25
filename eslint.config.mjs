@@ -19,14 +19,13 @@ export default [
   ...nextCoreWebVitals,
   {
     rules: {
-      // WARN during the Next 16 migration: this new react-hooks@7 rule flags
-      // deliberate, user-specified patterns — window.location.origin read in
-      // an effect (Step-8 doctrine, hydration safety), post-refresh re-sync
-      // effects (the proven fix for stale flight payloads, Steps 23/33),
-      // dialog exit-presence, motion-rows list diffing, timer tick. Each is
-      // external-system sync, which is the documented legitimate effect use;
-      // refactors belong in their own reviewed step, not the migration.
-      "react-hooks/set-state-in-effect": "warn",
+      // Promoted back to the plugin default (error) after the Step 34(a-fix5)
+      // refactors: origin reads -> useSyncExternalStore (lib/use-origin.ts),
+      // hydration flag -> useSyncExternalStore, re-sync effects ->
+      // adjust-state-during-render, timer restore -> deferred callback,
+      // dialog keep -> render-time adjust. The one deliberate exception is
+      // motion-rows.tsx's list-diff choreography (file-level disable there,
+      // justified and probe-tested).
     },
   },
 ];

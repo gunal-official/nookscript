@@ -34,10 +34,13 @@ export function TaskChecklist({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Re-sync when the server re-renders with fresh data after revalidation.
-  useEffect(() => {
+  // Re-sync when the server re-renders with fresh data after revalidation
+  // (adjust-state-during-render — the endorsed props→state pattern).
+  const [prevTasks, setPrevTasks] = useState(initialTasks);
+  if (prevTasks !== initialTasks) {
+    setPrevTasks(initialTasks);
     setTasks(initialTasks);
-  }, [initialTasks]);
+  }
 
   const doneCount = tasks.filter((t) => t.checked).length;
 

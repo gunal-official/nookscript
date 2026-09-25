@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useOrigin } from "@/lib/use-origin";
 import { Ban, Check, Copy, Link2, Loader2, RefreshCw } from "lucide-react";
 
 import {
@@ -36,14 +37,8 @@ export function ShareLinkPanel({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (shareLink) {
-      setShareUrl(`${window.location.origin}/share/${shareLink.token}`);
-    } else {
-      setShareUrl(null);
-    }
-  }, [shareLink]);
+  const origin = useOrigin();
+  const shareUrl = shareLink ? `${origin}/share/${shareLink.token}` : null;
 
   const isActive = shareLink !== null && shareLink.revoked_at === null;
 

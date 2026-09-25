@@ -60,6 +60,10 @@ const pidsOnPort = (port) => {
 };
 const freePort = (port) => {
   for (const pid of pidsOnPort(port)) {
+    // The stub server listens in THIS process — sweeping the port must never
+    // kill the harness itself (or our parent shell): that was the exit-137
+    // "Killed" cascade on early-error paths.
+    if (pid === process.pid || pid === process.ppid) continue;
     try { process.kill(pid, "SIGKILL"); } catch {}
   }
 };
@@ -228,9 +232,10 @@ function startStub() {
           const hit = ROSTER.find((r) => r.user_id === uid);
           return send(hit ? [{ user_id: hit.user_id, role: hit.role }] : []);
         }
+        if (eq("user_id") === "usr-new" || sub === "usr-new") return send([]);
         return send([{ workspace_id: WS.id, role: "owner", workspace: WS }]);
       }
-      if (p.startsWith("/rest/v1/profiles")) return send(one({ id: sub, full_name: USERS[sub]?.full_name ?? "Sam Member", avatar_initials: "MC", active_workspace_id: WS.id }));
+      if (p.startsWith("/rest/v1/profiles")) return send(one({ id: sub, full_name: USERS[sub]?.full_name ?? "Sam Member", avatar_initials: "MC", active_workspace_id: sub === "usr-new" ? null : WS.id }));
       if (p.startsWith("/rest/v1/team_invites")) return send(INVITES);
       if (p.startsWith("/rest/v1/templates")) return send(TEMPLATES);
       if (p.startsWith("/rest/v1/brief_sources")) return send([]);
@@ -479,11 +484,22 @@ async function main() {
     domain: "127.0.0.1",
     path: "/",
   };
+  const authCookieNew = {
+    name: "sb-127-auth-token",
+    value: `base64-${b64url({ access_token: jwt("usr-new"), token_type: "bearer", expires_at: 2000000000, refresh_token: "r", user: { id: "usr-new", email: "new@example.com" } })}`,
+    domain: "127.0.0.1",
+    path: "/",
+  };
 
   for (const { w, h } of WIDTHS) {
-    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
-    await ctx.addCookies([authCookie]);
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, ...(process.env.DARK ? { colorScheme: "dark" } : {}) });
     for (const pg of PAGES) {
+      // Per-page auth state: marketing/auth pages captured WITHOUT the
+      // session cookie (an authed login/signup correctly redirects into the
+      // workspace — that aliased earlier evidence onto the intake page);
+      // /onboarding is the opposite — a brand-new user with zero workspaces.
+      await ctx.clearCookies();
+      if (pg.auth) await ctx.addCookies([pg.slug === "onboarding" ? authCookieNew : authCookie]);
       const page = await ctx.newPage();
       const pageErrors = [];
       page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 120)));

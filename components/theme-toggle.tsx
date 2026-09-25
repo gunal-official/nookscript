@@ -10,9 +10,13 @@ const THEMES = ["light", "dark", "system"] as const;
 /** Temporary verification control — lets you flip light / dark / system. */
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => setMounted(true), []);
+  // Canonical hydration flag (no setState-in-effect): SSR says false, the
+  // client says true the moment hydration completes.
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   return (
     <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
