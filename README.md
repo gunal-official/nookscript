@@ -1,7 +1,7 @@
 # nookscript
 
 Client-work writing studio: intake → AI briefs → proposals → plans → updates.
-Next.js 14 (App Router) · TypeScript · Tailwind · shadcn/ui · Supabase (auth + Postgres + RLS).
+Next.js 16 (App Router) · TypeScript · Tailwind · shadcn/ui · Supabase (auth + Postgres + RLS).
 
 ## Local setup
 
@@ -937,6 +937,62 @@ shrink, invoice line-items stacking below md, TeamCard select sizing.
 - Design tokens live as CSS variables in `app/globals.css` (light + `.dark`),
   consumed by Tailwind (`tailwind.config.ts`). Dark mode via `next-themes`
   with the `dark` class; default is `system`.
+
+
+---
+
+## Events, webhooks + Stripe billing (2026-09-26 phase)
+
+**Closeout**: `docs/billing-webhooks-closeout.md` — full phase summary
+(event types, the webhook delivery contract, the billing flow, honest
+limitations, user-side setup checklist).
+
+Everything in this phase is **optional**: with none of the new env set,
+the app behaves exactly as before (early-access mailto on the Plan
+card). All vars are commented out in `.env.local.example`.
+
+### What's in the app now
+
+- **Events** — 10 `event_type`s recorded as work moves (brief created,
+  proposal accepted/declined, plan task completed, invoice paid,
+  contract signed, team joined/left/removed, template created). Read
+  them in Settings → Activity.
+- **Outbound webhooks** — Settings → Webhooks: register an HTTPS
+  endpoint per workspace; every event is POSTed to it, HMAC-signed
+  (`X-NookScript-Signature: t=<sec>,v1=<hex>` where
+  `v1 = HMAC_SHA256(secret, "${t}.${body}")`, ±300s freshness), with a
+  delivery log (attempts 0/15s/60s then terminal `failed`), a test
+  ping, and one-click secret rotation. SSRF-guarded (no
+  private/loopback targets).
+- **Retry sweep** — `POST /api/cron/webhooks` (Bearer `CRON_SECRET`)
+  re-processes due `pending` deliveries with an atomic 1h-lease claim;
+  point any scheduler at it once a minute (serverless recovery for
+  frozen in-process retries).
+- **Stripe billing** — the Plan card's "Upgrade to Pro" creates a
+  hosted Stripe Checkout session (no card forms in the app; TEST-mode
+  keys in dev). Exactly two Stripe webhooks flip the subscription
+  (`checkout.session.completed` → active, `customer.subscription.deleted`
+  → canceled); Pro workspaces get a hosted Customer Portal link. Prices
+  are never printed in the app or on /pricing.
+
+### Five new migrations
+
+`20260926080000_events` · `20260926090000_webhooks` ·
+`20260926100000_billing` · `20260926110000_webhook_retry_schedule` ·
+`20260926120000_event_types_team_templates` — apply in filename order,
+as with all migrations.
+
+### Env (all optional)
+
+| Var | Needed for |
+|---|---|
+| `STRIPE_SECRET_KEY` + `STRIPE_PRICE_ID` | the in-app upgrade button (one recurring price) |
+| `STRIPE_WEBHOOK_SECRET` + `SUPABASE_SERVICE_ROLE_KEY` | `/api/stripe/webhook` — register exactly `checkout.session.completed` + `customer.subscription.deleted` |
+| `CRON_SECRET` | the retry sweep at `/api/cron/webhooks` |
+
+Local dev: `stripe listen --forward-to localhost:3000/api/stripe/webhook`;
+smoke card `4242 4242 4242 4242`. Full checklist:
+`docs/billing-webhooks-closeout.md` §3.
 
 
 ---
