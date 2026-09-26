@@ -19,11 +19,18 @@
 import { Inbox as InboxIcon, MessageSquare } from "lucide-react";
 
 import { getInboxThreads } from "@/lib/data/inbox";
+import { getMailboxStaging } from "@/lib/data/mailbox";
+import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { InboxThreadList } from "@/components/intake/InboxThreadList";
+import { MailboxStaging } from "@/components/intake/MailboxStaging";
 import { DocHeader } from "@/components/ui/doc-detail";
 
 export default async function IntakeInboxPage() {
-  const threads = await getInboxThreads();
+  const [threads, staging, context] = await Promise.all([
+    getInboxThreads(),
+    getMailboxStaging(),
+    getWorkspaceContext(),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -32,6 +39,15 @@ export default async function IntakeInboxPage() {
         title="Inbox"
         subtitle="Every client message across every brief, as a running thread."
       />
+
+      {staging.length > 0 && (
+        <div className="mb-6">
+          <MailboxStaging
+            messages={staging}
+            canEdit={context?.canEdit ?? false}
+          />
+        </div>
+      )}
 
       {threads === null ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-16 text-center">

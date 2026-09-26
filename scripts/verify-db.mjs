@@ -579,7 +579,9 @@ await db.exec(`
     public.team_invites, public.invoices, public.invoice_links,
     public.time_entries, public.contracts, public.events,
     public.webhook_endpoints, public.webhook_deliveries,
-    public.billing_subscriptions
+    public.billing_subscriptions,
+    public.email_accounts,
+    public.email_messages
     to nstester;
   grant execute on function public.get_workspace_webhook_endpoints(uuid) to nstester;
 `);
@@ -2300,6 +2302,98 @@ await db.query("reset role");
     "billing: owner sees currency + amount (global pricing)",
     proRow.rows[0]?.currency === "USD" && proRow.rows[0]?.a === "19"
   );
+  await db.query("reset role");
+}
+
+// ── mailbox (future-list item: Gmail/Outlook) ──
+{
+  await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+  await db.query("set role nstester");
+  const noAccounts = await db.query(
+    "select count(*)::int as n from public.email_accounts where workspace_id = $1",
+    [SEED_WS]
+  );
+  check("mailbox: no connected accounts by default", noAccounts.rows[0]?.n === 0);
+  const acctWrite = await db
+    .query(
+      "insert into public.email_accounts (workspace_id, service, email_address, access_token_enc, refresh_token_enc) values ($1, 'gmail', 'ops@studio.com', 'v1.a.b.c', 'v1.a.b.c')",
+      [SEED_WS]
+    )
+    .then(() => ({ ok: true }))
+    .catch(() => ({ ok: false }));
+  check("RLS: users cannot write mailbox accounts (service role only)", acctWrite.ok === false);
+  const msgWrite = await db
+    .query(
+      "insert into public.email_messages (workspace_id, account_id, external_id, sender, received_at) values ($1, '00000000-0000-0000-0000-000000000090', 'ext-x', 'x@y.com', now())",
+      [SEED_WS]
+    )
+    .then(() => ({ ok: true }))
+    .catch(() => ({ ok: false }));
+  check("RLS: users cannot write staged mail (service role only)", msgWrite.ok === false);
+  await db.query("reset role");
+
+  // service-role stand-in (the OAuth callback / sync sweep's client)
+  await db.query(
+    "insert into public.email_accounts (workspace_id, service, email_address, display_name, access_token_enc, refresh_token_enc, token_expires_at, status) values ($1, 'gmail', 'ops@studio.com', 'Ops', 'v1.ct.tag', 'v1.rt.tag', now() + interval '1 hour', 'active')",
+    [SEED_WS]
+  );
+  const acctId = (
+    await db.query(
+      "select id from public.email_accounts where workspace_id = $1",
+      [SEED_WS]
+    )
+  ).rows[0]?.id;
+  const badService = await db
+    .query(
+      "insert into public.email_accounts (workspace_id, service, email_address, access_token_enc, refresh_token_enc) values ($1, 'yahoo', 'y@y.com', 'x', 'y')",
+      [SEED_WS]
+    )
+    .then(() => ({ ok: true }))
+    .catch(() => ({ ok: false }));
+  check("email_accounts.service CHECK rejects non-Gmail/Outlook values", badService.ok === false);
+  const dupAcct = await db
+    .query(
+      "insert into public.email_accounts (workspace_id, service, email_address, access_token_enc, refresh_token_enc) values ($1, 'gmail', 'ops@studio.com', 'x', 'y')",
+      [SEED_WS]
+    )
+    .then(() => ({ ok: true }))
+    .catch(() => ({ ok: false }));
+  check("email_accounts unique (workspace, service, address) holds", dupAcct.ok === false);
+
+  await db.query(
+    "insert into public.email_messages (workspace_id, account_id, external_id, sender, subject, snippet, body_text, received_at) values ($1, $2, 'ext-1', 'Ada <ada@client.com>', 'Kickoff', 'Kickoff snippet', 'Kickoff body', now() - interval '10 minutes')",
+    [SEED_WS, acctId]
+  );
+  const dupMsg = await db
+    .query(
+      "insert into public.email_messages (workspace_id, account_id, external_id, sender, received_at) values ($1, $2, 'ext-1', 'Ada', now())",
+      [SEED_WS, acctId]
+    )
+    .then(() => ({ ok: true }))
+    .catch(() => ({ ok: false }));
+  check("email_messages unique (account_id, external_id) holds (idempotent sync)", dupMsg.ok === false);
+
+  await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+  await db.query("set role nstester");
+  const staged = await db.query(
+    "select count(*)::int as n from public.email_messages where workspace_id = $1 and attached_brief_id is null",
+    [SEED_WS]
+  );
+  check("mailbox: owner sees the staged (unattached) mail", staged.rows[0]?.n === 1);
+  await db.query("reset role");
+  // 'create brief from mail' marks the row attached (service role) — the
+  // staging view then drops it
+  await db.query(
+    "update public.email_messages set attached_brief_id = $2 where workspace_id = $1",
+    [SEED_WS, SEED_BRIEF]
+  );
+  await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+  await db.query("set role nstester");
+  const stagedAfter = await db.query(
+    "select count(*)::int as n from public.email_messages where workspace_id = $1 and attached_brief_id is null",
+    [SEED_WS]
+  );
+  check("mailbox: attached mail drops out of the staging view", stagedAfter.rows[0]?.n === 0);
   await db.query("reset role");
 }
 

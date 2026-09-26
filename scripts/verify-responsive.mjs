@@ -239,6 +239,46 @@ function startStub() {
       }
       if (p.startsWith("/rest/v1/profiles")) return send(one({ id: sub, full_name: USERS[sub]?.full_name ?? "Sam Member", avatar_initials: "MC", active_workspace_id: sub === "usr-new" ? null : WS.id }));
       if (p.startsWith("/rest/v1/team_invites")) return send(INVITES);
+      // Mailbox fixtures (future-list item "Gmail/Outlook") — served only
+      // in the configured-state sweep (EMAIL_DEMO=1): one connected Gmail
+      // account + two staged (unattached) messages with the account join
+      // the staging query embeds.
+      if (p.startsWith("/rest/v1/email_accounts")) {
+        if (!process.env.EMAIL_DEMO) return send([]);
+        return send([{
+          id: "acct-gmail-1",
+          workspace_id: WS.id,
+          service: "gmail",
+          email_address: "ops@studio.com",
+          display_name: "Ops",
+          status: "active",
+          last_synced_at: NOW,
+          last_error: null,
+        }]);
+      }
+      if (p.startsWith("/rest/v1/email_messages")) {
+        if (!process.env.EMAIL_DEMO) return send([]);
+        return send([
+          {
+            id: "msg-mail-1",
+            workspace_id: WS.id,
+            sender: "Ada <ada@client.com>",
+            subject: "Kickoff notes",
+            snippet: "Hi — sending over the kickoff notes for the new site…",
+            received_at: NOW,
+            account: { id: "acct-gmail-1", service: "gmail" },
+          },
+          {
+            id: "msg-mail-2",
+            workspace_id: WS.id,
+            sender: "Bob <bob@client.com>",
+            subject: "Re: scope",
+            snippet: "Can we add the landing page to phase one?",
+            received_at: NOW,
+            account: { id: "acct-gmail-1", service: "gmail" },
+          },
+        ]);
+      }
       if (p.startsWith("/rest/v1/templates")) return send(process.env.EMPTY_FIXTURES ? [] : TEMPLATES);
       if (p.startsWith("/rest/v1/brief_sources")) return send([]);
       if (p.startsWith("/rest/v1/brief_questions")) return send([]);

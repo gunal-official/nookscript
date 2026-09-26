@@ -1028,6 +1028,37 @@ shows an inline error instead of failing silently. Full summary:
 
 ---
 
+## Gmail/Outlook mailbox intake (2026-09-26)
+
+Connected client mailboxes (Gmail and/or Outlook) sync their latest
+inbox mail into the workspace. New mail is **staged in the Inbox**
+("Staged mail" section), where editors turn any message into a brief —
+it then flows through the existing briefs → proposals → plans pipeline
+as a normal `email` source. Read-only scopes (gmail.readonly / Graph
+Mail.Read): the app **never sends mail**.
+
+- **Settings → Mailbox** — Connect Gmail / Connect Outlook (owner-only
+  OAuth, 2-step: consent → signed-state callback), Sync now, last-sync
+  status, inline error + needs-reauth state, disconnect (best-effort
+  provider revocation).
+- **Tokens** are stored AES-256-GCM encrypted (`EMAIL_TOKEN_ENCRYPTION_KEY`);
+  the OAuth `state` is HMAC-signed per user + workspace + provider, so
+  a tampered callback can't route one user's tokens into another
+  workspace. Sync is idempotent (`unique(account_id, external_id)`).
+- **Refreshes** happen automatically (sync-now and the optional
+  `/api/cron/email` sweep, same `CRON_SECRET` gate pattern as the
+  webhook sweep). A dead refresh marks the account `needs_reauth`
+  (Settings offers "Connect again" instead of failing silently).
+
+Env (all optional — see `.env.local.example`): `GOOGLE_CLIENT_ID` /
+`GOOGLE_CLIENT_SECRET`, `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` /
+`AZURE_TENANT_ID`, `EMAIL_TOKEN_ENCRYPTION_KEY`. Operator setup (Google
+Cloud + Azure app registration, redirect URIs, scopes) and the v1
+limits: `docs/email-intake-closeout.md`.
+
+
+---
+
 ## Step 34 — ui.webp design system + Next 16 migration
 
 **Closeout**: `docs/step-34-closeout.md` — final Step-34 summary (what

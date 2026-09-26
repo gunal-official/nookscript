@@ -46,6 +46,10 @@
  */
 
 import { CheckoutNotice } from "@/components/settings/CheckoutNotice";
+import { EmailNotice } from "@/components/settings/EmailNotice";
+import { MailboxCard } from "@/components/settings/MailboxCard";
+import { getMailboxAccounts } from "@/lib/data/mailbox";
+import { hasTokenKey } from "@/lib/email/crypto";
 import { getPricesConfig } from "@/lib/stripe";
 import { EventsCard } from "@/components/settings/EventsCard";
 import { PlanCard } from "@/components/settings/PlanCard";
@@ -78,6 +82,7 @@ export default async function SettingsPage() {
     billing,
     webhookDeliveries,
     recentEvents,
+    mailboxAccounts,
   ] = await Promise.all([
       workspace ? getTemplates(workspace.id) : Promise.resolve([]),
       getTeamMembers(),
@@ -124,6 +129,9 @@ export default async function SettingsPage() {
             .limit(25)
             .then(({ data }) => data ?? [])
         : Promise.resolve([]),
+      // Mailbox connections for the Mailbox card (future-list item
+      // "Gmail/Outlook") — empty array when no workspace / on error.
+      getMailboxAccounts(),
     ]);
 
   // event_id → event_type for the delivery log lines: the recent-25
@@ -156,6 +164,8 @@ export default async function SettingsPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       {/* One-time toast when returning from Stripe Checkout (?checkout=) */}
       <CheckoutNotice />
+      {/* One-time toast when returning from a mailbox OAuth connect (?email=) */}
+      <EmailNotice />
       <DocHeader
         icon={SettingsIcon}
         title="Settings"
@@ -185,6 +195,17 @@ export default async function SettingsPage() {
         deliveries={webhookDeliveries}
         eventTypes={eventTypes}
         isOwner={isOwner}
+      />
+      <MailboxCard
+        accounts={mailboxAccounts}
+        isOwner={isOwner}
+        gmailConfigured={
+          Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+        }
+        outlookConfigured={
+          Boolean(process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET)
+        }
+        tokenKeyOk={hasTokenKey(process.env.EMAIL_TOKEN_ENCRYPTION_KEY)}
       />
       <EventsCard events={recentEvents} />
       {workspace && isOwner && <WorkspaceDangerCard name={workspace.name} />}
