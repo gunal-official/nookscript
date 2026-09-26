@@ -25,10 +25,10 @@ import {
 
 /** Condensed from the Free tier on /pricing (same voice, no new claims). */
 const INCLUDED = [
-  "Solo use · 1 workspace",
+  "Team invites — owner, member, viewer",
   "Intake → briefs → proposals → plans → updates",
-  "Public, revocable share links + workspace templates",
-  "Inbox threading + full edit history",
+  "Invoices & contracts + signed outbound webhooks",
+  "Share links, templates, inbox threading, edit history",
 ];
 
 const PRO_PLANNED = [

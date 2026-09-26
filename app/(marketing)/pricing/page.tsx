@@ -16,14 +16,16 @@ import {
 export const metadata: Metadata = {
   title: "Pricing — nookscript",
   description:
-    "nookscript pricing: free during early access. Free tier is the full core pipeline; Pro early access adds share links, templates, and inbox threading.",
+    "nookscript pricing: the full pipeline is free — team, templates, webhooks included. Pro is a Stripe-billed subscription you can upgrade to from Settings, any time.",
 };
 
-// No dollar amounts — there is no billing system yet, and inventing prices
-// on a public page would be a false claim. Early-access framing only.
-// NOTE: Templates, share links, and inbox threading are genuinely available
-// to every workspace TODAY — they live in the Free list because that's
-// what's true in code; the Pro list is forward-looking roadmap only.
+// Pricing doctrine (now that billing is live): the price itself is never
+// printed on this page — it lives in the operator's Stripe account (one
+// recurring price ID in env), so no number here can go stale.
+// Free list = what is genuinely in the app today (team invites, roles,
+// invoices/contracts, activity feed, signed webhooks). Pro = the real
+// Stripe subscription; nothing is feature-gated in code yet, so
+// forward-looking items are explicitly marked "planned".
 const TIERS: {
   name: string;
   icon: LucideIcon;
@@ -37,13 +39,13 @@ const TIERS: {
     name: "Free",
     icon: CheckCircle2,
     chip: "icon-chip-success",
-    blurb: "The full product as it exists today — early access.",
+    blurb: "The full product, as it exists today — early access.",
     features: [
-      "Solo use · 1 workspace",
+      "Your workspace + team invites (owner, member, viewer)",
       "Intake → briefs (AI or built-in parser)",
-      "Proposals from briefs",
-      "Plans from proposals",
-      "Updates from plans",
+      "Proposals → plans → client updates",
+      "Invoices & contracts",
+      "Activity feed + signed outbound webhooks",
       "Public, revocable share links",
       "Workspace templates",
       "Inbox threading — replies onto brief source threads",
@@ -56,33 +58,38 @@ const TIERS: {
     icon: Sparkles,
     chip: "icon-chip-accent",
     badge: "Early access",
-    blurb: "Nothing here exists yet — this is the shape of the roadmap.",
+    blurb:
+      "A Stripe-billed subscription — upgrade from Settings, cancel any time. The same product today; priority as the roadmap lands.",
     features: [
       "Everything in Free",
+      "Card billing through Stripe — hosted checkout, managed in the customer portal",
+      "Early builds of whatever ships next",
       "Custom domains for share links — planned",
       "Custom role tiers (admin and beyond) — planned",
       "Priority support — planned",
-      "Early builds of whatever ships next",
     ],
     cta: {
-      label: "Request access",
-      href: "mailto:hello@nookscript.dev?subject=nookscript%20Pro%20early%20access",
+      label: "Start free, upgrade in Settings",
+      href: "/signup",
     },
   },
 ];
 
 /**
- * Step 13 — /pricing. Two tiers, no invented prices: Free today, Pro framed
- * as early-access with a mailto CTA — no billing system exists or is implied.
+ * /pricing (Step 13; copy refreshed once Stripe billing went live):
+ * two tiers, no printed prices. Free = the real product today (team,
+ * roles, webhooks, activity included). Pro = the live Stripe
+ * subscription — checkout happens in-app (Settings → Plan card), so the
+ * Pro CTA routes to signup and the blurb states where the upgrade lives.
  */
 export default function PricingPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16 text-center">
       <h1 className="font-display text-3xl font-bold tracking-tight">Pricing</h1>
       <p className="mt-3 text-sm text-muted-foreground sm:text-base">
-        Everything that exists today is free during early access — paid
-        plans land before general availability, and early users keep the
-        Free tier as-is.
+        Everything that ships is in the Free tier — the full pipeline, team,
+        webhooks. Pro is the Stripe-billed subscription: upgrade from
+        Settings any time, and early users keep the Free tier as-is.
       </p>
 
       <div className="mt-10 grid gap-5 text-left sm:grid-cols-2">
@@ -116,11 +123,7 @@ export default function PricingPage() {
                 variant={cta.primary ? "default" : "outline"}
                 className="w-full"
               >
-                {cta.href.startsWith("mailto:") ? (
-                  <a href={cta.href}>{cta.label}</a>
-                ) : (
-                  <Link href={cta.href}>{cta.label}</Link>
-                )}
+                <Link href={cta.href}>{cta.label}</Link>
               </Button>
             </CardFooter>
           </Card>
@@ -128,7 +131,7 @@ export default function PricingPage() {
       </div>
 
       <p className="mt-8 text-xs text-muted-foreground">
-        Questions about teams or multiple workspaces?{" "}
+        Questions about Pro or anything that&apos;s missing?{" "}
         <a
           href="mailto:hello@nookscript.dev"
           className="inline-flex min-h-11 min-w-11 items-center underline underline-offset-2 transition-colors hover:text-text"
