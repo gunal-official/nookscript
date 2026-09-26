@@ -46,6 +46,7 @@
  */
 
 import { CheckoutNotice } from "@/components/settings/CheckoutNotice";
+import { EventsCard } from "@/components/settings/EventsCard";
 import { PlanCard } from "@/components/settings/PlanCard";
 import { WebhooksCard } from "@/components/settings/WebhooksCard";
 import { TeamCard } from "@/components/settings/TeamCard";
@@ -75,6 +76,7 @@ export default async function SettingsPage() {
     webhookEndpoints,
     billing,
     webhookDeliveries,
+    recentEvents,
   ] = await Promise.all([
       workspace ? getTemplates(workspace.id) : Promise.resolve([]),
       getTeamMembers(),
@@ -109,29 +111,39 @@ export default async function SettingsPage() {
             .limit(50)
             .then(({ data }) => data ?? [])
         : Promise.resolve([]),
+      // The 25 newest events feed the Activity card (suggestions pass
+      // 8/10) AND the delivery log's event_type annotations (1/10) —
+      // one read serves both.
+      workspace
+        ? supabase
+            .from("events")
+            .select("id, event_type, payload, created_at")
+            .eq("workspace_id", workspace.id)
+            .order("created_at", { ascending: false })
+            .limit(25)
+            .then(({ data }) => data ?? [])
+        : Promise.resolve([]),
     ]);
 
-  // event_id → event_type for the delivery log lines (one extra scoped
-  // read; empty when there are no deliveries to annotate).
-  const deliveryEventIds = [
-    ...new Set(webhookDeliveries.map((d: { event_id: string }) => d.event_id)),
+  // event_id → event_type for the delivery log lines: the recent-25
+  // window covers almost everything; one scoped top-up read annotates
+  // older deliveries that predate it.
+  const eventTypes: Record<string, string> = {};
+  for (const e of recentEvents) eventTypes[e.id] = e.event_type;
+  const missingDeliveryEventIds = [
+    ...new Set(
+      webhookDeliveries
+        .map((d: { event_id: string }) => d.event_id)
+        .filter((id: string) => !eventTypes[id])
+    ),
   ];
-  const eventTypes: Record<string, string> =
-    deliveryEventIds.length > 0
-      ? ((
-          await supabase
-            .from("events")
-            .select("id, event_type")
-            .in("id", deliveryEventIds)
-        ).data ?? []
-      ).reduce(
-        (acc, row: { id: string; event_type: string }) => {
-          acc[row.id] = row.event_type;
-          return acc;
-        },
-        {} as Record<string, string>
-      )
-      : {};
+  if (missingDeliveryEventIds.length > 0) {
+    const { data: extra } = await supabase
+      .from("events")
+      .select("id, event_type")
+      .in("id", missingDeliveryEventIds);
+    for (const row of extra ?? []) eventTypes[row.id] = row.event_type;
+  }
   const plan = billing?.status === "active" ? "pro" : "free";
   const billingConfigured = Boolean(
     process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID
@@ -170,6 +182,7 @@ export default async function SettingsPage() {
         eventTypes={eventTypes}
         isOwner={isOwner}
       />
+      <EventsCard events={recentEvents} />
       {workspace && isOwner && <WorkspaceDangerCard name={workspace.name} />}
     </div>
   );

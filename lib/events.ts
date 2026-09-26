@@ -27,6 +27,43 @@ export function isEventType(value: string): value is EventType {
   return (EVENT_TYPES as readonly string[]).includes(value);
 }
 
+/** Human labels for the Activity surface (suggestions pass 8/10).
+ *  Kept in lockstep with EVENT_TYPES; unknown types fall back to the
+ *  raw string (forward-safe). */
+export const EVENT_LABELS: Record<string, string> = {
+  "brief.created": "Brief created",
+  "proposal.accepted": "Proposal accepted",
+  "proposal.declined": "Proposal declined",
+  "plan.task_completed": "Plan task completed",
+  "invoice.paid": "Invoice paid",
+  "contract.signed": "Contract signed",
+  "team.member.joined": "Member joined",
+  "team.member.left": "Member left",
+  "team.member.removed": "Member removed",
+  "template.created": "Template created",
+};
+
+export function eventLabel(eventType: string): string {
+  return EVENT_LABELS[eventType] ?? eventType;
+}
+
+/** One short identifying detail for a log line (title-level facts only —
+ *  never money or bodies, per the events design decisions). */
+export function eventDetail(event: {
+  event_type: string;
+  payload: Record<string, unknown> | null;
+}): string {
+  const p = event.payload ?? {};
+  if (event.event_type === "invoice.paid" && typeof p.invoice_number === "number") {
+    return `Invoice #${p.invoice_number}`;
+  }
+  if (event.event_type === "plan.task_completed" && typeof p.task_text === "string") {
+    return p.task_text;
+  }
+  if (typeof p.title === "string" && p.title) return p.title;
+  return "";
+}
+
 export async function recordEvent(
   supabase: Supabase,
   event: {
