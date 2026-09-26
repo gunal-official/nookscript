@@ -19,7 +19,7 @@ import { redirect } from "next/navigation";
 
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
-import { createCheckoutSession } from "@/lib/stripe";
+import { createBillingPortalSession, createCheckoutSession } from "@/lib/stripe";
 
 export type ActionResult = { error?: string } | undefined;
 
@@ -211,6 +211,60 @@ export async function startCheckout(): Promise<ActionResult> {
     successUrl: `${host}/settings?checkout=success`,
     cancelUrl: `${host}/settings?checkout=canceled`,
     customerEmail: profile?.email ?? null,
+  });
+  if (!session.ok) return { error: session.error };
+
+  redirect(session.url);
+}
+
+/**
+ * Open the hosted Stripe Customer Portal for the workspace's
+ * subscription (suggestions pass 5/10). Owner-only, TEST-mode keys.
+ * The browser lands on Stripe's hosted page where the owner can cancel
+ * or update the subscription; the plan state HERE still flips only via
+ * the two webhooks (customer.subscription.deleted included) — the
+ * portal manages Stripe's side, the webhooks own ours.
+ */
+export async function openCustomerPortal(): Promise<ActionResult> {
+  const { supabase, membership } = await getMembership();
+  if (!membership) {
+    return { error: "Your session has expired. Please log in again." };
+  }
+  if (membership.role !== "owner") {
+    return { error: "Only workspace owners can manage billing." };
+  }
+
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    return {
+      error:
+        "Billing is not configured yet — set STRIPE_SECRET_KEY (test mode).",
+    };
+  }
+
+  const { data: billing } = await supabase
+    .from("billing_subscriptions")
+    .select("status, stripe_customer_id")
+    .eq("workspace_id", membership.workspace_id)
+    .maybeSingle();
+
+  if (!billing || !billing.stripe_customer_id) {
+    return {
+      error: "No subscription to manage yet — complete checkout first.",
+    };
+  }
+
+  const h = await headers();
+  const host =
+    h.get("origin") ??
+    (h.get("x-forwarded-host")
+      ? `https://${h.get("x-forwarded-host")}`
+      : "http://localhost:3000");
+
+  const session = await createBillingPortalSession({
+    secretKey,
+    customerId: billing.stripe_customer_id,
+    returnUrl: `${host}/settings`,
   });
   if (!session.ok) return { error: session.error };
 

@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 
 import {
   buildCheckoutSessionParams,
+  buildPortalSessionParams,
   parseStripeEvent,
 } from "../../lib/stripe.ts";
 
@@ -82,5 +83,18 @@ describe("buildCheckoutSessionParams (hosted Checkout contract)", () => {
       workspaceId: "w", priceId: "p", successUrl: "s", cancelUrl: "c",
       customerEmail: null,
     }).reduce((m, [k, v]) => ({ ...m, [k]: v }), {})));
+  });
+});
+
+describe("buildPortalSessionParams (Customer Portal contract)", () => {
+  test("posts exactly customer + return_url", () => {
+    const params = buildPortalSessionParams({
+      customerId: "cus_test_abc123",
+      returnUrl: "https://app.example/settings",
+    });
+    assert.deepEqual(params, [
+      ["customer", "cus_test_abc123"],
+      ["return_url", "https://app.example/settings"],
+    ]);
   });
 });

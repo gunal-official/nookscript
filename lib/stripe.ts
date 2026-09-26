@@ -85,6 +85,60 @@ export function buildCheckoutSessionParams(input: {
   return params;
 }
 
+/**
+ * Customer Portal (suggestions pass 5/10): let the owner manage/cancel
+ * the subscription on Stripe's hosted page. Same zero-SDK approach —
+ * one fetch to api.stripe.com, test-mode keys.
+ */
+export function buildPortalSessionParams(input: {
+  customerId: string;
+  returnUrl: string;
+}): [string, string][] {
+  return [
+    ["customer", input.customerId],
+    ["return_url", input.returnUrl],
+  ];
+}
+
+/** Create a hosted Customer Portal session (test keys). */
+export async function createBillingPortalSession(input: {
+  secretKey: string;
+  customerId: string;
+  returnUrl: string;
+}): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(
+      "https://api.stripe.com/v1/billing_portal/sessions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${input.secretKey}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Stripe-Version": STRIPE_API_VERSION,
+        },
+        body: new URLSearchParams(buildPortalSessionParams(input)),
+        signal: AbortSignal.timeout(15_000),
+      }
+    );
+    const data = (await res.json()) as {
+      url?: string;
+      error?: { message?: string };
+    };
+    if (!res.ok || !data.url) {
+      return {
+        ok: false,
+        error: data.error?.message ?? `Stripe error (HTTP ${res.status}).`,
+      };
+    }
+    return { ok: true, url: data.url };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Could not reach Stripe.",
+    };
+  }
+}
+
 /** Create a hosted Checkout Session via the plain REST API (test keys). */
 export async function createCheckoutSession(input: {
   secretKey: string;

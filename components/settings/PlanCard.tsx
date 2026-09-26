@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { ArrowRight, Check, CreditCard, Sparkles } from "lucide-react";
 
+import { ManageBillingButton } from "@/components/settings/ManageBillingButton";
 import { PlanCheckoutButton } from "@/components/settings/PlanCheckoutButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -115,10 +116,14 @@ export function PlanCard({
           </ul>
           <div className="flex flex-wrap items-center gap-3 pt-1">
             {isPro ? (
-              <p className="text-sm text-muted-foreground">
-                Your workspace is on Pro — billing is managed through your
-                Stripe receipt.
-              </p>
+              billingConfigured ? (
+                <ManageBillingButton />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Your workspace is on Pro — billing is managed through your
+                  Stripe receipt.
+                </p>
+              )
             ) : billingConfigured ? (
               <PlanCheckoutButton />
             ) : (
@@ -138,7 +143,7 @@ export function PlanCard({
           </div>
           <p className="text-xs text-muted-foreground">
             {isPro
-              ? "Cancel anytime from the Stripe billing portal link in your receipt — the plan flips back to Free when the subscription ends."
+              ? "Manage or cancel the subscription anytime in the Stripe billing portal — the plan flips back to Free when the subscription ends."
               : billingConfigured
                 ? "Upgrade opens Stripe Checkout (test mode). The plan updates here once Stripe confirms payment."
                 : "Changing plans is by request until billing is configured — early users keep Free exactly as it is today. Nothing to cancel, ever."}
