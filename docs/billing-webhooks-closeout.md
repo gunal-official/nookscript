@@ -3,7 +3,9 @@
 Final summary of the 2026-09-26 phase: event recording, outbound webhooks,
 and Stripe Checkout billing for Nookscript's own Free → Pro subscription
 (this is platform billing — client invoicing already existed). Written at
-`9d99507`. Foundation: `d3433ab` ("events/webhooks foundation + Stripe
+`9d99507`, updated for global multi-currency Stripe billing (the product
+is global, not India-only — Stripe is the only provider; a Razorpay
+pivot that started the same day was reversed before commit). Foundation: `d3433ab` ("events/webhooks foundation + Stripe
 Checkout"). Follow-ups: the eight "suggestions pass N/10" commits
 `b0f48a1`…`9d99507`. Companions: `README.md` ("Events, webhooks + Stripe
 billing" section), `.env.local.example` (all vars commented out).
@@ -18,7 +20,7 @@ billing" section), `.env.local.example` (all vars commented out).
 | Test ping | `testWebhookEndpoint` action | owner fires one signed ping at an endpoint, result shown in the card |
 | Secret rotation | `rotateWebhookEndpoint` action | new secret in place (no endpoint re-registration); old signature stops verifying |
 | Retry cron sweep | `20260926110000_webhook_retry_schedule.sql`, `app/api/cron/webhooks/route.ts` | `next_retry_at` column + atomic claim (1h lease); `POST /api/cron/webhooks` gated by `CRON_SECRET` (Bearer, constant-time); recovers rows frozen by serverless process death |
-| Stripe billing | `20260926100000_billing.sql`, `lib/stripe.ts`, `app/api/stripe/webhook/route.ts`, PlanCard | hosted Checkout (no card forms anywhere; raw `fetch` + `node:crypto` — zero new dependencies), exactly two Stripe webhooks, per-workspace `billing_subscriptions`, Customer Portal for Pro |
+| Stripe billing (global) | `20260926100000_billing.sql` + `20260926130000_billing_currency.sql`, `lib/stripe.ts`, `app/api/stripe/webhook/route.ts`, PlanCard | hosted Checkout (no card forms anywhere; raw `fetch` + `node:crypto` — zero new dependencies), **multi-currency: `STRIPE_PRICES` JSON config (one recurring price per currency, currency picker in Settings, prices shown on /pricing + Settings)**, exactly two Stripe webhooks, per-workspace `billing_subscriptions` (currency/amount recorded), Customer Portal for Pro |
 | Activity feed | EventsCard on Settings (pass 8) | the events table's read surface — latest workspace events with type + time |
 | Four more event types | `20260926120000_event_types_team_templates.sql` (pass 9) | CHECK constraint grows 6 → 10 (replaced in place, house rule: new types land by migration) |
 
@@ -49,15 +51,20 @@ billing" section), `.env.local.example` (all vars commented out).
 
 ### Billing flow (locked)
 
-- **Upgrade**: Settings → Plan card → `startCheckout()` (owner-only;
-  requires `STRIPE_SECRET_KEY` + `STRIPE_PRICE_ID`, else an actionable
-  error) → `POST /v1/checkout/sessions` (`Stripe-Version: 2024-06-20`,
-  urlencoded, 15s timeout) → redirect to Stripe-hosted Checkout.
+- **Upgrade**: Settings → Plan card → pick a currency →
+  `startCheckout(currency)` (owner-only; requires `STRIPE_SECRET_KEY` +
+  a parseable `STRIPE_PRICES` listing that currency, else an actionable
+  error naming the configured currencies) → `POST /v1/checkout/sessions`
+  for that currency's price (`Stripe-Version: 2024-06-20`, urlencoded,
+  15s timeout) → redirect to Stripe-hosted Checkout.
   Success/cancel land back on `/settings?checkout=success|canceled`
   (one-time toast, pass 6).
 - **Webhooks** (register exactly two): `checkout.session.completed` →
-  upsert `billing_subscriptions` `status='active'` (onConflict
-  `workspace_id`); `customer.subscription.deleted` → `status='canceled'`.
+  upsert `billing_subscriptions` `status='active'` + the session's
+  `currency` (uppercased ISO-4217) + the amount resolved from
+  `STRIPE_PRICES` via the line item's price id (onConflict
+  `workspace_id`); `customer.subscription.deleted` → `status='canceled'`
+  (currency/amount kept as history).
   All other event types: 200 + ignored. Bad/missing signature: 400.
   Writes go through the service-role client only; RLS gives members
   SELECT.
@@ -66,14 +73,18 @@ billing" section), `.env.local.example` (all vars commented out).
 - **Portal** (pass 5): Pro workspaces get a hosted Stripe Customer
   Portal link (ManageBillingButton) — card management/cancellation on
   Stripe's side.
-- **Prices are never printed** in the app or on /pricing — the price
-  lives in the operator's Stripe account (one recurring price ID).
+- **Prices are the operator's config**: one recurring (monthly) price
+  per currency in `STRIPE_PRICES`; the amounts the app shows (Settings +
+  /pricing) are that config's display values (major units) and must
+  match the Stripe prices. The CHARGED amount is always Stripe's — the
+  DB columns are display data. Config absent → no price renders
+  anywhere (no invented numbers).
 
 ## 2. Env (all optional, all commented in `.env.local.example`)
 
 | Var | Needed for |
 |---|---|
-| `STRIPE_SECRET_KEY` (test mode in dev) + `STRIPE_PRICE_ID` | the in-app upgrade button |
+| `STRIPE_SECRET_KEY` (test mode in dev) + `STRIPE_PRICES` (JSON, one recurring price per currency) | the in-app upgrade button (currency picker appears with 2+) |
 | `STRIPE_WEBHOOK_SECRET` | `/api/stripe/webhook` signature verification |
 | `SUPABASE_SERVICE_ROLE_KEY` | Stripe-webhook + cron-sweep writes (service role, bypasses RLS) |
 | `CRON_SECRET` | the retry sweep (`POST /api/cron/webhooks`, Bearer) |
@@ -88,7 +99,9 @@ Nothing configured = the app behaves exactly as before the phase
    `20260926100000_billing` · `20260926110000_webhook_retry_schedule` ·
    `20260926120000_event_types_team_templates`.
 2. Stripe (TEST mode for dev): create a product with ONE recurring
-   price → `STRIPE_PRICE_ID`.
+   (monthly) price PER CURRENCY you offer — Stripe Checkout accepts
+   cards in 135+ currencies worldwide — and list them in
+   `STRIPE_PRICES` (JSON: currency, priceId, amount in major units).
 3. Register a webhook endpoint at `https://<your-domain>/api/stripe/webhook`
    subscribed to exactly `checkout.session.completed` and
    `customer.subscription.deleted` → its signing secret is
@@ -118,10 +131,16 @@ Nothing configured = the app behaves exactly as before the phase
   construction — 10 event types, 3 attempts max).
 - Secret rotation invalidates signatures immediately — receivers holding
   the old secret see verification failures until updated.
+- The app is Stripe-only by design (global product — one provider with
+  worldwide card coverage); the currency list is whatever the operator
+  configures in `STRIPE_PRICES`, never a hardcoded list.
+- Display amounts come from the operator's config; if a Stripe price is
+  changed in the dashboard without updating `STRIPE_PRICES`, the shown
+  amount can drift from the charged one (the charge is authoritative).
 - Dev keys are TEST mode only; production credentials are never
   referenced or required by the repo.
 
-## 5. Verification (all green at `9d99507`)
+## 5. Verification (all green at this phase's HEAD — CI `verify` on the branch)
 
 `npx tsc --noEmit` · `npm run lint` · `npm test` (116/116) ·
 `npm run build` (24 routes incl. `ƒ /api/stripe/webhook`,

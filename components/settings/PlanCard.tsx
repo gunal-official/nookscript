@@ -1,17 +1,20 @@
 /**
  * Plan & billing (Step 34(b), billing live in the events/webhooks
- * foundation phase) — the subscription surface reflects REAL state from
- * billing_subscriptions (row absent = Free, 'active' = Pro; the Stripe
- * webhooks own those transitions). Upgrade = hosted Stripe Checkout
- * (test-mode keys) when configured; when billing env is absent the early
- * access mailto remains as the honest fallback. No prices are shown or
- * implied (pricing doctrine) — the price lives in your Stripe account.
+ * foundation phase; global multi-currency 2026-09-26) — the
+ * subscription surface reflects REAL state from billing_subscriptions
+ * (row absent = Free, 'active' = Pro; the Stripe webhooks own those
+ * transitions). Upgrade = hosted Stripe Checkout (test-mode keys) in
+ * the currency the owner picks; when billing env is absent the early
+ * access mailto remains as the honest fallback. Prices shown are the
+ * operator's STRIPE_PRICES config (display data) — the charged amount
+ * is always Stripe's.
  */
 
 import Link from "next/link";
 import { ArrowRight, Check, CreditCard, Sparkles } from "lucide-react";
 
 import { ManageBillingButton } from "@/components/settings/ManageBillingButton";
+import { formatPrice, type StripePriceConfig } from "@/lib/stripe";
 import { PlanCheckoutButton } from "@/components/settings/PlanCheckoutButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,11 +48,19 @@ export function PlanCard({
   templateCount,
   plan,
   billingConfigured,
+  prices,
+  billing,
 }: {
   memberCount: number;
   templateCount: number;
   plan: "free" | "pro";
   billingConfigured: boolean;
+  prices: StripePriceConfig[];
+  billing: {
+    status: string;
+    currency: string | null;
+    amount: number | null;
+  } | null;
 }) {
   const isPro = plan === "pro";
   return (
@@ -63,8 +74,7 @@ export function PlanCard({
         </div>
         <CardDescription>
           Subscription and billing for NookScript itself — real plan state,
-          checkout via Stripe when configured. No prices are shown or
-          implied.
+          checkout via Stripe in the currency you choose.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5 p-5">
@@ -83,6 +93,9 @@ export function PlanCard({
             </Badge>
           )}
           <p className="w-full text-sm text-muted-foreground sm:w-auto">
+            {isPro && billing?.currency && billing.amount != null
+              ? `${formatPrice(billing.amount, billing.currency)} ${billing.currency} · `
+              : ""}
             {memberCount} member{memberCount === 1 ? "" : "s"} ·{" "}
             {templateCount} template{templateCount === 1 ? "" : "s"} · 1
             workspace
@@ -125,7 +138,7 @@ export function PlanCard({
                 </p>
               )
             ) : billingConfigured ? (
-              <PlanCheckoutButton />
+              <PlanCheckoutButton prices={prices} />
             ) : (
               <Button asChild variant="outline">
                 <a href={PRO_MAILTO} className="inline-flex min-h-11 min-w-11 items-center">
@@ -145,7 +158,7 @@ export function PlanCard({
             {isPro
               ? "Manage or cancel the subscription anytime in the Stripe billing portal — the plan flips back to Free when the subscription ends."
               : billingConfigured
-                ? "Upgrade opens Stripe Checkout (test mode). The plan updates here once Stripe confirms payment."
+                ? "Pick a currency, then upgrade opens Stripe Checkout (test mode). The plan updates here once Stripe confirms payment."
                 : "Changing plans is by request until billing is configured — early users keep Free exactly as it is today. Nothing to cancel, ever."}
           </p>
         </div>

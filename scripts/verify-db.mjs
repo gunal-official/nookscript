@@ -2266,7 +2266,7 @@ await db.query("reset role");
   await db.query("reset role");
   // service-role stand-in (superuser — the Stripe webhook route's client)
   await db.query(
-    "insert into public.billing_subscriptions (workspace_id, stripe_customer_id, stripe_subscription_id, status) values ($1, 'cus_test', 'sub_test', 'active')",
+    "insert into public.billing_subscriptions (workspace_id, stripe_customer_id, stripe_subscription_id, currency, amount, status) values ($1, 'cus_test', 'sub_test', 'USD', 19, 'active')",
     [SEED_WS]
   );
   const badStatus = await db
@@ -2277,13 +2277,29 @@ await db.query("reset role");
     .then(() => ({ ok: true }))
     .catch(() => ({ ok: false }));
   check("billing.status CHECK rejects invented values", badStatus.ok === false);
+  const curCols = await db.query(
+    "select count(*)::int as n from information_schema.columns where table_schema = 'public' and table_name = 'billing_subscriptions' and column_name in ('currency', 'amount')"
+  );
+  check("billing: currency + amount display columns exist", curCols.rows[0]?.n === 2);
+  const badCur = await db
+    .query(
+      "update public.billing_subscriptions set currency = 'XX' where workspace_id = $1",
+      [SEED_WS]
+    )
+    .then(() => ({ ok: true }))
+    .catch(() => ({ ok: false }));
+  check("billing.currency CHECK rejects non-ISO codes", badCur.ok === false);
   await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
   await db.query("set role nstester");
   const proRow = await db.query(
-    "select status from public.billing_subscriptions where workspace_id = $1",
+    "select status, currency, amount::text as a from public.billing_subscriptions where workspace_id = $1",
     [SEED_WS]
   );
   check("billing: owner sees the active subscription (Pro)", proRow.rows[0]?.status === "active");
+  check(
+    "billing: owner sees currency + amount (global pricing)",
+    proRow.rows[0]?.currency === "USD" && proRow.rows[0]?.a === "19"
+  );
   await db.query("reset role");
 }
 

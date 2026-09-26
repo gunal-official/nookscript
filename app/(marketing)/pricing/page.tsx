@@ -12,16 +12,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { formatPrice, getPricesConfig } from "@/lib/stripe";
 
 export const metadata: Metadata = {
   title: "Pricing — nookscript",
   description:
-    "nookscript pricing: the full pipeline is free — team, templates, webhooks included. Pro is a Stripe-billed subscription you can upgrade to from Settings, any time.",
+    "nookscript pricing: the full pipeline is free — team, templates, webhooks included. Pro is a Stripe-billed subscription in your currency; upgrade from Settings any time.",
 };
 
-// Pricing doctrine (now that billing is live): the price itself is never
-// printed on this page — it lives in the operator's Stripe account (one
-// recurring price ID in env), so no number here can go stale.
+// Pricing (global multi-currency, 2026-09-26): the amounts shown are
+// the operator's STRIPE_PRICES config (display data, major units) — one
+// recurring price per currency, created in the Stripe dashboard. The
+// charged amount is always Stripe's; if the config is absent the price
+// row simply doesn't render (no invented numbers, ever).
 // Free list = what is genuinely in the app today (team invites, roles,
 // invoices/contracts, activity feed, signed webhooks). Pro = the real
 // Stripe subscription; nothing is feature-gated in code yet, so
@@ -59,10 +62,10 @@ const TIERS: {
     chip: "icon-chip-accent",
     badge: "Early access",
     blurb:
-      "A Stripe-billed subscription — upgrade from Settings, cancel any time. The same product today; priority as the roadmap lands.",
+      "A Stripe-billed subscription — upgrade from Settings in the currency you choose, cancel any time. The same product today; priority as the roadmap lands.",
     features: [
       "Everything in Free",
-      "Card billing through Stripe — hosted checkout, managed in the customer portal",
+      "Billing through Stripe — cards accepted worldwide, pay in your currency",
       "Early builds of whatever ships next",
       "Custom domains for share links — planned",
       "Custom role tiers (admin and beyond) — planned",
@@ -83,13 +86,17 @@ const TIERS: {
  * Pro CTA routes to signup and the blurb states where the upgrade lives.
  */
 export default function PricingPage() {
+  const pricesConfig = getPricesConfig();
+  const proPrices = pricesConfig.ok ? pricesConfig.prices : [];
   return (
     <div className="mx-auto max-w-3xl px-6 py-16 text-center">
       <h1 className="font-display text-3xl font-bold tracking-tight">Pricing</h1>
       <p className="mt-3 text-sm text-muted-foreground sm:text-base">
-        Everything that ships is in the Free tier — the full pipeline, team,
-        webhooks. Pro is the Stripe-billed subscription: upgrade from
-        Settings any time, and early users keep the Free tier as-is.
+        Everything that ships is in the Free tier — the full pipeline,
+        team, webhooks. Pro is the Stripe-billed subscription for a
+        global product: upgrade from Settings in the currency you choose
+        (cards accepted worldwide via Stripe), and early users keep the
+        Free tier as-is.
       </p>
 
       <div className="mt-10 grid gap-5 text-left sm:grid-cols-2">
@@ -106,6 +113,13 @@ export default function PricingPage() {
                 {badge && <Badge variant="secondary">{badge}</Badge>}
               </div>
               <CardDescription className="text-sm">{blurb}</CardDescription>
+              {name === "Pro" && proPrices.length > 0 ? (
+                <p className="text-sm font-semibold text-text">
+                  {proPrices
+                    .map((p) => `${formatPrice(p.amount, p.currency)} ${p.currency}`)
+                    .join("  ·  ")}
+                </p>
+              ) : null}
             </CardHeader>
             <CardContent className="flex-1 p-5">
               <ul className="space-y-2.5">

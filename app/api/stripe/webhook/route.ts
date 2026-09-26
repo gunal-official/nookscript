@@ -13,7 +13,7 @@
 import { NextResponse } from "next/server";
 
 import { isUuid } from "@/lib/utils";
-import { parseStripeEvent } from "@/lib/stripe";
+import { findPriceById, getPricesConfig, parseStripeEvent } from "@/lib/stripe";
 import { createServiceClient } from "@/lib/supabase/service";
 import { verifySignedPayload } from "@/lib/webhooks";
 
@@ -57,11 +57,22 @@ export async function POST(request: Request) {
     const supabase = createServiceClient();
 
     if (event.kind === "checkout_session_completed") {
+      // currency rides the session (authoritative; Stripe sends it
+      // lowercased — parseStripeEvent uppercases it); amount is display
+      // data from the operator's STRIPE_PRICES config, resolved via the
+      // line item's price id.
+      const pricesConfig = getPricesConfig();
+      const configuredPrice =
+        pricesConfig.ok && event.priceId
+          ? findPriceById(pricesConfig.prices, event.priceId)
+          : null;
       const { error } = await supabase.from("billing_subscriptions").upsert(
         {
           workspace_id: event.workspaceId,
           stripe_customer_id: event.customerId,
           stripe_subscription_id: event.subscriptionId,
+          currency: event.currency,
+          amount: configuredPrice?.amount ?? null,
           status: "active",
         },
         { onConflict: "workspace_id" }

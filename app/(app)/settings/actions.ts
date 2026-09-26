@@ -20,7 +20,13 @@ import { redirect } from "next/navigation";
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { recordEvent } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
-import { createBillingPortalSession, createCheckoutSession } from "@/lib/stripe";
+import {
+  createBillingPortalSession,
+  createCheckoutSession,
+  findPrice,
+  formatPrice,
+  getPricesConfig,
+} from "@/lib/stripe";
 
 export type ActionResult = { error?: string } | undefined;
 
@@ -186,12 +192,14 @@ export async function deleteTemplate(input: {
 
 /**
  * Start a hosted Stripe Checkout session for the Free → Pro upgrade
- * (Phase: events/webhooks foundation). Owner-only; TEST-mode keys only
- * (STRIPE_SECRET_KEY = sk_test_…, STRIPE_PRICE_ID = a test price). On
- * success this NEVER returns — the browser lands on Stripe's hosted page;
- * state changes arrive via /api/stripe/webhook, not from this action.
+ * (Phase: events/webhooks foundation; global multi-currency 2026-09-26).
+ * Owner-only; TEST-mode keys only (STRIPE_SECRET_KEY = sk_test_…,
+ * STRIPE_PRICES = JSON array of one recurring price per currency).
+ * `currency` must be one of the configured codes. On success this NEVER
+ * returns — the browser lands on Stripe's hosted page; state changes
+ * arrive via /api/stripe/webhook, not from this action.
  */
-export async function startCheckout(): Promise<ActionResult> {
+export async function startCheckout(currency: string): Promise<ActionResult> {
   const { supabase, membership } = await getMembership();
   if (!membership) {
     return { error: "Your session has expired. Please log in again." };
@@ -201,11 +209,23 @@ export async function startCheckout(): Promise<ActionResult> {
   }
 
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  const priceId = process.env.STRIPE_PRICE_ID;
-  if (!secretKey || !priceId) {
+  if (!secretKey) {
     return {
       error:
-        "Billing is not configured yet — set STRIPE_SECRET_KEY and STRIPE_PRICE_ID (test mode).",
+        "Billing is not configured yet — set STRIPE_SECRET_KEY and STRIPE_PRICES (test mode).",
+    };
+  }
+  const pricesConfig = getPricesConfig();
+  if (!pricesConfig.ok) {
+    return { error: pricesConfig.error };
+  }
+  const price = findPrice(pricesConfig.prices, currency);
+  if (!price) {
+    const available = pricesConfig.prices
+      .map((p) => `${formatPrice(p.amount, p.currency)} ${p.currency}`)
+      .join(" · ");
+    return {
+      error: `Pro is not available in ${currency.toUpperCase()} yet — configured: ${available}.`,
     };
   }
 
@@ -221,7 +241,7 @@ export async function startCheckout(): Promise<ActionResult> {
   const session = await createCheckoutSession({
     secretKey,
     workspaceId: membership.workspace_id,
-    priceId,
+    priceId: price.priceId,
     successUrl: `${host}/settings?checkout=success`,
     cancelUrl: `${host}/settings?checkout=canceled`,
     customerEmail: profile?.email ?? null,

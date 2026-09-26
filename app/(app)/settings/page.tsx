@@ -46,6 +46,7 @@
  */
 
 import { CheckoutNotice } from "@/components/settings/CheckoutNotice";
+import { getPricesConfig } from "@/lib/stripe";
 import { EventsCard } from "@/components/settings/EventsCard";
 import { PlanCard } from "@/components/settings/PlanCard";
 import { WebhooksCard } from "@/components/settings/WebhooksCard";
@@ -92,7 +93,7 @@ export default async function SettingsPage() {
       workspace
         ? supabase
             .from("billing_subscriptions")
-            .select("status")
+            .select("status, currency, amount")
             .eq("workspace_id", workspace.id)
             .maybeSingle()
             .then(({ data }) => data)
@@ -145,9 +146,10 @@ export default async function SettingsPage() {
     for (const row of extra ?? []) eventTypes[row.id] = row.event_type;
   }
   const plan = billing?.status === "active" ? "pro" : "free";
-  const billingConfigured = Boolean(
-    process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID
-  );
+  const pricesConfig = getPricesConfig();
+  const prices = pricesConfig.ok ? pricesConfig.prices : [];
+  const billingConfigured =
+    Boolean(process.env.STRIPE_SECRET_KEY) && pricesConfig.ok;
   const isOwner = workspace?.role === "owner";
 
   return (
@@ -175,6 +177,8 @@ export default async function SettingsPage() {
         templateCount={templates.length}
         plan={plan}
         billingConfigured={billingConfigured}
+        prices={prices}
+        billing={billing}
       />
       <WebhooksCard
         endpoints={webhookEndpoints}
