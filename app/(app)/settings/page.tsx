@@ -67,8 +67,14 @@ export default async function SettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   const workspace = await getWorkspaceContext();
-  const [templates, members, pendingInvites, webhookEndpoints, billing] =
-    await Promise.all([
+  const [
+    templates,
+    members,
+    pendingInvites,
+    webhookEndpoints,
+    billing,
+    webhookDeliveries,
+  ] = await Promise.all([
       workspace ? getTemplates(workspace.id) : Promise.resolve([]),
       getTeamMembers(),
       getPendingInvites(),
@@ -88,7 +94,43 @@ export default async function SettingsPage() {
             .maybeSingle()
             .then(({ data }) => data)
         : Promise.resolve(null),
+      // Delivery audit rows for the Webhooks card (suggestions pass 1/10).
+      // Owners read them; RLS yields [] for members (the card's "View only"
+      // precedent — nothing is rendered for non-owners).
+      workspace
+        ? supabase
+            .from("webhook_deliveries")
+            .select(
+              "id, endpoint_id, event_id, status, attempts, last_error, created_at, updated_at"
+            )
+            .eq("workspace_id", workspace.id)
+            .order("updated_at", { ascending: false })
+            .limit(50)
+            .then(({ data }) => data ?? [])
+        : Promise.resolve([]),
     ]);
+
+  // event_id → event_type for the delivery log lines (one extra scoped
+  // read; empty when there are no deliveries to annotate).
+  const deliveryEventIds = [
+    ...new Set(webhookDeliveries.map((d: { event_id: string }) => d.event_id)),
+  ];
+  const eventTypes: Record<string, string> =
+    deliveryEventIds.length > 0
+      ? ((
+          await supabase
+            .from("events")
+            .select("id, event_type")
+            .in("id", deliveryEventIds)
+        ).data ?? []
+      ).reduce(
+        (acc, row: { id: string; event_type: string }) => {
+          acc[row.id] = row.event_type;
+          return acc;
+        },
+        {} as Record<string, string>
+      )
+      : {};
   const plan = billing?.status === "active" ? "pro" : "free";
   const billingConfigured = Boolean(
     process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID
@@ -119,7 +161,12 @@ export default async function SettingsPage() {
         plan={plan}
         billingConfigured={billingConfigured}
       />
-      <WebhooksCard endpoints={webhookEndpoints} isOwner={isOwner} />
+      <WebhooksCard
+        endpoints={webhookEndpoints}
+        deliveries={webhookDeliveries}
+        eventTypes={eventTypes}
+        isOwner={isOwner}
+      />
       {workspace && isOwner && <WorkspaceDangerCard name={workspace.name} />}
     </div>
   );

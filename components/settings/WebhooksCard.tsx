@@ -8,7 +8,15 @@
  */
 
 import { useState, useTransition } from "react";
-import { Copy, Loader2, Trash2, Webhook } from "lucide-react";
+import {
+  CheckCircle2,
+  Clock3,
+  Copy,
+  Loader2,
+  Trash2,
+  Webhook,
+  XCircle,
+} from "lucide-react";
 
 import {
   deleteWebhookEndpoint,
@@ -24,18 +32,37 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
-import type { WebhookEndpoint } from "@/lib/types/webhook";
+import type { WebhookDelivery, WebhookEndpoint } from "@/lib/types/webhook";
+import { timeAgo } from "@/lib/utils";
 
 export function WebhooksCard({
   endpoints,
+  deliveries,
+  eventTypes,
   isOwner,
 }: {
   endpoints: WebhookEndpoint[];
+  /** Owner-read delivery audit rows, newest first (suggestions pass 1/10).
+   *  RLS (owners can select) returns nothing for non-owners. */
+  deliveries: WebhookDelivery[];
+  /** event_id → event_type, for the log lines. */
+  eventTypes: Record<string, string>;
   isOwner: boolean;
 }) {
   const [url, setUrl] = useState("");
   const [pending, startTransition] = useTransition();
   const toast = useToast();
+
+  // The three newest delivery rows per endpoint (the list arrives sorted
+  // newest-first; the full log stays in the DB — this is a glance surface).
+  const deliveriesByEndpoint = new Map<string, WebhookDelivery[]>();
+  for (const d of deliveries) {
+    const bucket = deliveriesByEndpoint.get(d.endpoint_id) ?? [];
+    if (bucket.length < 3) {
+      bucket.push(d);
+      deliveriesByEndpoint.set(d.endpoint_id, bucket);
+    }
+  }
 
   const register = () => {
     const value = url.trim();
@@ -134,6 +161,51 @@ export function WebhooksCard({
                     {endpoint.signing_secret}
                   </p>
                 )}
+                {isOwner &&
+                (deliveriesByEndpoint.get(endpoint.id) ?? []).length > 0 ? (
+                  <ul
+                    className="mt-2 space-y-1.5 border-t border-border pt-2"
+                    aria-label={`Recent deliveries to ${endpoint.url}`}
+                  >
+                    {(deliveriesByEndpoint.get(endpoint.id) ?? []).map(
+                      (d) => (
+                        <li
+                          key={d.id}
+                          className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground"
+                        >
+                          {d.status === "delivered" ? (
+                            <CheckCircle2
+                              className="h-4 w-4 shrink-0 text-success"
+                              aria-hidden="true"
+                            />
+                          ) : d.status === "failed" ? (
+                            <XCircle
+                              className="h-4 w-4 shrink-0 text-error"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          )}
+                          <span className="font-medium text-foreground">
+                            {eventTypes[d.event_id] ?? "event"}
+                          </span>
+                          <span>
+                            {d.status}
+                            {d.attempts > 0
+                              ? ` · ${d.attempts} attempt${d.attempts === 1 ? "" : "s"}`
+                              : ""}
+                          </span>
+                          <span>{timeAgo(d.updated_at)}</span>
+                          {d.status !== "delivered" && d.last_error ? (
+                            <span className="w-full break-all pl-6">
+                              {d.last_error}
+                            </span>
+                          ) : null}
+                        </li>
+                      )
+                    )}
+                  </ul>
+                ) : null}
               </li>
             ))}
           </ul>
