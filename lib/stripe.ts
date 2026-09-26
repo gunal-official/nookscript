@@ -159,14 +159,15 @@ export async function createBillingPortalSession(input: {
     }
     return { ok: true, url: data.url };
   } catch (err) {
+    // Network-layer failure (DNS/refused/proxy/timeout) — undici throws
+    // "fetch failed" with the real cause on .cause; either way the
+    // user-facing message is the same, honest one.
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Could not reach Stripe.",
+      error: "Could not reach Stripe — check your connection and try again.",
     };
   }
 }
-
-/** Create a hosted Checkout Session via the plain REST API (test keys). */
 export async function createCheckoutSession(input: {
   secretKey: string;
   workspaceId: string;
@@ -198,9 +199,12 @@ export async function createCheckoutSession(input: {
     }
     return { ok: true, url: data.url };
   } catch (err) {
+    // Network-layer failure (DNS/refused/proxy/timeout) — undici throws
+    // "fetch failed" with the real cause on .cause; either way the
+    // user-facing message is the same, honest one.
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Could not reach Stripe.",
+      error: "Could not reach Stripe — check your connection and try again.",
     };
   }
 }

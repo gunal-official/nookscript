@@ -780,7 +780,9 @@ async function main() {
   }
 
   // ── interaction-state probes (RUN_INTERACT=1): drive the timer pill, its
-  // stop form, a select popover, and the inline destructive confirm at 320+768.
+  // stop form, a select popover, the inline destructive confirm, and — when
+  // billing env is set — the Pro upgrade flow (currency switch + upgrade
+  // click → actionable Stripe toast) at 320+768.
   if (process.env.RUN_INTERACT === "1") {
     for (const w of [320, 768]) {
       const vh2 = w === 320 ? 568 : 1024;
@@ -877,6 +879,45 @@ async function main() {
           const landed = new URL(page.url()).pathname.startsWith("/proposals");
           m = await page.evaluate(METRICS_FN);
           await record("drawer-navigate", landed && m.small.length === 0 && m.overflowX === 0, m);
+        }
+
+        // E) billing upgrade flow (only when billing env is set): the
+        // currency switch is client state; the upgrade click must reach
+        // the server action and surface an actionable toast. The sandbox
+        // has no route to api.stripe.com, so "Could not reach Stripe." is
+        // the expected error — the point is: no silent failure, no
+        // redirect off /settings.
+        if (process.env.STRIPE_PRICES && process.env.STRIPE_SECRET_KEY) {
+          await page.goto(`${BASE}/settings`, { waitUntil: "load", timeout: 20000 });
+          await page.waitForTimeout(400);
+          const upBtn = page.locator('button:has-text("Upgrade to Pro")').first();
+          if (await upBtn.count()) {
+            const picker = page.locator('button[aria-label="Billing currency"]');
+            if ((await picker.count()) > 0) {
+              await picker.click({ timeout: 8000 });
+              await page.waitForTimeout(250);
+              const eur = page.locator('[role="option"]:has-text("€17")').first();
+              if (await eur.count()) {
+                await eur.click({ timeout: 5000 });
+                await page.waitForTimeout(200);
+                const label = (await upBtn.textContent()) ?? "";
+                if (!/€17 EUR/.test(label)) {
+                  failures++;
+                  say(`✗ ${String(w).padStart(4)} interact-currency-switch label="${label.slice(0, 40)}"`);
+                }
+              }
+            }
+            await upBtn.scrollIntoViewIfNeeded();
+            await upBtn.click({ timeout: 8000 });
+            const toast = page.locator('[role="status"]').first();
+            await toast.waitFor({ state: "visible", timeout: 20000 });
+            const toastText = (await toast.textContent()) ?? "";
+            const stayed = new URL(page.url()).pathname === "/settings";
+            m = await page.evaluate(METRICS_FN);
+            x = await extra();
+            ok = /Stripe/i.test(toastText) && stayed && m.overflowX === 0 && m.small.length === 0;
+            await record("billing-upgrade", ok, m);
+          }
         }
       } catch (e) {
         failures++;
