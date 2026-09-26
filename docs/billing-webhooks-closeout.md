@@ -142,10 +142,12 @@ Nothing configured = the app behaves exactly as before the phase
 
 ## 5. Verification (all green at this phase's HEAD — CI `verify` on the branch)
 
-`npx tsc --noEmit` · `npm run lint` · `npm test` (116/116) ·
+`npx tsc --noEmit` · `npm run lint` · `npm test` (128/128) ·
 `npm run build` (24 routes incl. `ƒ /api/stripe/webhook`,
 `ƒ /api/cron/webhooks`) · `npm run verify:db` (all migrations +
 delivery/claim/RLS groups) · `npm run verify:responsive` full sweep
 (29 pages × 320/375/414/600/768/1024/1440, zero overflow/cut/tap
-findings — evidence `~/responsive-evidence/step7-pricing-copy/`, which
-covers the Settings card states this phase changed).
+findings — evidence `~/responsive-evidence/step7-stripe-global/`
+(unconfigured) and `~/responsive-evidence/step7-stripe-global-configured/`
+(demo billing env), which cover the Settings card states this phase
+changed).
