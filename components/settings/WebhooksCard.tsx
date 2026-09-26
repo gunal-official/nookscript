@@ -13,6 +13,7 @@ import {
   Clock3,
   Copy,
   Loader2,
+  Send,
   Trash2,
   Webhook,
   XCircle,
@@ -21,6 +22,7 @@ import {
 import {
   deleteWebhookEndpoint,
   registerWebhookEndpoint,
+  testWebhookEndpoint,
 } from "@/app/(app)/settings/webhook-actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,6 +80,21 @@ export function WebhooksCard({
     });
   };
 
+  const test = (endpoint: WebhookEndpoint) => {
+    startTransition(async () => {
+      const result = await testWebhookEndpoint({
+        endpointId: endpoint.id,
+      });
+      if (result?.error) {
+        toast(result.error);
+        return;
+      }
+      toast(
+        `Test delivered — your receiver answered HTTP ${result.status}.`
+      );
+    });
+  };
+
   const remove = (endpoint: WebhookEndpoint) => {
     startTransition(async () => {
       const result = await deleteWebhookEndpoint({ endpointId: endpoint.id });
@@ -129,6 +146,19 @@ export function WebhooksCard({
                   <p className="min-w-0 flex-1 break-all text-sm font-medium">
                     {endpoint.url}
                   </p>
+                  {isOwner && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-11 w-11 shrink-0"
+                      aria-label="Send test delivery to webhook"
+                      disabled={pending}
+                      onClick={() => test(endpoint)}
+                    >
+                      <Send className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  )}
                   {isOwner && (
                     <Button
                       type="button"

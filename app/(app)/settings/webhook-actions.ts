@@ -12,15 +12,24 @@
  * endpoints table has no UPDATE policy on purpose).
  */
 
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/utils";
-import { normalizeWebhookUrl } from "@/lib/webhooks";
+import {
+  buildDeliveryBody,
+  buildDeliveryHeaders,
+  normalizeWebhookUrl,
+} from "@/lib/webhooks";
 
-export type WebhookActionResult = { error?: string; secret?: string };
+export type WebhookActionResult = {
+  error?: string;
+  secret?: string;
+  /** HTTP status the receiver answered with (test ping). */
+  status?: number;
+};
 
 async function getMembership() {
   const supabase = await createClient();
@@ -70,6 +79,72 @@ export async function registerWebhookEndpoint(input: {
 
   revalidatePath("/settings");
   return { secret: signingSecret };
+}
+
+/**
+ * Send a one-off signed test delivery to a registered endpoint
+ * (suggestions pass 2/10). Owner-only. The ping uses the REAL delivery
+ * shape and signature scheme under its own event type
+ * (`nookscript.endpoint_test`) so a receiver's full verify-and-parse
+ * pipeline runs; it is NOT an event row and writes no
+ * webhook_deliveries entry (delivery rows require a real event).
+ */
+export async function testWebhookEndpoint(input: {
+  endpointId: string;
+}): Promise<WebhookActionResult> {
+  if (!isUuid(input.endpointId)) return { error: "Unknown webhook." };
+
+  const { supabase, membership } = await getMembership();
+  if (!membership) {
+    return { error: "Your session has expired. Please log in again." };
+  }
+  if (membership.role !== "owner") return { error: NOT_OWNER };
+
+  const { data: endpoint, error } = await supabase
+    .from("webhook_endpoints")
+    .select("id, url, signing_secret")
+    .eq("id", input.endpointId)
+    .maybeSingle();
+  if (error || !endpoint) return { error: "Unknown webhook." };
+
+  // Stored URLs are validated at registration; re-check before any
+  // outbound request (defense in depth against stale rows).
+  const normalized = normalizeWebhookUrl(endpoint.url);
+  if (!normalized.ok) return { error: normalized.error };
+
+  const body = buildDeliveryBody({
+    id: randomUUID(),
+    event_type: "nookscript.endpoint_test",
+    payload: { test: true, sent_at: new Date().toISOString() },
+    created_at: new Date().toISOString(),
+  });
+
+  try {
+    const res = await fetch(normalized.url, {
+      method: "POST",
+      headers: buildDeliveryHeaders(
+        body,
+        endpoint.signing_secret,
+        Math.floor(Date.now() / 1000),
+        "endpoint-test",
+        "nookscript.endpoint_test"
+      ),
+      body,
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (res.ok) return { status: res.status };
+    return {
+      status: res.status,
+      error: `Your receiver answered HTTP ${res.status} — check its logs.`,
+    };
+  } catch (err) {
+    return {
+      error:
+        err instanceof Error
+          ? `Could not reach the URL (${err.message}).`
+          : "Could not reach the URL.",
+    };
+  }
 }
 
 export async function deleteWebhookEndpoint(input: {
