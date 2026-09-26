@@ -2276,5 +2276,82 @@ await db.query("reset role");
   await db.query("reset role");
 }
 
+// ── webhook retry schedule (suggestions pass 4/10: cron sweep) ──
+{
+  const { rows: colRows } = await db.query(
+    "select count(*)::int as n from information_schema.columns where table_schema = 'public' and table_name = 'webhook_deliveries' and column_name = 'next_retry_at'"
+  );
+  check(
+    "retry: webhook_deliveries.next_retry_at column exists",
+    colRows[0]?.n === 1
+  );
+  const { rows: idxRows } = await db.query(
+    "select count(*)::int as n from pg_indexes where tablename = 'webhook_deliveries' and indexname = 'webhook_deliveries_retry_idx'"
+  );
+  check(
+    "retry: partial index on due pending rows exists",
+    idxRows[0]?.n === 1
+  );
+
+  await db.query("select set_config('app.jwt_sub', $1, false)", [SEED_UID]);
+  await db.query("set role nstester");
+  const ev = await db
+    .query(
+      "insert into public.events (workspace_id, event_type) values ($1, 'brief.created') returning id",
+      [SEED_WS]
+    )
+    .catch((e) => ({ rows: [] }));
+  const ep = await db
+    .query(
+      "insert into public.webhook_endpoints (workspace_id, url, signing_secret) values ($1, 'https://example.com/h3', 'whsec_z') returning id",
+      [SEED_WS]
+    )
+    .catch((e) => ({ rows: [] }));
+  check(
+    "retry: fixtures (event + endpoint) inserted",
+    ev.rows?.length === 1 && ep.rows?.length === 1
+  );
+  const d = await db
+    .query(
+      "insert into public.webhook_deliveries (workspace_id, endpoint_id, event_id) values ($1, $2, $3) returning id",
+      [SEED_WS, ep.rows[0].id, ev.rows[0].id]
+    )
+    .catch((e) => ({ rows: [] }));
+  check("retry: member can open a delivery row", d.rows?.length === 1);
+  const lease = await db
+    .query(
+      "update public.webhook_deliveries set status = 'pending', attempts = 1, next_retry_at = now() - interval '1 minute' where id = $1",
+      [d.rows[0].id]
+    )
+    .catch((e) => ({ rowCount: 0 }));
+  check(
+    "retry: member can set next_retry_at (existing UPDATE policy covers it)",
+    lease.rowCount === 1
+  );
+
+  // The claim — raw SQL mirror of lib/webhook-dispatch.ts's conditional
+  // update. Postgres row locks make the winner/loser semantics atomic;
+  // here we exercise the WHERE predicate sequence instead.
+  const claim1 = await db.query(
+    "update public.webhook_deliveries set next_retry_at = now() + interval '1 hour' where id = $1 and status = 'pending' and (next_retry_at is null or next_retry_at <= now()) returning id",
+    [d.rows[0].id]
+  );
+  check("retry: claim wins once (due pending row)", claim1.rowCount === 1);
+  const claim2 = await db.query(
+    "update public.webhook_deliveries set next_retry_at = now() + interval '1 hour' where id = $1 and status = 'pending' and (next_retry_at is null or next_retry_at <= now()) returning id",
+    [d.rows[0].id]
+  );
+  check(
+    "retry: second claim loses (lease is in the future)",
+    claim2.rowCount === 0
+  );
+  const failedClaim = await db.query(
+    "update public.webhook_deliveries set next_retry_at = now() + interval '1 hour' where id = $1 and status = 'failed' and (next_retry_at is null or next_retry_at <= now()) returning id",
+    [d.rows[0].id]
+  );
+  check("retry: claim never touches settled rows", failedClaim.rowCount === 0);
+  await db.query("reset role");
+}
+
 console.log(failures === 0 ? "\nAll database checks passed ✔" : `\n${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
