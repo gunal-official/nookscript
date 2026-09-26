@@ -1002,6 +1002,32 @@ smoke card `4242 4242 4242 4242`. Full checklist:
 
 ---
 
+## Google SSO (2026-09-26)
+
+"Continue with Google" on **/login and /signup** — the global-product
+auth path for SSO. Supabase Auth owns the OAuth handshake, so the app
+side is thin: one call (`signInWithOAuth({ provider: "google" })`),
+zero new app env vars, and the return lands on the app's own origin
+where the browser client's session detection restores the session
+automatically.
+
+Operator setup (once, in the Supabase dashboard — no app env vars):
+
+1. Authentication → Providers → **Google**: enable + paste the OAuth
+   Client ID/Secret from a Google Cloud OAuth client (Web application).
+2. In that Google OAuth client, add the app's origin
+   (e.g. `https://<your-domain>`) to authorized redirect URIs —
+   Supabase appends `/auth/v1/callback` itself.
+3. SAML / OIDC SSO (Okta, Microsoft Entra, …) needs no app code at all —
+   same dashboard (Authentication → SSO).
+
+If the provider isn't enabled on the project, clicking the button
+shows an inline error instead of failing silently. Full summary:
+`docs/sso-closeout.md`.
+
+
+---
+
 ## Step 34 — ui.webp design system + Next 16 migration
 
 **Closeout**: `docs/step-34-closeout.md` — final Step-34 summary (what
@@ -1098,9 +1124,11 @@ responsive audit passed ✔  (evidence: ~/responsive-evidence/step32-after)
 1. **Port/lifecycle bug (blocking, fixed first)** — see above. Proven by a
    dummy-listener takeover test and two full back-to-back runs with a zero-orphan
    process check after exit.
-2. **Icon system** — `docs/icon-audit.md`: audit of all 114 icon instances,
-   size scale 16/18/20/24 with roles, ONE stroke width (1.5, global `svg.lucide`
-   rule), semantic nav mapping, `aria-hidden` on 109 decorative icons,
+2. **Icon system** — `docs/icon-audit.md`: audit of all icon instances
+   (114 as of Step 33; later items — e.g. the SSO Chrome icon — follow the
+   same rules), size scale 16/18/20/24 with roles, ONE stroke width
+   (1.5, global `svg.lucide` rule), semantic nav mapping, `aria-hidden` on
+   decorative icons,
    `aria-label` on every icon-only control, 44×44 targets.
 3. **Navigation** — one icon-bearing nav model (`components/app-shell/nav-items.ts`):
    mobile <600 = hamburger → slide-in drawer (every item a 44px icon+label row);

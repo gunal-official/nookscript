@@ -6,6 +6,7 @@ import { Suspense, useState } from "react";
 
 import { AuthCard } from "@/components/auth/AuthCard";
 import { ConfigNotice } from "@/components/auth/ConfigNotice";
+import { GoogleSignInButton, OAuthDivider } from "@/components/auth/GoogleSignInButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
@@ -81,6 +82,13 @@ function LoginForm() {
       }
     >
       {!configured && <ConfigNotice />}
+
+      <div className="mb-6">
+        <GoogleSignInButton next={next} />
+        <div className="mt-4">
+          <OAuthDivider />
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">

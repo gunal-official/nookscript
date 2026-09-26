@@ -8,6 +8,7 @@ import { createWorkspaceAction } from "@/app/(auth)/actions";
 import { acceptTeamInviteAction } from "@/app/invite/actions";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { ConfigNotice } from "@/components/auth/ConfigNotice";
+import { GoogleSignInButton, OAuthDivider } from "@/components/auth/GoogleSignInButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -138,6 +139,16 @@ function SignupForm() {
       }
     >
       {!configured && <ConfigNotice />}
+
+      <div className="mb-6">
+        {/* Returns to "/" on purpose: after a fresh Google sign-in the
+            middleware routes by workspace state (/onboarding or
+            /intake). Invitees keep their token in the invite link. */}
+        <GoogleSignInButton />
+        <div className="mt-4">
+          <OAuthDivider />
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
