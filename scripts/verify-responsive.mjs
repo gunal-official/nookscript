@@ -780,9 +780,10 @@ async function main() {
   }
 
   // ── interaction-state probes (RUN_INTERACT=1): drive the timer pill, its
-  // stop form, a select popover, the inline destructive confirm, and — when
-  // billing env is set — the Pro upgrade flow (currency switch + upgrade
-  // click → actionable Stripe toast) at 320+768.
+  // stop form, a select popover, the inline destructive confirm, the
+  // checkout-return toasts, and — when billing env is set — the Pro
+  // upgrade flow (currency switch + upgrade click → actionable Stripe
+  // toast) at 320+768.
   if (process.env.RUN_INTERACT === "1") {
     for (const w of [320, 768]) {
       const vh2 = w === 320 ? 568 : 1024;
@@ -917,6 +918,32 @@ async function main() {
             x = await extra();
             ok = /Stripe/i.test(toastText) && stayed && m.overflowX === 0 && m.small.length === 0;
             await record("billing-upgrade", ok, m);
+          }
+        }
+
+        // F) checkout return flow: landing back from hosted Stripe Checkout
+        // with ?checkout=success|canceled lands exactly one toast, strips
+        // the param, and a refresh must NOT re-toast (fires once).
+        for (const [param, expected] of [
+          ["success", "Back from Stripe Checkout"],
+          ["canceled", "Checkout canceled"],
+        ]) {
+          await page.goto(`${BASE}/settings?checkout=${param}`, { waitUntil: "load", timeout: 20000 });
+          const toast = page.locator('[role="status"]').first();
+          await toast.waitFor({ state: "visible", timeout: 10000 });
+          const toastText = (await toast.textContent()) ?? "";
+          await page.waitForTimeout(200);
+          const stripped = new URL(page.url()).search === "";
+          m = await page.evaluate(METRICS_FN);
+          x = await extra();
+          ok = toastText.includes(expected) && stripped && m.overflowX === 0 && m.small.length === 0;
+          await record(`checkout-return-${param}`, ok, m);
+          await page.reload({ waitUntil: "load", timeout: 20000 });
+          await page.waitForTimeout(600);
+          const reToasted = await page.locator('[role="status"]').count();
+          if (reToasted > 0) {
+            failures++;
+            say(`✗ ${String(w).padStart(4)} checkout-return-${param}  re-toasted on refresh`);
           }
         }
       } catch (e) {
