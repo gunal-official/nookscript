@@ -89,6 +89,61 @@ export async function registerWebhookEndpoint(input: {
  * pipeline runs; it is NOT an event row and writes no
  * webhook_deliveries entry (delivery rows require a real event).
  */
+/**
+ * Rotate an endpoint's signing secret (suggestions pass 3/10). Owner-only.
+ * The endpoints table has NO update policy on purpose — rotation is
+ * delete + re-register with the SAME URL and a fresh app-generated
+ * secret. Honest consequence (same as manual delete + register): the
+ * endpoint's id changes, so its webhook_deliveries rows cascade away
+ * and the card's delivery log restarts. The receiver must be updated
+ * with the new secret or every later delivery fails signature checks.
+ */
+export async function rotateWebhookEndpoint(input: {
+  endpointId: string;
+}): Promise<WebhookActionResult> {
+  if (!isUuid(input.endpointId)) return { error: "Unknown webhook." };
+
+  const { supabase, membership } = await getMembership();
+  if (!membership) {
+    return { error: "Your session has expired. Please log in again." };
+  }
+  if (membership.role !== "owner") return { error: NOT_OWNER };
+
+  const { data: endpoint, error } = await supabase
+    .from("webhook_endpoints")
+    .select("id, url")
+    .eq("id", input.endpointId)
+    .maybeSingle();
+  if (error || !endpoint) return { error: "Unknown webhook." };
+
+  const { error: deleteError } = await supabase
+    .from("webhook_endpoints")
+    .delete()
+    .eq("id", input.endpointId);
+  if (deleteError) return { error: deleteError.message };
+
+  const signingSecret = `whsec_${randomBytes(24).toString("base64url")}`;
+  const { error: insertError } = await supabase
+    .from("webhook_endpoints")
+    .insert({
+      workspace_id: membership.workspace_id,
+      url: endpoint.url,
+      signing_secret: signingSecret,
+    });
+  if (insertError) {
+    if (insertError.code === "23505") {
+      return {
+        error:
+          "Rotation failed — another endpoint now owns that URL. Re-register it manually.",
+      };
+    }
+    return { error: insertError.message };
+  }
+
+  revalidatePath("/settings");
+  return { secret: signingSecret };
+}
+
 export async function testWebhookEndpoint(input: {
   endpointId: string;
 }): Promise<WebhookActionResult> {

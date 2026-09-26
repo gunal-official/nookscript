@@ -13,6 +13,7 @@ import {
   Clock3,
   Copy,
   Loader2,
+  RefreshCw,
   Send,
   Trash2,
   Webhook,
@@ -22,6 +23,7 @@ import {
 import {
   deleteWebhookEndpoint,
   registerWebhookEndpoint,
+  rotateWebhookEndpoint,
   testWebhookEndpoint,
 } from "@/app/(app)/settings/webhook-actions";
 import { Button } from "@/components/ui/button";
@@ -77,6 +79,21 @@ export function WebhooksCard({
       }
       setUrl("");
       toast("Webhook registered — copy the signing secret.");
+    });
+  };
+
+  const rotate = (endpoint: WebhookEndpoint) => {
+    startTransition(async () => {
+      const result = await rotateWebhookEndpoint({
+        endpointId: endpoint.id,
+      });
+      if (result?.error) {
+        toast(result.error);
+        return;
+      }
+      toast(
+        "Secret rotated — copy it, update your receiver. This endpoint's delivery history restarted."
+      );
     });
   };
 
@@ -146,6 +163,19 @@ export function WebhooksCard({
                   <p className="min-w-0 flex-1 break-all text-sm font-medium">
                     {endpoint.url}
                   </p>
+                  {isOwner && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-11 w-11 shrink-0"
+                      aria-label="Rotate signing secret"
+                      disabled={pending}
+                      onClick={() => rotate(endpoint)}
+                    >
+                      <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  )}
                   {isOwner && (
                     <Button
                       type="button"
