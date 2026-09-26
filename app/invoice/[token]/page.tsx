@@ -17,9 +17,12 @@
  *      of link they have (by design).
  *   3. /invoice/not-a-uuid never reaches the database (shape check
  *      first).
- *   4. "Print" → the browser print dialog (the v1 export story — no
- *      markdown/PDF endpoint recorded-cut). Print output = the paper
- *      only (chrome + footer are print:hidden).
+ *   4. "Print" → the browser print dialog. Print output = the paper only
+ *      (chrome + footer are print:hidden).
+ *   5. "Download PDF" → GET /api/pdf/shared/invoice/<token> streams the
+ *      same invoice as a real PDF file (same totals, letterhead and
+ *      notes); a revoked or draft link 404s there exactly as it does
+ *      here.
  *
  * Security notes: data comes ONLY from the get_shared_invoice SECURITY
  * DEFINER RPC (invoice_links itself is fully member-gated); invalid vs
@@ -32,6 +35,7 @@ import { Link2Off } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
 import { PrintButton } from "@/components/invoices/PrintButton";
+import { DownloadPdfButton } from "@/components/ui/DownloadPdfButton";
 import { PaperCard } from "@/components/ui/doc-detail";
 import { getSharedInvoiceByToken } from "@/lib/data/invoices";
 import {
@@ -42,14 +46,22 @@ import {
 } from "@/lib/utils";
 import { invoiceTotals } from "@/lib/invoice-totals";
 
-function Brand() {
+function Brand({ token }: { token?: string }) {
   return (
-    <div className="mb-6 flex items-center justify-between print:hidden">
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 print:hidden">
       <span className="font-display text-lg font-bold tracking-tight">
         nook<span className="text-accent">script</span>
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline">Shared invoice — read only</Badge>
+        {/* Only offered once the token resolved: the unavailable state must
+            not hand a visitor a download link that 404s. */}
+        {token && (
+          <DownloadPdfButton
+            href={`/api/pdf/shared/invoice/${token}`}
+            label="Download PDF"
+          />
+        )}
         <PrintButton />
       </div>
     </div>
@@ -110,7 +122,7 @@ export default async function PublicInvoicePage({
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col [justify-content:safe_center] px-6 py-16">
-      <Brand />
+      <Brand token={token} />
 
       <PaperCard
         letterLabel="Invoice"

@@ -1,4 +1,4 @@
-# Step 14 — CI. Runs the five offline gates on every push/PR.
+# Step 14 — CI. Runs the six offline gates on every push/PR.
 # INTENTIONALLY EXCLUDES `npm run verify:live`: that probe needs real
 # production Supabase credentials and must stay a manual pre-deploy step —
 # no production secrets belong in this project's CI.
@@ -40,3 +40,9 @@ jobs:
       # no network, no secrets required. Safe on a fresh clone.
       - name: DB gate (offline)
         run: npm run verify:db
+
+      # Offline gate: builds the generated PDFs (including hostile inputs)
+      # and reads every one back — structure, margins, page furniture,
+      # content. No env, no network, no browser.
+      - name: PDF gate (offline)
+        run: npm run verify:pdf

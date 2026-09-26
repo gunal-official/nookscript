@@ -6,7 +6,9 @@
  *
  * SCOPE: applied ONLY to unauthenticated routes that hit Postgres on
  * every request — /share/* (Step 14), /invite/* (Step 15's public
- * token-probe page), and /invoice/* (Step 17's public invoice forms).
+ * token-probe page), /invoice/* (Step 17's public invoice forms) and
+ * /api/pdf/shared/* (the public PDF download, which additionally burns
+ * CPU building a document).
  * Login/signup are intentionally NOT covered — those
  * are client-component flows whose traffic goes straight to Supabase's
  * hosted auth API, never touching this server, so their abuse protection
@@ -36,7 +38,16 @@ const SWEEP_THRESHOLD = 5_000; // Map size that triggers an idle-key sweep
  *  "/invoices" (startsWith collision). The public form is always
  *  /invoice/<token>, so the slashed prefix is exactly the public
  *  surface — nothing else. */
-export const RATE_LIMITED_PREFIXES = ["/share", "/invite", "/invoice/"] as const;
+export const RATE_LIMITED_PREFIXES = [
+  "/share",
+  "/invite",
+  "/invoice/",
+  // PDF export: the PUBLIC token-gated download only. Member downloads
+  // (/api/pdf/<kind>/<id>) need a session and are out of scope, exactly
+  // like the rest of (app) — the prefix below cannot match them because
+  // "shared" is not one of the member kinds.
+  "/api/pdf/shared",
+] as const;
 
 const hits = new Map<string, number[]>();
 

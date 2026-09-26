@@ -43,6 +43,8 @@ import { InvoiceComposer } from "@/components/invoices/InvoiceComposer";
 import { InvoiceLinkPanel } from "@/components/invoices/InvoiceLinkPanel";
 import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
 import { InvoiceStatusSelect } from "@/components/invoices/InvoiceStatusSelect";
+import { PrintButton } from "@/components/invoices/PrintButton";
+import { DownloadPdfButton } from "@/components/ui/DownloadPdfButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -219,6 +221,12 @@ export default async function InvoiceDetailPage({
         title={invoice.title}
         badges={<InvoiceStatusBadge status={invoice.status} />}
         subtitle={`${invoiceNumberLabel(invoice.invoice_number)} · ${invoice.client_name}`}
+        actions={
+          <>
+            <DownloadPdfButton href={`/api/pdf/invoice/${invoice.id}`} />
+            <PrintButton />
+          </>
+        }
       />
 
       {/* Stat tiles */}
