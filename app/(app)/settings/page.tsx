@@ -45,6 +45,7 @@
  *      children cascade, active pointers cleared).
  */
 
+import { CheckoutNotice } from "@/components/settings/CheckoutNotice";
 import { PlanCard } from "@/components/settings/PlanCard";
 import { WebhooksCard } from "@/components/settings/WebhooksCard";
 import { TeamCard } from "@/components/settings/TeamCard";
@@ -139,6 +140,8 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      {/* One-time toast when returning from Stripe Checkout (?checkout=) */}
+      <CheckoutNotice />
       <DocHeader
         icon={SettingsIcon}
         title="Settings"
