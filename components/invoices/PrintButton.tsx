@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * Print affordance for the public invoice form (Step 17). Browser print
- * is the v1 export story (no markdown/PDF endpoint — recorded cut).
+ * Print affordance for the document surfaces (Step 17). Browser print is
+ * the "give me paper right now" path; the real file export sits next to it
+ * as DownloadPdfButton (/api/pdf/… — PDF export, 2026-09-27).
  *
  * A client island ON PURPOSE: the public page is a Server Component
  * (it calls the server-only data layer), so the onClick handler must

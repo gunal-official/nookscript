@@ -427,7 +427,8 @@ button).
    `/invoice/<token>` URL → open it in an INCOGNITO window (seed
    demo: `http://localhost:3000/invoice/00000000-0000-0000-0000-000000000070`):
    a clean read-only form (number, billed to, line items, totals, due
-   date, notes, from-line) with a Print button — the v1 export story.
+   date, notes, from-line) with **Download PDF** (a real file from
+   `/api/pdf/shared/invoice/<token>`) and Print next to it.
 6. **What never renders** — the DRAFT invoice's seeded link (token
    `…0069`), a revoked link, a voided invoice, and a garbage URL all
    show the SAME generic "unavailable" state — a visitor cannot tell
@@ -515,9 +516,9 @@ no delete anywhere and no money fields (the invoices hold the value).
    never overwritten on re-send); Signed stamps `signed_at`; Signed →
    Draft/Sent CLEARS `signed_at`; Void keeps every stamp. The row is
    never destroyed.
-5. **Print** — the detail page has a Print button (reused client
-   island); browser print is the v1 export story (no PDF endpoint,
-   no e-sign).
+5. **Export** — the detail page has **PDF** (generated file from
+   `/api/pdf/contract/<id>`, with a printed signature block) and Print
+   (browser print of the letter). E-signature remains a recorded cut.
 6. **Bogus / foreign ids** render the "not found" state (RLS hides
    them identically).
 7. **DB-level proof** — `npm run verify:db` (120 checks / 15
@@ -1055,6 +1056,52 @@ Env (all optional — see `.env.local.example`): `GOOGLE_CLIENT_ID` /
 `AZURE_TENANT_ID`, `EMAIL_TOKEN_ENCRYPTION_KEY`. Operator setup (Google
 Cloud + Azure app registration, redirect URIs, scopes) and the v1
 limits: `docs/email-intake-closeout.md`.
+
+
+---
+
+## PDF export (2026-09-27)
+
+**Invoices, contracts and proposals download as real PDF files** — not a
+browser print dialog. `/invoices/:id`, `/contracts/:id` and
+`/proposals/:id` carry a **PDF** button next to Print, and the public
+invoice page `/invoice/<token>` offers **Download PDF** to the client
+(same token, same visibility rules — a revoked or draft link 404s).
+
+- **Routes** — `GET /api/pdf/<invoice|contract|proposal>/<id>` (session,
+  RLS-scoped; invoices additionally require `canSeeMoney`, so viewers
+  can't export money) and `GET /api/pdf/shared/invoice/<token>` (public,
+  token-gated, rate-limited with the other public surfaces). Add
+  `?size=letter` for US Letter; the default is A4.
+- **Zero new dependencies.** `lib/pdf/` is a small PDF 1.7 writer: page
+  tree + content streams + an xref table (`writer.ts`), Adobe base-14
+  font metrics for measurement (`metrics.ts` + the generated
+  `metrics-data.ts`), a UTF-8 → WinAnsi encoder (`encoding.ts`), a
+  top-down flow layout with page breaks and repeated letterheads
+  (`layout.ts`), and the three documents (`documents.ts`). The house
+  no-runtime-deps rule, same as Stripe and the mailbox sync.
+- **Parity with the screen** — the same `lib/invoice-totals.ts` math, the
+  same statuses and stamps, the ui.webp look (letterhead, accent rule,
+  status strip, zebra line items, accent total). Money and dates are
+  formatted without `Intl`, so a server's locale can't shift a document
+  a client keeps.
+- **Gate** — `npm run verify:pdf` builds ten documents (including
+  hostile ones: 400-character titles, 60 line items, unbreakable URLs,
+  CJK/emoji, PDF-operator injection strings) and reads every byte back:
+  xref offsets, `/Length`, page count, "no text outside the margins",
+  page furniture, forbidden strings, determinism. It is offline (no env,
+  no network, no browser) and runs in CI with the other five gates.
+  Samples land in `~/pdf-evidence` (override with `PDF_SHOTS_DIR=…`).
+
+```bash
+npm run verify:pdf     # 10 documents, 16 pages → "pdf audit passed ✔"
+```
+
+Limitations (v1, deliberate): base-14 fonts only, so scripts outside
+Latin-1 transliterate (₹ → "Rs.") or render as "?" — an embedded font is
+the fix when a customer needs one; no images/logo; no shared-update or
+plan/report PDFs yet; streams are uncompressed (documents are a few KB).
+Full summary: `docs/pdf-export-closeout.md`.
 
 
 ---

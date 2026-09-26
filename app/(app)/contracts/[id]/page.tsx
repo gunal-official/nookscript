@@ -4,11 +4,14 @@
  * signature block, a signing-flow rail (Draft → Sent → Signed with audit
  * stamps), an activity timeline, and the composer below for editors.
  *
- * Printing: the on-screen UI is the editor + letter preview; the PRINTABLE
- * document is PrintContractDocument (hidden print:block) — with the (app)
+ * Exporting: "PDF" downloads a generated document from
+ * /api/pdf/contract/<id> (lib/pdf — real file, page numbers, signature
+ * block). Printing stays as it was: the on-screen UI is the editor +
+ * letter preview; the PRINTABLE document is PrintContractDocument (hidden
+ * print:block) — with the (app)
  * chrome (topbar + sidebar) also print:hidden, browser print of this page
- * yields a clean contract. That is the v1 export story (D4: no public
- * surface, no PDF endpoint, no e-sign).
+ * yields a clean contract. Standing v1 cuts (D4): no public contract
+ * surface, and no e-signature — the PDF prints signature lines instead.
  *
  * HOW TO TEST (locally — ⚠ contracts migration + seed applied first):
  *   1. From /contracts open the seeded signed contract. Details show
@@ -49,6 +52,7 @@ import {
 import { ContractStatusSelect } from "@/components/contracts/ContractStatusSelect";
 import { PrintContractDocument } from "@/components/contracts/PrintContractDocument";
 import { PrintButton } from "@/components/invoices/PrintButton";
+import { DownloadPdfButton } from "@/components/ui/DownloadPdfButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -277,7 +281,12 @@ export default async function ContractDetailPage({
             </>
           }
           subtitle={`${contract.client_name}${briefTitle ? ` — ${briefTitle}` : ""}`}
-          actions={<PrintButton />}
+          actions={
+            <>
+              <DownloadPdfButton href={`/api/pdf/contract/${contract.id}`} />
+              <PrintButton />
+            </>
+          }
         />
 
         {/* Stat tiles */}
@@ -451,7 +460,8 @@ export default async function ContractDetailPage({
                 {formatDate(contract.created_at)}
               </MetaRow>
               <MetaRow label="Updated">{timeAgo(contract.updated_at)}</MetaRow>
-              <div className="border-t border-border pt-3.5">
+              <div className="flex flex-wrap gap-2 border-t border-border pt-3.5">
+                <DownloadPdfButton href={`/api/pdf/contract/${contract.id}`} />
                 <PrintButton />
               </div>
             </RailCard>

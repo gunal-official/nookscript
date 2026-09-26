@@ -11,8 +11,20 @@ import { clientKey, RATE_LIMITED_PREFIXES } from "../../lib/rate-limit.ts";
 
 describe("RATE_LIMITED_PREFIXES", () => {
   test("exact public surface, /invoice/ slashed on purpose", () => {
-    assert.deepEqual([...RATE_LIMITED_PREFIXES], ["/share", "/invite", "/invoice/"]);
+    assert.deepEqual(
+      [...RATE_LIMITED_PREFIXES],
+      ["/share", "/invite", "/invoice/", "/api/pdf/shared"]
+    );
     assert.ok(!RATE_LIMITED_PREFIXES.includes("/invoices" as never), "never the authed app list");
+  });
+
+  test("the PDF prefix covers the public download only", () => {
+    const matches = (path: string) =>
+      RATE_LIMITED_PREFIXES.some((prefix) => path.startsWith(prefix));
+    assert.ok(matches("/api/pdf/shared/invoice/00000000-0000-0000-0000-000000000070"));
+    // Member downloads carry a session and are out of scope, like all of (app).
+    assert.ok(!matches("/api/pdf/invoice/00000000-0000-0000-0000-000000000070"));
+    assert.ok(!matches("/api/pdf/contract/x"));
   });
 });
 

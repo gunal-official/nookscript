@@ -37,6 +37,7 @@ import { formatDate, isUuid, timeAgo } from "@/lib/utils";
 import { GeneratePlanButton } from "@/components/proposals/GeneratePlanButton";
 import { CanEdit } from "@/components/app-shell/CanEdit";
 import { ProposalStatusBadge } from "@/components/proposals/ProposalStatusBadge";
+import { DownloadPdfButton } from "@/components/ui/DownloadPdfButton";
 import { ProposalStatusSelect } from "@/components/proposals/ProposalStatusSelect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -176,6 +177,7 @@ export default async function ProposalDetailPage({
         title={proposal.title}
         badges={<ProposalStatusBadge status={proposal.status} />}
         subtitle={proposal.client_name ?? undefined}
+        actions={<DownloadPdfButton href={`/api/pdf/proposal/${proposal.id}`} />}
       />
 
       {/* Stat tiles */}
