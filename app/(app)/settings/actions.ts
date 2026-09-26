@@ -18,6 +18,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
+import { recordEvent } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
 import { createBillingPortalSession, createCheckoutSession } from "@/lib/stripe";
 
@@ -114,13 +115,26 @@ export async function createTemplate(input: {
   }
   if (membership.role !== "owner") return { error: NOT_OWNER };
 
-  const { error } = await supabase.from("templates").insert({
-    workspace_id: membership.workspace_id,
-    title: input.title.trim(),
-    body: input.body ?? "",
-  });
+  const { data: created, error } = await supabase
+    .from("templates")
+    .insert({
+      workspace_id: membership.workspace_id,
+      title: input.title.trim(),
+      body: input.body ?? "",
+    })
+    .select("id, title")
+    .single();
 
   if (error) return { error: error.message };
+  if (!created) return { error: "Could not create the template." };
+
+  // The template-created event (suggestions pass 9/10) — recordEvent
+  // never throws; a missed row never blocks template creation.
+  await recordEvent(supabase, {
+    workspace_id: membership.workspace_id,
+    event_type: "template.created",
+    payload: { template_id: created.id, title: created.title },
+  });
 
   revalidatePath("/settings");
   return { error: undefined };

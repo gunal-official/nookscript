@@ -2164,6 +2164,17 @@ await db.query("reset role");
     .then(() => ({ ok: true }))
     .catch(() => ({ ok: false }));
   check("events.event_type CHECK rejects unknown types", badType.ok === false);
+  const newTypes = await db
+    .query(
+      "insert into public.events (workspace_id, event_type, payload) values ($1, 'team.member.joined', $2::jsonb), ($1, 'template.created', $2::jsonb)",
+      [SEED_WS, JSON.stringify({ user_id: SEED_UID, template_id: "t1" })]
+    )
+    .then(() => ({ ok: true }))
+    .catch(() => ({ ok: false }));
+  check(
+    "events: team/template types accepted (suggestions pass 9/10)",
+    newTypes.ok === true
+  );
   const { rows: evMut } = await db.query(
     "select count(*)::int as n from pg_policies where tablename = 'events' and cmd in ('UPDATE', 'DELETE')"
   );

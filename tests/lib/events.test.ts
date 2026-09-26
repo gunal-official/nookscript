@@ -14,7 +14,7 @@ import {
 } from "../../lib/events.ts";
 
 describe("EVENT_TYPES (the recorded transitions)", () => {
-  test("exactly the six scoped transitions, in scope order", () => {
+  test("exactly the ten recorded transitions, in scope order", () => {
     assert.deepEqual([...EVENT_TYPES], [
       "brief.created",
       "proposal.accepted",
@@ -22,6 +22,10 @@ describe("EVENT_TYPES (the recorded transitions)", () => {
       "plan.task_completed",
       "invoice.paid",
       "contract.signed",
+      "team.member.joined",
+      "team.member.left",
+      "team.member.removed",
+      "template.created",
     ]);
   });
 

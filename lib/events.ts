@@ -10,8 +10,9 @@ import { dispatchWebhooks } from "./webhook-dispatch.ts";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-/** The six recorded transitions (kept in lockstep with the events table's
- *  event_type CHECK constraint — see supabase/migrations/20260926080000). */
+/** The ten recorded transitions (kept in lockstep with the events table's
+ *  event_type CHECK constraint — supabase/migrations/20260926080000 +
+ *  20260926120000). */
 export const EVENT_TYPES = [
   "brief.created",
   "proposal.accepted",
@@ -19,6 +20,10 @@ export const EVENT_TYPES = [
   "plan.task_completed",
   "invoice.paid",
   "contract.signed",
+  "team.member.joined",
+  "team.member.left",
+  "team.member.removed",
+  "template.created",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

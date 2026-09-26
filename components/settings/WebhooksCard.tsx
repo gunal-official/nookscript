@@ -143,8 +143,8 @@ export function WebhooksCard({
         </div>
         <CardDescription>
           Outbound events — NookScript POSTs workspace events (briefs,
-          proposals, plans, invoices, contracts) to your URL, signed with an
-          HMAC secret. 3 attempts, 15s / 60s apart.
+          proposals, plans, invoices, contracts, team, templates) to your
+          URL, signed with an HMAC secret. 3 attempts, 15s / 60s apart.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 p-5">

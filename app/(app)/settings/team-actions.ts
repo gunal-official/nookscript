@@ -20,6 +20,7 @@ import { headers } from "next/headers";
 import { clearActiveWorkspaceIfPointingAt } from "@/lib/active-pointer";
 import { sendInviteEmail } from "@/lib/invite-email";
 import { getWorkspaceContext } from "@/lib/data/workspace-context";
+import { recordEvent } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/utils";
 
@@ -340,6 +341,13 @@ export async function removeMemberAction(input: {
     membership.workspace_id
   );
 
+  // The removed event (suggestions pass 9/10) — recordEvent never throws.
+  await recordEvent(supabase, {
+    workspace_id: membership.workspace_id,
+    event_type: "team.member.removed",
+    payload: { user_id: input.userId },
+  });
+
   revalidatePath("/settings");
   return { error: undefined };
 }
@@ -386,6 +394,13 @@ export async function leaveWorkspaceAction(): Promise<TeamActionResult> {
     user.id,
     membership.workspace_id
   );
+
+  // The left event (suggestions pass 9/10) — recordEvent never throws.
+  await recordEvent(supabase, {
+    workspace_id: membership.workspace_id,
+    event_type: "team.member.left",
+    payload: { user_id: user.id },
+  });
 
   // The whole shell changes (switcher, every page's scoping) — and with
   // no membership left the (app) layout redirects to /onboarding.

@@ -12,6 +12,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { recordEvent } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/utils";
 
@@ -26,9 +27,13 @@ export async function acceptTeamInviteAction(input: {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("accept_team_invite", {
-    p_token: token,
-  });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: workspaceId, error } = await supabase.rpc(
+    "accept_team_invite",
+    { p_token: token }
+  );
 
   if (error) {
     if (error.message.includes("invite_email_mismatch")) {
@@ -44,6 +49,17 @@ export async function acceptTeamInviteAction(input: {
       };
     }
     return { error: error.message };
+  }
+
+  // The joined event (suggestions pass 9/10). The RPC returns the joined
+  // workspace id — no guesswork for multi-workspace users. recordEvent
+  // never throws; a missed row never blocks the join.
+  if (user && typeof workspaceId === "string") {
+    await recordEvent(supabase, {
+      workspace_id: workspaceId,
+      event_type: "team.member.joined",
+      payload: { user_id: user.id },
+    });
   }
 
   revalidatePath("/", "layout"); // membership changed → app shell re-reads it
